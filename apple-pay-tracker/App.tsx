@@ -11,9 +11,16 @@ import type { Session } from "@supabase/supabase-js";
 import { supabase } from "./lib/supabase";
 import AuthScreen from "./screens/AuthScreen";
 import PaymentsScreen from "./screens/PaymentsScreen";
+import SettingsScreen from "./screens/SettingsScreen";
 import StatsScreen from "./screens/StatsScreen";
 
-type Tab = "payments" | "stats";
+type Tab = "payments" | "stats" | "settings";
+
+const TAB_TITLES: Record<Tab, string> = {
+  stats: "Statistiche",
+  payments: "Pagamenti",
+  settings: "Impostazioni",
+};
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
@@ -46,37 +53,32 @@ export default function App() {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>
-          {tab === "stats" ? "Statistiche" : "Pagamenti"}
-        </Text>
+        <Text style={styles.headerTitle}>{TAB_TITLES[tab]}</Text>
         <TouchableOpacity onPress={() => supabase.auth.signOut()}>
           <Text style={styles.logout}>Esci</Text>
         </TouchableOpacity>
       </View>
 
       <View style={styles.content}>
-        {tab === "stats" ? <StatsScreen /> : <PaymentsScreen />}
+        {tab === "stats" && <StatsScreen />}
+        {tab === "payments" && <PaymentsScreen />}
+        {tab === "settings" && <SettingsScreen />}
       </View>
 
       <View style={styles.tabBar}>
-        <TouchableOpacity
-          style={styles.tabButton}
-          onPress={() => setTab("stats")}
-        >
-          <Text style={[styles.tabLabel, tab === "stats" && styles.tabLabelActive]}>
-            Statistiche
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.tabButton}
-          onPress={() => setTab("payments")}
-        >
-          <Text
-            style={[styles.tabLabel, tab === "payments" && styles.tabLabelActive]}
+        {(Object.keys(TAB_TITLES) as Tab[]).map((key) => (
+          <TouchableOpacity
+            key={key}
+            style={styles.tabButton}
+            onPress={() => setTab(key)}
           >
-            Pagamenti
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[styles.tabLabel, tab === key && styles.tabLabelActive]}
+            >
+              {TAB_TITLES[key]}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
       <StatusBar style="auto" />
     </SafeAreaView>

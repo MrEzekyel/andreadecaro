@@ -3,6 +3,9 @@
 App mobile (Expo / React Native) che registra automaticamente i pagamenti
 Apple Pay e li categorizza in base all'esercente.
 
+> ⚠️ Questo repository è **pubblico**. Non committare mai il file `.env`, la
+> `service_role` key o i token di ingestione. `.env` è già in `.gitignore`.
+
 ## Come funziona
 
 Apple non espone un'API pubblica per leggere le transazioni Apple Pay/Wallet,
@@ -13,127 +16,177 @@ Notifica Wallet (banca) sul telefono
         │  attiva
         ▼
 Automazione Shortcuts (estrae importo + esercente dalla notifica)
-        │  POST JSON + secret
+        │  POST JSON + header x-ingest-token
         ▼
 Supabase Edge Function "ingest-payment"
-        │  categorizza (regole utente > regole predefinite) e salva
+        │  risolve l'utente dal token, categorizza, deduplica, salva
         ▼
 Tabella payments (Postgres, RLS per utente)
         │  letta in realtime
         ▼
-App Apple Pay Tracker (questa app) → lista pagamenti + statistiche
+App Apple Pay Tracker → lista pagamenti + statistiche
 ```
 
-## 1. Crea il tuo progetto Supabase personale
+L'autenticazione della Shortcut usa un **token per utente**: la function ne
+calcola l'hash SHA-256 e lo cerca in `ingest_tokens` per risalire all'utente.
+In tabella non finisce mai il token in chiaro, e non c'è nessun segreto da
+configurare a mano nella function.
 
-1. Vai su [supabase.com](https://supabase.com) e crea un nuovo progetto (piano Free).
-2. In **Project Settings → API** copia:
-   - `Project URL`
-   - `anon public` key
-   - `service_role` key (segreta, non finisce mai nell'app)
-3. Applica lo schema: apri **SQL Editor** e incolla il contenuto di
-   `supabase/migrations/0001_init.sql`, poi esegui.
-   In alternativa, con la CLI:
-   ```bash
-   npm install -g supabase
-   supabase login
-   cd apple-pay-tracker
-   supabase link --project-ref <il-tuo-project-ref>
-   supabase db push
-   ```
-4. Nell'app, registra il tuo account (vedi punto 3) così da avere un utente in
-   **Authentication → Users**. Copia il suo `UID`: ti servirà per la Edge Function.
+## Stato del backend
 
-## 2. Deploy della Edge Function
+Lo schema e la Edge Function sono **già deployati** sul progetto Supabase
+personale. Le migration in `supabase/migrations/` sono l'esatta copia di ciò
+che è stato applicato, e servono per ricreare l'ambiente da zero.
 
-```bash
-cd apple-pay-tracker
-supabase functions deploy ingest-payment
+Tabelle:
 
-# Segreti della function (sostituisci con i tuoi valori)
-supabase secrets set INGEST_SECRET="una-stringa-lunga-a-caso"
-supabase secrets set TARGET_USER_ID="uuid-del-tuo-utente-auth"
-```
+| tabella | contenuto |
+| --- | --- |
+| `payments` | i pagamenti registrati |
+| `default_merchant_categories` | ~96 regole keyword→categoria predefinite |
+| `merchant_categories` | regole personali dell'utente (hanno priorità) |
+| `ingest_tokens` | token delle Shortcut (solo hash SHA-256) |
 
-L'URL della function sarà:
-`https://<project-ref>.supabase.co/functions/v1/ingest-payment`
+Tutte con RLS attiva e policy limitate a `auth.uid()`.
 
-Test rapido:
-```bash
-curl -X POST "https://<project-ref>.supabase.co/functions/v1/ingest-payment" \
-  -H "content-type: application/json" \
-  -H "x-ingest-secret: una-stringa-lunga-a-caso" \
-  -d '{"merchant": "Esselunga", "amount": 23.40}'
-```
-
-## 3. Configura ed esegui l'app
+## Configurazione dell'app
 
 ```bash
 cd apple-pay-tracker
 cp .env.example .env
-# modifica .env con EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY
+# inserisci EXPO_PUBLIC_SUPABASE_URL e EXPO_PUBLIC_SUPABASE_ANON_KEY
+# (Supabase → Project Settings → API)
 npm install
 npx expo start
 ```
 
-Apri l'app con **Expo Go** sul telefono (scan del QR code) oppure `npm run ios`
-se hai un Mac con Xcode. Al primo avvio registrati con email + password: è il
-tuo account personale (nessun altro potrà vedere i tuoi dati grazie alla RLS).
+Apri l'app con **Expo Go** sul telefono (scan del QR code). Al primo avvio
+registrati con email + password: è il tuo account personale, e la RLS fa sì che
+nessun altro possa vedere i tuoi dati.
 
-## 4. Automazione Shortcuts (lato iPhone)
+## Collegare la Shortcut
 
-App **Comandi Rapidi (Shortcuts) → Automazione → Crea automazione personale**:
+### 1. Genera il token
 
-1. Trigger: **App** → seleziona *Wallet* → **Viene ricevuta una notifica**
-2. Azione **Ottieni ultima notifica** → **Testo notifica**
-3. Azioni di testo per estrarre importo ed esercente dal testo della notifica
-   (il formato dipende dalla tua banca — usa "Abbina testo" con un'espressione
-   regolare, es. `€\s?([0-9]+[,.][0-9]{2})` per l'importo). Esempio di notifica
-   tipica: `"Pagamento di 23,40 € - Esselunga"`.
+Nell'app, tab **Impostazioni** → *Genera nuovo token*. Il valore viene mostrato
+**una sola volta**: copialo subito. Nella stessa schermata trovi anche l'URL da
+usare, già pronto da copiare.
+
+### 2. Crea l'automazione
+
+App **Comandi Rapidi → Automazione → Crea automazione personale**:
+
+1. Trigger: **App** → *Wallet* → **Viene ricevuta una notifica**
+2. Azione **Ottieni ultima notifica** → prendi il **testo** della notifica
+3. Estrai importo ed esercente con l'azione **Abbina testo** (espressione
+   regolare). Il formato dipende dalla tua banca — per una notifica tipo
+   `Pagamento di 23,40 € presso Esselunga`:
+   - importo: `([0-9]+[,.][0-9]{2})`
+   - esercente: `presso (.+)$`
 4. Azione **Ottieni contenuto URL**:
-   - URL: `https://<project-ref>.supabase.co/functions/v1/ingest-payment`
-   - Metodo: POST
-   - Intestazioni: `x-ingest-secret` → il tuo `INGEST_SECRET`
-   - Corpo (JSON):
+   - URL: quello copiato dalle Impostazioni dell'app
+   - Metodo: **POST**
+   - Intestazioni: `x-ingest-token` → il token generato al passo 1
+   - Corpo richiesta: **JSON**
      ```json
-     { "merchant": "Esselunga", "amount": 23.40, "raw_text": "Pagamento di 23,40 € - Esselunga" }
+     {
+       "merchant": "<variabile esercente>",
+       "amount": "<variabile importo>",
+       "raw_text": "<testo notifica>"
+     }
      ```
-     (usa le variabili estratte al passo 3 al posto dei valori fissi)
-5. **Importante**: disattiva "Chiedi prima di eseguire" nelle impostazioni
-   dell'automazione, altrimenti dovrai confermare ogni volta manualmente.
+5. Disattiva **"Chiedi prima di eseguire"**, altrimenti dovrai confermare
+   manualmente ogni pagamento.
 
-Le prime volte controlla che l'esercente venga categorizzato correttamente;
-se una categoria manca, aggiungi una riga nella tabella `merchant_categories`
-(via SQL Editor o una futura schermata "Impostazioni" nell'app) con la parola
-chiave del tuo esercente.
+`amount` può essere inviato come stringa: la function gestisce il formato
+italiano (`23,40` e `1.234,56`).
 
-## 5. Pubblicazione su App Store (quando sei pronto)
+### 3. Verifica
 
-Serve un account **Apple Developer Program** (99$/anno, personale) — non è
-qualcosa che si può automatizzare da qui. Una volta ottenuto:
+```bash
+curl -X POST "https://<project-ref>.supabase.co/functions/v1/ingest-payment" \
+  -H "content-type: application/json" \
+  -H "x-ingest-token: <il-tuo-token>" \
+  -d '{"merchant": "Esselunga", "amount": "23,40"}'
+```
+
+Risposta attesa: `201` con il pagamento creato e `"category": "Spesa"`.
+Rilanciando lo stesso comando entro 5 minuti ottieni `{"skipped":"duplicate"}`:
+è la protezione contro il doppio scatto della Shortcut.
+
+## Categorie
+
+Il match è per sottostringa case-insensitive sul nome esercente, con questa
+priorità:
+
+1. `merchant_categories` — le tue regole personali
+2. `default_merchant_categories` — le regole predefinite
+3. fallback: `Da categorizzare`
+
+Per aggiungere una regola personale:
+
+```sql
+insert into merchant_categories (user_id, keyword, category)
+values (auth.uid(), 'nome esercente', 'Categoria');
+```
+
+## Riprodurre il backend da zero
+
+```bash
+npm install -g supabase
+supabase login
+cd apple-pay-tracker
+supabase link --project-ref <project-ref>
+supabase db push
+supabase functions deploy ingest-payment --no-verify-jwt
+```
+
+`--no-verify-jwt` è necessario: la Shortcut non può produrre un JWT Supabase,
+quindi la function implementa la propria autenticazione tramite token.
+
+## Pubblicazione su App Store
+
+Serve un account **Apple Developer Program** (99$/anno, personale). Una volta
+ottenuto:
 
 ```bash
 npm install -g eas-cli
 eas login
 eas build:configure
 eas build --platform ios      # build in cloud, non serve un Mac
-eas submit --platform ios     # invio alla App Store Connect
+eas submit --platform ios
 ```
 
-## Struttura del progetto
+## Struttura
 
 ```
 apple-pay-tracker/
-├── App.tsx                     # entrypoint, gestione sessione + tab
+├── App.tsx                        # entrypoint, sessione + tab bar
 ├── screens/
-│   ├── AuthScreen.tsx           # login / registrazione
-│   ├── PaymentsScreen.tsx       # lista pagamenti (realtime)
-│   └── StatsScreen.tsx          # totale mensile + breakdown per categoria
+│   ├── AuthScreen.tsx              # login / registrazione
+│   ├── PaymentsScreen.tsx          # lista pagamenti (realtime)
+│   ├── StatsScreen.tsx             # totale mensile + breakdown categorie
+│   └── SettingsScreen.tsx          # genera/revoca token, URL webhook
 ├── lib/
-│   ├── supabase.ts              # client Supabase
+│   ├── supabase.ts
 │   └── types.ts
 └── supabase/
-    ├── migrations/0001_init.sql # schema + RLS
+    ├── migrations/
+    │   ├── 0001_init.sql            # tabelle, indici, RLS
+    │   ├── 0002_seed_default_categories.sql
+    │   ├── 0003_ingest_tokens.sql   # token + create_ingest_token()
+    │   └── 0004_revoke_anon_execute_on_create_ingest_token.sql
     ├── config.toml
     └── functions/ingest-payment/index.ts
 ```
+
+## Limiti noti
+
+- L'automazione dipende dal **formato della notifica** della tua banca: se
+  cambia, vanno aggiornate le regex nella Shortcut. Il campo `raw_text` salva
+  il testo originale, utile per correggere il parsing a posteriori.
+- Le notifiche Wallet non contengono l'MCC (codice categoria del commerciante),
+  quindi la categorizzazione si basa sul nome. Per dati più affidabili servirebbe
+  un collegamento Open Banking (Plaid / TrueLayer / Nordigen).
+- L'app non registra i pagamenti fatti quando il telefono è offline: la Shortcut
+  scatta ma la POST fallisce.
