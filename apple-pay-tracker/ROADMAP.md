@@ -98,20 +98,33 @@ checkbox in un unico foglio modale, non due alert in fila.
       andamento nel tempo
 - [ ] Toggle settimana / mese / anno
 
-## Fase 3 — Limiti di spesa
+## Fase 3 — Limiti di spesa ✅ (avvisi in-app)
 
-- [ ] Tabella `spending_limits` (periodo, importo, categoria opzionale,
+> Completata nella parte in-app. Le notifiche push restano da agganciare:
+> i limiti e le soglie sono già lì, serve solo il canale di consegna.
+
+- [x] Tabella `spending_limits` (periodo, importo, categoria opzionale,
       soglia di preavviso in %)
-- [ ] Limite **totale** e limite **per categoria**, settimanale o mensile
-- [ ] Linea di riferimento nei grafici (grigia, semi-trasparente)
-- [ ] Barra di avanzamento "speso / limite" che cambia colore avvicinandosi
-- [ ] Notifica alla soglia di preavviso (es. 80%) e al 100%
+- [x] Limite **totale** e limite **per categoria**, settimanale o mensile
+- [x] Linea di riferimento nel grafico (grigia tratteggiata, semi-trasparente)
+- [x] Barra di avanzamento "speso / limite" che cambia colore avvicinandosi
+- [x] Avviso in-app alla soglia di preavviso e al superamento
+- [ ] **Notifiche push** alla soglia e al 100% *(rimandate)*
 - [ ] Anti-spam: una sola notifica per soglia per periodo (tabella
-      `limit_notifications`)
+      `limit_notifications`) — serve solo con le push
+
+Note di implementazione:
+
+- La settimana comincia **lunedì**, non domenica.
+- I limiti si valutano sempre sul **periodo corrente**: sfogliando un mese
+  passato la Home non li mostra, perché sarebbe un confronto privo di senso.
+- La scala verticale del grafico include il limite, così la sua linea non
+  finisce mai fuori dall'area disegnata anche quando hai speso molto meno.
+- Verde / ambra / rosso sono riservati all'avanzamento sui limiti e non
+  vengono mai riusati come colore di una categoria.
 
 > ⚠️ Le notifiche push richiedono una **development build** — vedi punto 7 di
-> `DA-FARE.md`. Se preferisci rimandare, in Fase 3 mostro gli avvisi solo
-> dentro l'app e le push le agganciamo dopo.
+> `DA-FARE.md`.
 
 ## Fase 4 — Transazioni ricorrenti + Siri
 

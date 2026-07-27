@@ -34,6 +34,18 @@ export type Payment = {
   created_at: string;
 };
 
+export type SpendingLimit = {
+  id: string;
+  user_id: string;
+  period: "weekly" | "monthly";
+  amount: number;
+  /** NULL = limite complessivo su tutte le categorie. */
+  category_id: string | null;
+  warn_at_percent: number;
+  active: boolean;
+  created_at: string;
+};
+
 export type IngestToken = {
   id: string;
   user_id: string;

@@ -14,7 +14,9 @@ import { ThemePreference, useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
 import { IngestToken } from "../lib/types";
+import { useLimits } from "../lib/useLimits";
 import CategoriesScreen from "./CategoriesScreen";
+import LimitsScreen from "./LimitsScreen";
 
 const INGEST_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/ingest-payment`;
 
@@ -27,8 +29,9 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; icon: string }[] =
 export default function SettingsScreen() {
   const { palette, preference, setPreference } = useTheme();
   const { categories } = useData();
+  const { statuses } = useLimits();
 
-  const [page, setPage] = useState<"root" | "categories" | "token">("root");
+  const [page, setPage] = useState<"root" | "categories" | "limits">("root");
   const [tokens, setTokens] = useState<IngestToken[]>([]);
   const [freshToken, setFreshToken] = useState<string | null>(null);
 
@@ -46,6 +49,10 @@ export default function SettingsScreen() {
 
   if (page === "categories") {
     return <CategoriesScreen onBack={() => setPage("root")} />;
+  }
+
+  if (page === "limits") {
+    return <LimitsScreen onBack={() => setPage("root")} />;
   }
 
   const activeTokens = tokens.filter((t) => !t.revoked_at).length;
@@ -147,7 +154,16 @@ export default function SettingsScreen() {
           onPress={() => setPage("categories")}
         />
         <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
-        <SettingRow icon="gauge" label="Limiti di spesa" value="presto" muted />
+        <SettingRow
+          icon="gauge"
+          label="Limiti di spesa"
+          value={
+            statuses.length === 0
+              ? "nessuno"
+              : `${statuses.length} attiv${statuses.length === 1 ? "o" : "i"}`
+          }
+          onPress={() => setPage("limits")}
+        />
         <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
         <SettingRow icon="repeat" label="Spese ricorrenti" value="presto" muted />
         <View style={[styles.divider, { backgroundColor: palette.hairline }]} />

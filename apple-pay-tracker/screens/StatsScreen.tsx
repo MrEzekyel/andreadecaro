@@ -6,13 +6,22 @@ import {
   Text,
   View,
 } from "react-native";
-import Svg, { Circle, Defs, LinearGradient, Path, Stop } from "react-native-svg";
+import Svg, {
+  Circle,
+  Defs,
+  Line,
+  LinearGradient,
+  Path,
+  Stop,
+  Text as SvgText,
+} from "react-native-svg";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, monthName } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { categoryColor, radius, space, type } from "../lib/theme";
 import { Payment } from "../lib/types";
+import { useLimits } from "../lib/useLimits";
 
 const CHART_W = 300;
 const CHART_H = 120;
@@ -42,6 +51,11 @@ export default function StatsScreen() {
 
   const [payments, setPayments] = useState<Payment[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const { monthlyOverall, reload: reloadLimits } = useLimits();
+
+  const limitAmount = monthlyOverall
+    ? Number(monthlyOverall.limit.amount)
+    : null;
 
   const month = useMemo(() => new Date(), []);
 
@@ -89,7 +103,9 @@ export default function StatsScreen() {
 
     const points: { x: number; y: number }[] = [];
     let running = 0;
-    const max = total > 0 ? total : 1;
+    // La scala deve contenere anche il limite, altrimenti la sua linea
+    // finirebbe fuori dall'area disegnata.
+    const max = Math.max(total, limitAmount ?? 0) || 1;
 
     for (let day = 1; day <= lastDay; day++) {
       running += perDay[day];
@@ -99,7 +115,7 @@ export default function StatsScreen() {
       });
     }
     return points;
-  }, [payments, total, month]);
+  }, [payments, total, month, limitAmount]);
 
   const byCategory = useMemo(() => {
     const map = new Map<string | null, number>();
@@ -116,9 +132,15 @@ export default function StatsScreen() {
 
   async function onRefresh() {
     setRefreshing(true);
-    await load();
+    await Promise.all([load(), reloadLimits()]);
     setRefreshing(false);
   }
+
+  const chartMax = Math.max(total, limitAmount ?? 0) || 1;
+  const limitY =
+    limitAmount !== null
+      ? CHART_H - (limitAmount / chartMax) * (CHART_H - 12)
+      : null;
 
   const line = smoothPath(cumulative);
   const area =
@@ -165,6 +187,30 @@ export default function StatsScreen() {
                   <Stop offset="100%" stopColor={palette.accent} stopOpacity="0" />
                 </LinearGradient>
               </Defs>
+
+              {limitY !== null && (
+                <>
+                  <Line
+                    x1={0}
+                    y1={limitY}
+                    x2={CHART_W}
+                    y2={limitY}
+                    stroke={palette.limit}
+                    strokeWidth={1.5}
+                    strokeDasharray="4 4"
+                    opacity={0.55}
+                  />
+                  <SvgText
+                    x={CHART_W}
+                    y={Math.max(limitY - 4, 8)}
+                    textAnchor="end"
+                    fontSize={8.5}
+                    fill={palette.limit}
+                  >
+                    {`LIMITE ${formatAmount(limitAmount as number)}`}
+                  </SvgText>
+                </>
+              )}
 
               <Path d={area} fill="url(#fill)" />
               <Path

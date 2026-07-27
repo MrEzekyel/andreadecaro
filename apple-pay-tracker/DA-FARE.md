@@ -102,17 +102,16 @@ tiene privata.
 Opzioni: lasciare così, oppure sposto tutto in un repo dedicato e privato
 (consigliato). Dimmi tu — è una cosa che costa poco adesso e molto dopo.
 
-### 7. Notifiche push
+### 7. Notifiche push — ✅ deciso: rimandate
 
-Diverse funzionalità che hai chiesto (avviso al superamento di un limite,
-"Leonardo non ti ha ancora pagato") hanno bisogno di **notifiche push**.
+Deciso di rimandarle. I limiti di spesa funzionano già con **avvisi dentro
+l'app**: la Home mostra un riquadro quando superi la soglia di preavviso o il
+limite stesso.
 
-Problema: le push non funzionano dentro Expo Go, serve una **development
-build**. È gratis, la build gira in cloud, ma da quel momento non usi più
-Expo Go per testare.
-
-Dimmi se vuoi che le implementi ora (e passiamo alla development build) o se
-preferisci rimandare e per adesso mostrare gli avvisi solo dentro l'app.
+Quando vorrai le push servirà passare a una **development build** (gratis, la
+build gira in cloud, ma da quel momento non si usa più Expo Go per testare).
+Il lavoro residuo è solo il canale di consegna: soglie, periodi e stato dei
+limiti sono già nel database.
 
 ---
 
@@ -161,8 +160,12 @@ Quando ci arriveremo ti servirà preparare:
 
 Solo per chiarezza, questi sono già fatti e non richiedono niente da te:
 
-- ✅ Schema del database (4 migration applicate, RLS attiva ovunque)
+- ✅ Schema del database (9 migration applicate, RLS attiva ovunque)
 - ✅ 96 regole di categorizzazione predefinite già caricate
 - ✅ Edge Function deployata e attiva
 - ✅ Sistema di token (generazione, revoca, hashing)
-- ✅ App con login, lista pagamenti, statistiche, impostazioni
+- ✅ App: login, Home, elenco spese, statistiche, impostazioni
+- ✅ Modifica ed eliminazione spese, aggiunta manuale
+- ✅ Categorie personalizzate con colore e icona
+- ✅ Limiti settimanali e mensili con avvisi in-app
+- ✅ Tema chiaro / scuro / sistema
