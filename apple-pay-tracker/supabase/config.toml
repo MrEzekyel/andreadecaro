@@ -1,0 +1,6 @@
+# Config minima per la Supabase CLI. Dopo `supabase login`, esegui
+# `supabase link --project-ref <il-tuo-project-ref>` da dentro apple-pay-tracker/
+# prima di usare `supabase db push` o `supabase functions deploy`.
+
+[functions.ingest-payment]
+verify_jwt = false
