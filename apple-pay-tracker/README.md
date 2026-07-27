@@ -9,13 +9,16 @@ Apple Pay e li categorizza in base all'esercente.
 ## Come funziona
 
 Apple non espone un'API pubblica per leggere le transazioni Apple Pay/Wallet,
-quindi l'ingestione avviene così:
+e **iOS non permette a Comandi Rapidi di leggere le notifiche di altre app**
+(i trigger di comunicazione coprono solo email e messaggi). L'ingestione
+automatica quindi non può partire dalla notifica di Wallet.
+
+Quello che la Edge Function accetta è un pagamento da **qualunque** sorgente
+che sappia fare una POST:
 
 ```
-Notifica Wallet (banca) sul telefono
-        │  attiva
-        ▼
-Automazione Shortcuts (estrae importo + esercente dalla notifica)
+Sorgente (SMS o email della banca via Comandi Rapidi,
+          dettatura Siri, inserimento manuale, Open Banking)
         │  POST JSON + header x-ingest-token
         ▼
 Supabase Edge Function "ingest-payment"
@@ -24,13 +27,21 @@ Supabase Edge Function "ingest-payment"
 Tabella payments (Postgres, RLS per utente)
         │  letta in realtime
         ▼
-App Apple Pay Tracker → lista pagamenti + statistiche
+App Apple Pay Tracker → spese, statistiche, limiti
 ```
 
-L'autenticazione della Shortcut usa un **token per utente**: la function ne
-calcola l'hash SHA-256 e lo cerca in `ingest_tokens` per risalire all'utente.
-In tabella non finisce mai il token in chiaro, e non c'è nessun segreto da
-configurare a mano nella function.
+Le sorgenti praticabili, in ordine di comodità:
+
+| Sorgente | Automatica | Costo | Requisito |
+| --- | --- | --- | --- |
+| SMS della banca | ✅ | gratis | la banca deve mandare SMS per ogni pagamento |
+| Email della banca | ✅ | gratis | avvisi email attivabili nell'home banking |
+| Open Banking | ✅ | dipende | consenso bancario, provider PSD2 |
+| Siri / manuale | ❌ | gratis | nessuno |
+
+L'autenticazione usa un **token per utente**: la function ne calcola l'hash
+SHA-256 e lo cerca in `ingest_tokens` per risalire all'utente. In tabella non
+finisce mai il token in chiaro.
 
 ## Stato del backend
 
@@ -55,7 +66,7 @@ Apri l'app con **Expo Go** sul telefono (scan del QR code). Al primo avvio
 registrati con email + password: è il tuo account personale, e la RLS fa sì che
 nessun altro possa vedere i tuoi dati.
 
-## Collegare la Shortcut
+## Collegare una sorgente automatica
 
 ### 1. Genera il token
 
@@ -65,16 +76,21 @@ usare, già pronto da copiare.
 
 ### 2. Crea l'automazione
 
-App **Comandi Rapidi → Automazione → Crea automazione personale**:
+App **Comandi Rapidi → Automazione → Crea automazione personale**, e come
+trigger scegli quello che corrisponde a ciò che ti manda la banca:
 
-1. Trigger: **App** → *Wallet* → **Viene ricevuta una notifica**
-2. Azione **Ottieni ultima notifica** → prendi il **testo** della notifica
-3. Estrai importo ed esercente con l'azione **Abbina testo** (espressione
-   regolare). Il formato dipende dalla tua banca — per una notifica tipo
-   `Pagamento di 23,40 € presso Esselunga`:
-   - importo: `([0-9]+[,.][0-9]{2})`
-   - esercente: `presso (.+)$`
-4. Azione **Ottieni contenuto URL**:
+- **Messaggio** → mittente della banca, eventualmente con "Il messaggio
+  contiene" per filtrare i soli avvisi di pagamento
+- **Email** → stesso principio, sul mittente degli avvisi
+
+Poi, in entrambi i casi:
+
+1. Estrai importo ed esercente con l'azione **Abbina testo** (espressione
+   regolare). Le espressioni dipendono dal formato esatto del messaggio della
+   tua banca — per un testo tipo `Pagamento di 23,40 EUR presso ESSELUNGA`:
+   - importo: `([0-9]+[.,][0-9]{2})`
+   - esercente: `presso (.+?)(?:\.|$)`
+2. Azione **Ottieni contenuto URL**:
    - URL: quello copiato dalle Impostazioni dell'app
    - Metodo: **POST**
    - Intestazioni: `x-ingest-token` → il token generato al passo 1
@@ -83,14 +99,22 @@ App **Comandi Rapidi → Automazione → Crea automazione personale**:
      {
        "merchant": "<variabile esercente>",
        "amount": "<variabile importo>",
-       "raw_text": "<testo notifica>"
+       "raw_text": "<testo completo del messaggio>"
      }
      ```
-5. Disattiva **"Chiedi prima di eseguire"**, altrimenti dovrai confermare
-   manualmente ogni pagamento.
+3. Attiva **"Esegui immediatamente"** e disattiva la richiesta di conferma,
+   altrimenti l'automatismo perde senso.
 
 `amount` può essere inviato come stringa: la function gestisce il formato
-italiano (`23,40` e `1.234,56`).
+italiano (`23,40` e `1.234,56`). Manda sempre anche `raw_text`: se il parsing
+sbaglia, il testo originale resta salvato e permette di correggere a
+posteriori.
+
+### Inserimento a voce con Siri
+
+Un Comando Rapido con frase di attivazione ("Aggiungi spesa") che usa **Chiedi
+input** per importo ed esercente e chiama lo stesso URL con
+`"source": "siri"`. Non è automatico, ma non dipende da cosa manda la banca.
 
 ### 3. Verifica
 
@@ -202,11 +226,18 @@ Ordine con cui la Edge Function assegna la categoria:
 
 ## Limiti noti
 
-- L'automazione dipende dal **formato della notifica** della tua banca: se
+- **iOS non permette di leggere le notifiche di altre app**, quindi non esiste
+  un modo di intercettare la notifica di Wallet. L'ingestione automatica
+  richiede che la banca mandi un SMS o una email, oppure un collegamento Open
+  Banking.
+- L'automazione dipende dal **formato del messaggio** della tua banca: se
   cambia, vanno aggiornate le regex nella Shortcut. Il campo `raw_text` salva
   il testo originale, utile per correggere il parsing a posteriori.
-- Le notifiche Wallet non contengono l'MCC (codice categoria del commerciante),
-  quindi la categorizzazione si basa sul nome. Per dati più affidabili servirebbe
-  un collegamento Open Banking (Plaid / TrueLayer / Nordigen).
+- Gli avvisi della banca non contengono l'MCC (codice categoria del
+  commerciante), quindi la categorizzazione si basa sul nome. Per dati più
+  affidabili servirebbe un collegamento Open Banking.
 - L'app non registra i pagamenti fatti quando il telefono è offline: la Shortcut
   scatta ma la POST fallisce.
+- GoCardless / Nordigen, che offriva un piano gratuito per l'accesso ai propri
+  conti, **non accetta più nuove iscrizioni** da metà 2025. Fra le alternative
+  self-serve c'è Enable Banking.

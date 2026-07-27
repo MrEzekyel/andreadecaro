@@ -46,48 +46,43 @@ Row Level Security del database lo garantisce a livello di Postgres).
 
 Nell'app: tab **Impostazioni** → *Genera nuovo token*.
 
-Il token viene mostrato **una sola volta**. Copialo e tienilo da parte per il
-passo successivo. Se lo perdi non è un dramma: ne generi un altro e revochi il
-vecchio.
+Il token viene mostrato **una sola volta**. Copialo e tienilo da parte: serve
+in qualunque automazione decideremo di usare. Se lo perdi non è un dramma: ne
+generi un altro e revochi il vecchio.
 
-### 4. Creare l'automazione Shortcuts
+### 4. Dirmi cosa ti manda la banca quando paghi
 
-Sul telefono, app **Comandi Rapidi → Automazione → Crea automazione personale**:
+⚠️ **Correzione importante rispetto a quanto scritto prima.** Avevo indicato
+come trigger "quando Wallet riceve una notifica". **Quel trigger non esiste**:
+iOS non permette a nessuna app né a Comandi Rapidi di leggere le notifiche di
+altre app. È una cosa possibile su Android, non su iPhone.
 
-| Passo | Cosa impostare |
-| --- | --- |
-| Trigger | **App** → *Wallet* → "Viene ricevuta una notifica" |
-| Azione 1 | **Ottieni ultima notifica** → prendi il testo |
-| Azione 2 | **Abbina testo** per estrarre importo: `([0-9]+[,.][0-9]{2})` |
-| Azione 3 | **Abbina testo** per estrarre esercente: dipende dalla tua banca |
-| Azione 4 | **Ottieni contenuto URL** (dettagli sotto) |
+I trigger di comunicazione di Comandi Rapidi coprono **solo email e messaggi**
+([documentazione Apple](https://support.apple.com/guide/shortcuts/communication-triggers-apdd711f9dff/ios)).
+Quelli app coprono solo apertura e chiusura.
 
-Configurazione dell'azione "Ottieni contenuto URL":
+Quindi la domanda che sblocca tutto è: **quando paghi con Apple Pay, cosa ti
+arriva?**
 
-- **URL**: lo trovi già pronto da copiare nel tab Impostazioni dell'app
-- **Metodo**: `POST`
-- **Intestazioni**: `x-ingest-token` → il token del passo 3
-- **Corpo richiesta**: JSON
-  ```json
-  {
-    "merchant": "<variabile esercente>",
-    "amount": "<variabile importo>",
-    "raw_text": "<testo notifica completo>"
-  }
-  ```
+- Solo una **notifica push** dell'app della banca → l'automazione non è
+  possibile per questa via, si va di Open Banking o inserimento rapido
+- Un **SMS** → ✅ funziona, trigger "Messaggio"
+- Una **email** → ✅ funziona, trigger "Email"
 
-⚠️ **Disattiva "Chiedi prima di eseguire"**, altrimenti dovrai confermare a
-mano ogni singolo pagamento e l'automatismo perde senso.
+Molte banche italiane permettono di **attivare gli avvisi via email** nelle
+impostazioni, anche se di default mandano solo push. Vale la pena controllare:
+è la strada più semplice e gratuita.
 
-### 5. Mandarmi il testo esatto di una notifica Wallet
+Dimmi la banca e cosa ricevi, e ti scrivo l'automazione passo per passo.
 
-Questa è la cosa più utile che puoi farmi avere. Fai un pagamento con Apple
-Pay, poi copiami **il testo esatto** della notifica che ricevi (o uno
-screenshot).
+### 5. Inserimento rapido con Siri (funziona comunque)
 
-Serve perché le regex del passo 4 dipendono dal formato della tua banca, e
-finché non lo vedo sto tirando a indovinare. Con il testo reale te le scrivo
-esatte in 2 minuti.
+Indipendentemente dalla banca, questo si può fare subito e non dipende da
+nulla. Comando Rapido con frase di attivazione, che chiede importo ed
+esercente a voce e li manda all'app.
+
+Te lo preparo appena mi confermi il punto 4, così lo imposti una volta sola
+insieme all'altro.
 
 ---
 

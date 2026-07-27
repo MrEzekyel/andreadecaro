@@ -143,6 +143,30 @@ esattamente la stessa cosa senza codice iOS nativo. Se poi vorremo la
 trascrizione libera ("ho speso 12 euro dal fruttivendolo"), aggiungiamo un
 parser sul server.
 
+Con la via della notifica Wallet esclusa (vedi sotto), l'inserimento a voce
+passa da comodità a **strada principale** finché non c'è una sorgente
+automatica: merita quindi di essere fatto prima del resto della Fase 4.
+
+## Nota sull'ingestione automatica
+
+L'assunto iniziale — "una Shortcut si attiva sulla notifica di Wallet" — **è
+sbagliato**: iOS non consente a Comandi Rapidi né ad app di terze parti di
+leggere le notifiche di altre app. I trigger di comunicazione coprono solo
+**email e messaggi**.
+
+Le sorgenti automatiche realmente disponibili sono quindi:
+
+1. **SMS della banca** → trigger "Messaggio". Gratis, nativo, funziona solo se
+   la banca manda un SMS per ogni pagamento.
+2. **Email della banca** → trigger "Email". Molte banche italiane permettono di
+   attivare gli avvisi email anche quando di default mandano solo push.
+3. **Open Banking (PSD2)** → dati strutturati e con MCC, ma richiede consenso
+   bancario e un provider. GoCardless/Nordigen, che aveva un piano gratuito per
+   i propri conti, non accetta più nuove iscrizioni da metà 2025.
+
+La Edge Function non cambia in nessuno dei tre casi: accetta una POST con
+importo, esercente e testo originale, da qualunque sorgente.
+
 ## Fase 5 — Spese divise
 
 - [ ] Tabella `people` (i tuoi contatti ricorrenti: Leonardo, Marco, …)
