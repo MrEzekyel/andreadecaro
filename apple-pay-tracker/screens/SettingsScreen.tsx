@@ -1,70 +1,73 @@
 import * as Clipboard from "expo-clipboard";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
+import { Icon } from "../components/Icon";
+import { useData } from "../lib/DataContext";
+import { ThemePreference, useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
+import { radius, space, type } from "../lib/theme";
 import { IngestToken } from "../lib/types";
+import CategoriesScreen from "./CategoriesScreen";
 
 const INGEST_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/ingest-payment`;
 
-function formatDate(iso: string | null) {
-  if (!iso) return "mai";
-  return new Date(iso).toLocaleString("it-IT", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const THEME_OPTIONS: { value: ThemePreference; label: string; icon: string }[] = [
+  { value: "light", label: "Chiaro", icon: "sun" },
+  { value: "dark", label: "Scuro", icon: "moon" },
+  { value: "system", label: "Sistema", icon: "smartphone" },
+];
 
 export default function SettingsScreen() {
+  const { palette, preference, setPreference } = useTheme();
+  const { categories } = useData();
+
+  const [page, setPage] = useState<"root" | "categories" | "token">("root");
   const [tokens, setTokens] = useState<IngestToken[]>([]);
   const [freshToken, setFreshToken] = useState<string | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    const { data, error } = await supabase
+  const loadTokens = useCallback(async () => {
+    const { data } = await supabase
       .from("ingest_tokens")
       .select("*")
       .order("created_at", { ascending: false });
-    if (!error && data) setTokens(data as IngestToken[]);
+    if (data) setTokens(data as IngestToken[]);
   }, []);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    loadTokens();
+  }, [loadTokens]);
 
-  async function onRefresh() {
-    setRefreshing(true);
-    await load();
-    setRefreshing(false);
+  if (page === "categories") {
+    return <CategoriesScreen onBack={() => setPage("root")} />;
   }
 
+  const activeTokens = tokens.filter((t) => !t.revoked_at).length;
+
   async function generateToken() {
-    setGenerating(true);
     const { data, error } = await supabase.rpc("create_ingest_token", {
       p_label: "Shortcut iPhone",
     });
-    setGenerating(false);
-
     if (error) {
       Alert.alert("Errore", error.message);
       return;
     }
     setFreshToken(data as string);
-    await load();
+    await loadTokens();
   }
 
-  async function revokeToken(id: string) {
+  async function copy(value: string, what: string) {
+    await Clipboard.setStringAsync(value);
+    Alert.alert("Copiato", `${what} copiato negli appunti.`);
+  }
+
+  function revoke(id: string) {
     Alert.alert(
       "Revocare il token?",
       "La Shortcut che lo usa smetterà di funzionare.",
@@ -82,174 +85,265 @@ export default function SettingsScreen() {
               Alert.alert("Errore", error.message);
               return;
             }
-            await load();
+            await loadTokens();
           },
         },
       ]
     );
   }
 
-  async function copy(value: string, label: string) {
-    await Clipboard.setStringAsync(value);
-    Alert.alert("Copiato", `${label} copiato negli appunti.`);
-  }
-
   return (
     <ScrollView
-      style={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
+      style={{ backgroundColor: palette.ground }}
+      contentContainerStyle={styles.content}
     >
-      <Text style={styles.sectionTitle}>URL per la Shortcut</Text>
-      <TouchableOpacity
-        style={styles.urlBox}
-        onPress={() => copy(INGEST_URL, "URL")}
+      <Text style={[styles.title, { color: palette.ink }]}>Impostazioni</Text>
+
+      <View>
+        <Text style={[styles.label, { color: palette.ink3 }]}>Aspetto</Text>
+        <View style={[styles.segment, { backgroundColor: palette.surface2 }]}>
+          {THEME_OPTIONS.map((option) => {
+            const active = preference === option.value;
+            return (
+              <TouchableOpacity
+                key={option.value}
+                onPress={() => setPreference(option.value)}
+                style={[
+                  styles.segmentOption,
+                  active && { backgroundColor: palette.surface },
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Icon
+                  name={option.icon}
+                  size={14}
+                  color={active ? palette.ink : palette.ink3}
+                />
+                <Text
+                  style={[
+                    styles.segmentLabel,
+                    { color: active ? palette.ink : palette.ink3 },
+                  ]}
+                >
+                  {option.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: palette.surface, borderColor: palette.hairline },
+        ]}
       >
-        <Text style={styles.urlText} numberOfLines={2}>
-          {INGEST_URL}
+        <SettingRow
+          icon="palette"
+          label="Categorie"
+          value={String(categories.length)}
+          onPress={() => setPage("categories")}
+        />
+        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+        <SettingRow icon="gauge" label="Limiti di spesa" value="presto" muted />
+        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+        <SettingRow icon="repeat" label="Spese ricorrenti" value="presto" muted />
+        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+        <SettingRow icon="users" label="Persone" value="presto" muted />
+      </View>
+
+      <View>
+        <Text style={[styles.label, { color: palette.ink3 }]}>
+          Collegamento Shortcut
         </Text>
-        <Text style={styles.copyHint}>Tocca per copiare</Text>
-      </TouchableOpacity>
 
-      <Text style={styles.sectionTitle}>Token di ingestione</Text>
-      <Text style={styles.help}>
-        La Shortcut invia questo token nell'header {"\n"}
-        <Text style={styles.mono}>x-ingest-token</Text>. Viene mostrato una sola
-        volta: se lo perdi, generane un altro.
-      </Text>
-
-      {freshToken && (
-        <View style={styles.freshBox}>
-          <Text style={styles.freshLabel}>Nuovo token — copialo adesso</Text>
-          <Text style={styles.freshToken} selectable>
-            {freshToken}
+        <TouchableOpacity
+          onPress={() => copy(INGEST_URL, "URL")}
+          style={[
+            styles.urlBox,
+            { backgroundColor: palette.surface, borderColor: palette.hairline },
+          ]}
+        >
+          <Text style={[styles.url, { color: palette.ink }]} numberOfLines={2}>
+            {INGEST_URL}
           </Text>
-          <View style={styles.freshActions}>
-            <TouchableOpacity
-              style={styles.freshButton}
-              onPress={() => copy(freshToken, "Token")}
-            >
-              <Text style={styles.freshButtonText}>Copia</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.freshButton, styles.freshButtonGhost]}
-              onPress={() => setFreshToken(null)}
-            >
-              <Text style={styles.freshButtonGhostText}>Fatto</Text>
-            </TouchableOpacity>
+          <Text style={[styles.hint, { color: palette.ink3 }]}>
+            Tocca per copiare
+          </Text>
+        </TouchableOpacity>
+
+        {freshToken && (
+          <View style={[styles.fresh, { backgroundColor: palette.accentSoft }]}>
+            <Text style={[styles.freshLabel, { color: palette.accent }]}>
+              Nuovo token — copialo adesso
+            </Text>
+            <Text style={[styles.freshToken, { color: palette.ink }]} selectable>
+              {freshToken}
+            </Text>
+            <View style={styles.freshActions}>
+              <TouchableOpacity
+                style={[styles.smallBtn, { backgroundColor: palette.accent }]}
+                onPress={() => copy(freshToken, "Token")}
+              >
+                <Text style={[styles.smallBtnText, { color: palette.onAccent }]}>
+                  Copia
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.smallBtn, { borderColor: palette.hairline, borderWidth: 1 }]}
+                onPress={() => setFreshToken(null)}
+              >
+                <Text style={[styles.smallBtnText, { color: palette.ink2 }]}>
+                  Fatto
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
-      )}
+        )}
+
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: palette.accent }]}
+          onPress={generateToken}
+        >
+          <Text style={[styles.buttonText, { color: palette.onAccent }]}>
+            Genera nuovo token
+          </Text>
+        </TouchableOpacity>
+
+        {tokens.map((token) => (
+          <View key={token.id} style={styles.tokenRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.tokenLabel, { color: palette.ink }]}>
+                {token.label}
+                {token.revoked_at ? " · revocato" : ""}
+              </Text>
+              <Text style={[styles.tokenMeta, { color: palette.ink3 }]}>
+                ultimo uso{" "}
+                {token.last_used_at
+                  ? new Date(token.last_used_at).toLocaleDateString("it-IT")
+                  : "mai"}
+              </Text>
+            </View>
+            {!token.revoked_at && (
+              <TouchableOpacity onPress={() => revoke(token.id)}>
+                <Text style={[styles.revoke, { color: palette.over }]}>
+                  Revoca
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
+
+        <Text style={[styles.note, { color: palette.ink3 }]}>
+          {activeTokens === 0
+            ? "Genera un token e incollalo nell'intestazione x-ingest-token della Shortcut."
+            : "Il token si vede una volta sola. Se lo perdi, generane un altro e revoca il vecchio."}
+        </Text>
+      </View>
 
       <TouchableOpacity
-        style={styles.button}
-        onPress={generateToken}
-        disabled={generating}
+        style={styles.logout}
+        onPress={() => supabase.auth.signOut()}
       >
-        {generating ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Genera nuovo token</Text>
-        )}
+        <Text style={[styles.logoutText, { color: palette.over }]}>Esci</Text>
       </TouchableOpacity>
-
-      {tokens.map((token) => (
-        <View key={token.id} style={styles.tokenRow}>
-          <View style={styles.tokenInfo}>
-            <Text style={styles.tokenLabel}>
-              {token.label}
-              {token.revoked_at ? " · revocato" : ""}
-            </Text>
-            <Text style={styles.tokenMeta}>
-              creato {formatDate(token.created_at)} · ultimo uso{" "}
-              {formatDate(token.last_used_at)}
-            </Text>
-          </View>
-          {!token.revoked_at && (
-            <TouchableOpacity onPress={() => revokeToken(token.id)}>
-              <Text style={styles.revoke}>Revoca</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      ))}
-
-      {tokens.length === 0 && (
-        <Text style={styles.empty}>
-          Nessun token ancora. Generane uno per collegare la Shortcut.
-        </Text>
-      )}
-
-      <View style={styles.footerSpace} />
     </ScrollView>
   );
 }
 
+function SettingRow({
+  icon,
+  label,
+  value,
+  onPress,
+  muted,
+}: {
+  icon: string;
+  label: string;
+  value: string;
+  onPress?: () => void;
+  muted?: boolean;
+}) {
+  const { palette } = useTheme();
+  return (
+    <TouchableOpacity
+      style={styles.settingRow}
+      onPress={onPress}
+      disabled={!onPress}
+    >
+      <Icon name={icon} size={17} color={muted ? palette.ink3 : palette.ink2} />
+      <Text
+        style={[styles.settingName, { color: muted ? palette.ink3 : palette.ink }]}
+      >
+        {label}
+      </Text>
+      <Text style={[styles.settingValue, { color: palette.ink3 }]}>{value}</Text>
+      {onPress && <Icon name="chevron-right" size={14} color={palette.ink3} />}
+    </TouchableOpacity>
+  );
+}
+
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff", padding: 16 },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    marginTop: 8,
-    marginBottom: 10,
-  },
-  help: { fontSize: 13, color: "#666", lineHeight: 19, marginBottom: 14 },
-  mono: { fontFamily: "Courier", fontWeight: "600", color: "#111" },
-  urlBox: {
-    backgroundColor: "#f4f4f5",
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-  },
-  urlText: { fontSize: 13, color: "#111" },
-  copyHint: { fontSize: 11, color: "#888", marginTop: 6 },
-  freshBox: {
-    backgroundColor: "#111",
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 14,
-  },
-  freshLabel: { color: "#f5c518", fontSize: 13, fontWeight: "600" },
-  freshToken: {
-    color: "#fff",
-    fontSize: 13,
-    marginTop: 10,
-    lineHeight: 19,
-  },
-  freshActions: { flexDirection: "row", gap: 10, marginTop: 14 },
-  freshButton: {
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    paddingVertical: 9,
-    paddingHorizontal: 18,
-  },
-  freshButtonText: { color: "#111", fontWeight: "600" },
-  freshButtonGhost: {
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: "#555",
-  },
-  freshButtonGhostText: { color: "#ddd", fontWeight: "600" },
-  button: {
-    backgroundColor: "#000",
-    borderRadius: 10,
-    padding: 14,
+  content: { padding: space.lg, paddingBottom: space.xxl, gap: space.xl },
+  title: { ...type.title },
+  label: { ...type.label, marginBottom: space.sm },
+  segment: { flexDirection: "row", gap: 4, borderRadius: 11, padding: 4 },
+  segmentOption: {
+    flex: 1,
+    flexDirection: "row",
     alignItems: "center",
-    marginBottom: 20,
+    justifyContent: "center",
+    gap: 5,
+    paddingVertical: 9,
+    borderRadius: 8,
   },
-  buttonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  segmentLabel: { ...type.small, fontWeight: "500" },
+  card: { borderRadius: radius.card, borderWidth: 1, paddingHorizontal: space.lg },
+  divider: { height: 1 },
+  settingRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    paddingVertical: 13,
+  },
+  settingName: { ...type.body, flex: 1 },
+  settingValue: { ...type.caption },
+  urlBox: {
+    borderRadius: radius.field,
+    borderWidth: 1,
+    padding: 12,
+    marginBottom: space.md,
+  },
+  url: { ...type.caption },
+  hint: { ...type.small, fontSize: 10.5, marginTop: 5 },
+  fresh: { borderRadius: radius.card, padding: 14, marginBottom: space.md, gap: 9 },
+  freshLabel: { ...type.small, fontWeight: "500" },
+  freshToken: { ...type.caption, lineHeight: 18 },
+  freshActions: { flexDirection: "row", gap: 9 },
+  smallBtn: {
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+  },
+  smallBtnText: { ...type.caption, fontWeight: "500" },
+  button: {
+    borderRadius: radius.button,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  buttonText: { ...type.bodyMedium, fontSize: 14.5 },
   tokenRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingVertical: 12,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#e5e5e5",
+    gap: space.md,
   },
-  tokenInfo: { flexShrink: 1, paddingRight: 12 },
-  tokenLabel: { fontSize: 15, fontWeight: "500" },
-  tokenMeta: { fontSize: 12, color: "#888", marginTop: 3 },
-  revoke: { color: "#c00", fontSize: 14 },
-  empty: { textAlign: "center", color: "#888", marginTop: 10 },
-  footerSpace: { height: 40 },
+  tokenLabel: { ...type.body },
+  tokenMeta: { ...type.small, marginTop: 2 },
+  revoke: { ...type.caption },
+  note: { ...type.small, lineHeight: 17, marginTop: space.sm },
+  logout: { alignItems: "center", paddingVertical: space.md },
+  logoutText: { ...type.body },
 });

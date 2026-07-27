@@ -38,16 +38,7 @@ Lo schema e la Edge Function sono **già deployati** sul progetto Supabase
 personale. Le migration in `supabase/migrations/` sono l'esatta copia di ciò
 che è stato applicato, e servono per ricreare l'ambiente da zero.
 
-Tabelle:
-
-| tabella | contenuto |
-| --- | --- |
-| `payments` | i pagamenti registrati |
-| `default_merchant_categories` | ~96 regole keyword→categoria predefinite |
-| `merchant_categories` | regole personali dell'utente (hanno priorità) |
-| `ingest_tokens` | token delle Shortcut (solo hash SHA-256) |
-
-Tutte con RLS attiva e policy limitate a `auth.uid()`.
+Il modello dati completo è più sotto.
 
 ## Configurazione dell'app
 
@@ -110,25 +101,24 @@ curl -X POST "https://<project-ref>.supabase.co/functions/v1/ingest-payment" \
   -d '{"merchant": "Esselunga", "amount": "23,40"}'
 ```
 
-Risposta attesa: `201` con il pagamento creato e `"category": "Spesa"`.
-Rilanciando lo stesso comando entro 5 minuti ottieni `{"skipped":"duplicate"}`:
-è la protezione contro il doppio scatto della Shortcut.
+Risposta attesa: `201` con il pagamento creato e il `category_id` della
+categoria Spesa già assegnato. Rilanciando lo stesso comando entro 5 minuti
+ottieni `{"skipped":"duplicate"}`: è la protezione contro il doppio scatto
+della Shortcut.
 
 ## Categorie
 
-Il match è per sottostringa case-insensitive sul nome esercente, con questa
-priorità:
+Il riconoscimento è per sottostringa case-insensitive sul nome esercente
+(l'ordine di priorità è nella sezione *Modello dati*).
 
-1. `merchant_categories` — le tue regole personali
-2. `default_merchant_categories` — le regole predefinite
-3. fallback: `Da categorizzare`
+Il modo normale di correggere una categoria è **dall'app**: apri la spesa,
+cambia categoria, e il foglio ti chiede se applicare la correzione anche alle
+altre spese dello stesso esercente e se ricordarla per il futuro. La seconda
+opzione scrive `merchants.category_id`, quindi da quel momento l'esercente è
+mappato e non viene più indovinato.
 
-Per aggiungere una regola personale:
-
-```sql
-insert into merchant_categories (user_id, keyword, category)
-values (auth.uid(), 'nome esercente', 'Categoria');
-```
+Le categorie si creano e si modificano in **Impostazioni → Categorie**, dove
+scegli nome, colore e icona.
 
 ## Riprodurre il backend da zero
 
@@ -161,24 +151,54 @@ eas submit --platform ios
 
 ```
 apple-pay-tracker/
-├── App.tsx                        # entrypoint, sessione + tab bar
+├── App.tsx                         # sessione, tab bar, provider
+├── components/
+│   ├── Icon.tsx                     # icone Lucide risolte per nome
+│   ├── PaymentRow.tsx
+│   ├── CategoryPicker.tsx
+│   ├── AddPaymentSheet.tsx          # inserimento manuale
+│   └── EditPaymentSheet.tsx         # modifica, elimina, "applica a tutte"
 ├── screens/
-│   ├── AuthScreen.tsx              # login / registrazione
-│   ├── PaymentsScreen.tsx          # lista pagamenti (realtime)
-│   ├── StatsScreen.tsx             # totale mensile + breakdown categorie
-│   └── SettingsScreen.tsx          # genera/revoca token, URL webhook
+│   ├── AuthScreen.tsx
+│   ├── HomeScreen.tsx               # mese corrente + ripartizione
+│   ├── PaymentsScreen.tsx           # elenco per giorno
+│   ├── StatsScreen.tsx              # andamento cumulato + categorie
+│   ├── CategoriesScreen.tsx         # crea, modifica, elimina categorie
+│   └── SettingsScreen.tsx           # tema, categorie, token
 ├── lib/
+│   ├── theme.ts                     # design system (colori, scala, raggi)
+│   ├── ThemeContext.tsx             # chiaro / scuro / sistema
+│   ├── DataContext.tsx              # cache categorie
+│   ├── usePayments.ts               # spese del mese + realtime
+│   ├── format.ts                    # importi e date in italiano
 │   ├── supabase.ts
 │   └── types.ts
+├── design/mockup.html               # direzione di design navigabile
 └── supabase/
-    ├── migrations/
-    │   ├── 0001_init.sql            # tabelle, indici, RLS
-    │   ├── 0002_seed_default_categories.sql
-    │   ├── 0003_ingest_tokens.sql   # token + create_ingest_token()
-    │   └── 0004_revoke_anon_execute_on_create_ingest_token.sql
-    ├── config.toml
+    ├── migrations/                  # 0001–0008
     └── functions/ingest-payment/index.ts
 ```
+
+## Modello dati
+
+| tabella | contenuto |
+| --- | --- |
+| `payments` | le spese registrate |
+| `categories` | categorie dell'utente, con colore e icona |
+| `category_templates` | modello copiato a ogni nuovo utente |
+| `merchants` | esercenti; `category_id` è il "ricorda la scelta" |
+| `merchant_categories` | regole keyword personali |
+| `default_merchant_categories` | 96 regole keyword predefinite |
+| `ingest_tokens` | token delle Shortcut (solo hash SHA-256) |
+
+Tutte con RLS attiva e policy limitate a `auth.uid()`.
+
+Ordine con cui la Edge Function assegna la categoria:
+
+1. `merchants.category_id` — esercente già mappato → certo
+2. `merchant_categories` — le tue regole keyword
+3. `default_merchant_categories` — le regole predefinite
+4. `NULL` — resta da categorizzare
 
 ## Limiti noti
 

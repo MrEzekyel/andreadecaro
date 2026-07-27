@@ -1,22 +1,39 @@
 <title>Apple Pay Tracker — Direzione di design</title>
 
 <style>
+  /* ============================================================
+     Design system ispirato a quello di Anthropic / Claude.
+
+     Caratteri originali: Styrene B (sans) e Tiempos Text (serif),
+     entrambi commerciali e su licenza Anthropic — non ridistribuibili.
+     Qui sono dichiarati per primi negli stack: se un giorno li licenzi
+     e li installi, subentrano da soli senza toccare una riga di CSS.
+
+     Il tratto distintivo del sistema non sono i font ma la MISURA:
+     pesi bassi anche nei titoli grandi (mai 700+), crenatura quasi
+     neutra, fondo caldo, un solo accento argilla.
+     ============================================================ */
+
   :root {
     color-scheme: light dark;
 
-    --ground: #f7f7f9;
-    --surface: #ffffff;
-    --surface-2: #f1f1f4;
-    --frame: #d9d9e0;
-    --ink: #101014;
-    --ink-2: #55555f;
-    --ink-3: #8b8b96;
-    --hairline: #e7e7ec;
-    --accent: #4f46e5;
-    --accent-soft: #eeecfd;
+    /* fondo e superfici — crema calda, mai bianco puro */
+    --ground: #f0eee6;
+    --surface: #faf9f5;
+    --surface-2: #f2f0e9;
+    --frame: #ddd9cc;
+    --hairline: #e3e1d9;
 
-    /* Palette categorie — validata (banda di luminosita', soglia di croma,
-       separazione per daltonismo, contrasto sul fondo) */
+    /* inchiostro — nero caldo, non nero puro */
+    --ink: #141413;
+    --ink-2: #5f5e5a;
+    --ink-3: #8a8880;
+
+    /* accento argilla */
+    --accent: #c2613f;
+    --accent-soft: #f6e9e2;
+
+    /* palette categorie — rivalidata sul fondo crema */
     --c-spesa: #16a34a;
     --c-trasporti: #2563eb;
     --c-ristorazione: #ea580c;
@@ -30,35 +47,40 @@
     --c-sport: #65a30d;
     --c-altro: #71717a;
 
-    --limit: #9a9aa5;
-    --over: #dc2626;
+    --limit: #8a8880;
+    --over: #b4472c;
 
-    --r-card: 20px;
+    /* raggi contenuti — il sistema Anthropic non e' morbido */
+    --r-card: 14px;
+    --r-field: 10px;
+    --r-btn: 10px;
     --r-chip: 999px;
 
-    --sans: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
-      "Segoe UI", system-ui, sans-serif;
+    /* stack tipografici */
+    --serif: "Tiempos Text", ui-serif, "Iowan Old Style", "Palatino Linotype",
+      Palatino, Georgia, serif;
+    --sans: "Styrene B", "Styrene A", ui-sans-serif, -apple-system,
+      BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif;
   }
 
   @media (prefers-color-scheme: dark) {
     :root {
-      --ground: #0a0a0d;
-      --surface: #16161a;
-      --surface-2: #202026;
-      --frame: #2a2a32;
-      --ink: #f3f3f6;
-      --ink-2: #a3a3b0;
-      --ink-3: #6e6e7c;
-      --hairline: #26262e;
-      --accent: #6366f1;
-      --accent-soft: #1e1b45;
+      --ground: #141413;
+      --surface: #1f1e1c;
+      --surface-2: #262521;
+      --frame: #33322d;
+      --hairline: #2e2d29;
 
-      --c-spesa: #16a34a;
+      --ink: #f5f4ef;
+      --ink-2: #b0aea6;
+      --ink-3: #7a7872;
+
+      --accent: #d97757;
+      --accent-soft: #2e211a;
+
       --c-trasporti: #3b82f6;
-      --c-ristorazione: #ea580c;
       --c-shopping: #ec4899;
       --c-abbonamenti: #6366f1;
-      --c-viaggi: #0891b2;
       --c-utenze: #b77f06;
       --c-casa: #8b5cf6;
       --c-salute: #ef4444;
@@ -66,22 +88,22 @@
       --c-sport: #84cc16;
       --c-altro: #8b8b96;
 
-      --limit: #6e6e7c;
-      --over: #ef4444;
+      --limit: #7a7872;
+      --over: #e0765a;
     }
   }
 
   :root[data-theme="dark"] {
-    --ground: #0a0a0d;
-    --surface: #16161a;
-    --surface-2: #202026;
-    --frame: #2a2a32;
-    --ink: #f3f3f6;
-    --ink-2: #a3a3b0;
-    --ink-3: #6e6e7c;
-    --hairline: #26262e;
-    --accent: #6366f1;
-    --accent-soft: #1e1b45;
+    --ground: #141413;
+    --surface: #1f1e1c;
+    --surface-2: #262521;
+    --frame: #33322d;
+    --hairline: #2e2d29;
+    --ink: #f5f4ef;
+    --ink-2: #b0aea6;
+    --ink-3: #7a7872;
+    --accent: #d97757;
+    --accent-soft: #2e211a;
     --c-trasporti: #3b82f6;
     --c-shopping: #ec4899;
     --c-abbonamenti: #6366f1;
@@ -91,21 +113,21 @@
     --c-cultura: #14b8a6;
     --c-sport: #84cc16;
     --c-altro: #8b8b96;
-    --limit: #6e6e7c;
-    --over: #ef4444;
+    --limit: #7a7872;
+    --over: #e0765a;
   }
 
   :root[data-theme="light"] {
-    --ground: #f7f7f9;
-    --surface: #ffffff;
-    --surface-2: #f1f1f4;
-    --frame: #d9d9e0;
-    --ink: #101014;
-    --ink-2: #55555f;
-    --ink-3: #8b8b96;
-    --hairline: #e7e7ec;
-    --accent: #4f46e5;
-    --accent-soft: #eeecfd;
+    --ground: #f0eee6;
+    --surface: #faf9f5;
+    --surface-2: #f2f0e9;
+    --frame: #ddd9cc;
+    --hairline: #e3e1d9;
+    --ink: #141413;
+    --ink-2: #5f5e5a;
+    --ink-3: #8a8880;
+    --accent: #c2613f;
+    --accent-soft: #f6e9e2;
     --c-trasporti: #2563eb;
     --c-shopping: #db2777;
     --c-abbonamenti: #4f46e5;
@@ -115,8 +137,8 @@
     --c-cultura: #0d9488;
     --c-sport: #65a30d;
     --c-altro: #71717a;
-    --limit: #9a9aa5;
-    --over: #dc2626;
+    --limit: #8a8880;
+    --over: #b4472c;
   }
 
   body {
@@ -124,40 +146,43 @@
     background: var(--ground);
     color: var(--ink);
     font-family: var(--sans);
+    font-weight: 400;
     -webkit-font-smoothing: antialiased;
   }
 
   .wrap {
     max-width: 1180px;
     margin: 0 auto;
-    padding: clamp(32px, 6vw, 72px) clamp(18px, 4vw, 40px) 96px;
+    padding: clamp(32px, 6vw, 76px) clamp(18px, 4vw, 40px) 96px;
   }
 
   /* ---------- intestazione pagina ---------- */
 
   .eyebrow {
     font-size: 11px;
-    font-weight: 650;
-    letter-spacing: 0.14em;
+    font-weight: 500;
+    letter-spacing: 0.11em;
     text-transform: uppercase;
     color: var(--ink-3);
-    margin: 0 0 18px;
+    margin: 0 0 22px;
   }
 
   h1 {
-    font-size: clamp(34px, 6.2vw, 58px);
-    font-weight: 800;
-    letter-spacing: -0.038em;
-    line-height: 1.02;
+    font-family: var(--serif);
+    font-size: clamp(33px, 5.6vw, 52px);
+    font-weight: 400;
+    letter-spacing: -0.012em;
+    line-height: 1.1;
     text-wrap: balance;
-    margin: 0 0 20px;
+    margin: 0 0 22px;
   }
 
   .lede {
-    font-size: clamp(15px, 1.9vw, 18px);
-    line-height: 1.6;
+    font-family: var(--serif);
+    font-size: clamp(16px, 1.9vw, 19px);
+    line-height: 1.66;
     color: var(--ink-2);
-    max-width: 60ch;
+    max-width: 62ch;
     margin: 0;
   }
 
@@ -165,22 +190,25 @@
     height: 1px;
     background: var(--hairline);
     border: 0;
-    margin: clamp(38px, 6vw, 64px) 0;
+    margin: clamp(40px, 6vw, 68px) 0;
   }
 
   h2 {
-    font-size: clamp(21px, 3vw, 28px);
-    font-weight: 750;
-    letter-spacing: -0.025em;
-    margin: 0 0 10px;
+    font-family: var(--serif);
+    font-size: clamp(22px, 3vw, 29px);
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    line-height: 1.2;
+    margin: 0 0 12px;
   }
 
   .section-note {
+    font-family: var(--serif);
     color: var(--ink-2);
-    font-size: 15px;
-    line-height: 1.6;
-    max-width: 62ch;
-    margin: 0 0 32px;
+    font-size: 16px;
+    line-height: 1.65;
+    max-width: 64ch;
+    margin: 0 0 34px;
   }
 
   /* ---------- griglia telefoni ---------- */
@@ -188,43 +216,44 @@
   .screens {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(304px, 1fr));
-    gap: clamp(28px, 4vw, 44px);
+    gap: clamp(30px, 4vw, 46px);
   }
 
   .screen-cell {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 15px;
     min-width: 0;
   }
 
   .caption-title {
-    font-size: 15px;
-    font-weight: 700;
-    letter-spacing: -0.012em;
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0;
     margin: 0;
   }
 
   .caption-body {
-    font-size: 13.5px;
-    line-height: 1.55;
+    font-family: var(--serif);
+    font-size: 14.5px;
+    line-height: 1.6;
     color: var(--ink-2);
     margin: 0;
   }
 
   .phone {
     background: var(--frame);
-    border-radius: 46px;
+    border-radius: 44px;
     padding: 9px;
     width: 100%;
     max-width: 322px;
     margin-inline: auto;
-    box-shadow: 0 18px 44px -22px rgb(0 0 0 / 0.42);
+    box-shadow: 0 16px 40px -24px rgb(20 20 19 / 0.45);
   }
 
   .glass {
-    background: var(--surface);
-    border-radius: 38px;
+    background: var(--ground);
+    border-radius: 36px;
     overflow: hidden;
     height: 620px;
     display: flex;
@@ -238,7 +267,7 @@
     align-items: center;
     padding: 13px 22px 4px;
     font-size: 12px;
-    font-weight: 650;
+    font-weight: 500;
     color: var(--ink);
     flex-shrink: 0;
   }
@@ -259,10 +288,10 @@
   .app {
     flex: 1;
     overflow: hidden;
-    padding: 6px 18px 0;
+    padding: 8px 18px 0;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 17px;
   }
 
   .app-head {
@@ -273,62 +302,67 @@
   }
 
   .app-title {
-    font-size: 22px;
-    font-weight: 780;
-    letter-spacing: -0.026em;
+    font-family: var(--serif);
+    font-size: 23px;
+    font-weight: 400;
+    letter-spacing: -0.008em;
     margin: 0;
   }
 
   .month-nav {
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--ink-3);
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 12.5px;
-    font-weight: 600;
-    color: var(--ink-3);
   }
 
-  /* ---------- numero eroe ---------- */
+  /* ---------- numero eroe ----------
+     Peso 500, non 800: la scala fa il lavoro, non il grassetto. */
 
   .hero-amount {
-    font-size: 44px;
-    font-weight: 800;
-    letter-spacing: -0.045em;
-    font-variant-numeric: tabular-nums;
-    line-height: 1;
+    font-size: 42px;
+    font-weight: 500;
+    letter-spacing: -0.022em;
+    font-variant-numeric: tabular-nums lining-nums;
+    line-height: 1.05;
     margin: 0;
   }
 
   .hero-amount .cents {
-    font-size: 26px;
+    font-size: 25px;
+    font-weight: 400;
     color: var(--ink-3);
-    letter-spacing: -0.03em;
+    letter-spacing: -0.012em;
   }
 
   .hero-label {
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: 0.12em;
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.1em;
     text-transform: uppercase;
     color: var(--ink-3);
-    margin: 0 0 8px;
+    margin: 0 0 9px;
   }
 
   .hero-delta {
-    font-size: 12.5px;
+    font-family: var(--serif);
+    font-size: 13.5px;
     color: var(--ink-2);
-    margin: 8px 0 0;
+    margin: 9px 0 0;
   }
 
   .hero-delta b {
     color: var(--c-spesa);
-    font-weight: 650;
+    font-weight: 500;
   }
 
   /* ---------- card ---------- */
 
   .card {
-    background: var(--surface-2);
+    background: var(--surface);
+    border: 1px solid var(--hairline);
     border-radius: var(--r-card);
     padding: 15px 16px;
   }
@@ -337,28 +371,29 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
+    margin-bottom: 13px;
   }
 
   .card-title {
     font-size: 12.5px;
-    font-weight: 700;
-    letter-spacing: -0.005em;
+    font-weight: 500;
+    letter-spacing: 0;
     margin: 0;
   }
 
   .card-meta {
     font-size: 11.5px;
+    font-weight: 400;
     color: var(--ink-3);
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: tabular-nums lining-nums;
   }
 
   /* ---------- barra limite ---------- */
 
   .limit-track {
-    height: 9px;
+    height: 8px;
     border-radius: 999px;
-    background: color-mix(in srgb, var(--ink) 10%, transparent);
+    background: color-mix(in srgb, var(--ink) 9%, transparent);
     overflow: hidden;
     position: relative;
   }
@@ -375,21 +410,21 @@
   .limit-foot {
     display: flex;
     justify-content: space-between;
-    margin-top: 9px;
+    margin-top: 10px;
     font-size: 11.5px;
     color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: tabular-nums lining-nums;
   }
 
   /* ---------- lista transazioni ---------- */
 
   .day-label {
-    font-size: 11px;
-    font-weight: 650;
-    letter-spacing: 0.1em;
+    font-size: 10.5px;
+    font-weight: 500;
+    letter-spacing: 0.09em;
     text-transform: uppercase;
     color: var(--ink-3);
-    margin: 2px 0 6px;
+    margin: 3px 0 7px;
   }
 
   .tx {
@@ -400,13 +435,13 @@
   }
 
   .tx-icon {
-    width: 36px;
-    height: 36px;
+    width: 35px;
+    height: 35px;
     border-radius: 999px;
     display: grid;
     place-items: center;
     flex-shrink: 0;
-    font-size: 15px;
+    font-size: 14px;
     line-height: 1;
   }
 
@@ -414,8 +449,8 @@
 
   .tx-name {
     font-size: 14px;
-    font-weight: 620;
-    letter-spacing: -0.008em;
+    font-weight: 500;
+    letter-spacing: 0;
     margin: 0;
     white-space: nowrap;
     overflow: hidden;
@@ -424,29 +459,28 @@
 
   .tx-cat {
     font-size: 12px;
+    font-weight: 400;
     color: var(--ink-3);
     margin: 2px 0 0;
   }
 
   .tx-amt {
     font-size: 14.5px;
-    font-weight: 680;
-    font-variant-numeric: tabular-nums;
-    letter-spacing: -0.015em;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums lining-nums;
+    letter-spacing: -0.008em;
     flex-shrink: 0;
   }
 
-  .tx-amt.split {
-    color: var(--ink-2);
-  }
+  .tx-amt.split { color: var(--ink-2); }
 
   .tx-amt small {
     display: block;
     font-size: 10.5px;
-    font-weight: 550;
+    font-weight: 400;
     color: var(--ink-3);
     text-align: right;
-    margin-top: 1px;
+    margin-top: 2px;
   }
 
   /* ---------- legenda ---------- */
@@ -467,21 +501,21 @@
   .swatch {
     width: 9px;
     height: 9px;
-    border-radius: 3px;
+    border-radius: 2px;
     flex-shrink: 0;
   }
 
-  .legend-name { flex: 1; color: var(--ink-2); }
+  .legend-name { flex: 1; color: var(--ink-2); font-weight: 400; }
 
   .legend-val {
-    font-variant-numeric: tabular-nums;
-    font-weight: 650;
-    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums lining-nums;
+    font-weight: 500;
+    letter-spacing: -0.005em;
   }
 
   .legend-pct {
     color: var(--ink-3);
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: tabular-nums lining-nums;
     width: 34px;
     text-align: right;
   }
@@ -504,9 +538,8 @@
     align-items: center;
     gap: 3px;
     font-size: 9.5px;
-    font-weight: 600;
+    font-weight: 500;
     color: var(--ink-3);
-    letter-spacing: 0.01em;
   }
 
   .tab.active { color: var(--accent); }
@@ -516,6 +549,7 @@
     height: 20px;
     display: grid;
     place-items: center;
+    font-size: 15px;
   }
 
   .fab {
@@ -523,14 +557,14 @@
     height: 42px;
     border-radius: 999px;
     background: var(--accent);
-    color: #fff;
+    color: #fdfcfa;
     display: grid;
     place-items: center;
-    font-size: 23px;
+    font-size: 22px;
     font-weight: 400;
     line-height: 1;
     margin-top: -14px;
-    box-shadow: 0 6px 16px -4px color-mix(in srgb, var(--accent) 60%, transparent);
+    box-shadow: 0 5px 14px -5px color-mix(in srgb, var(--accent) 65%, transparent);
   }
 
   .home-indicator {
@@ -538,7 +572,7 @@
     width: 108px;
     border-radius: 999px;
     background: var(--ink);
-    opacity: 0.22;
+    opacity: 0.2;
     margin: 4px auto 7px;
     flex-shrink: 0;
   }
@@ -548,7 +582,7 @@
   .sheet-dim {
     position: absolute;
     inset: 0;
-    background: rgb(0 0 0 / 0.34);
+    background: rgb(20 20 19 / 0.36);
   }
 
   .sheet {
@@ -556,8 +590,8 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: var(--surface);
-    border-radius: 26px 26px 0 0;
+    background: var(--ground);
+    border-radius: 22px 22px 0 0;
     padding: 10px 18px 20px;
     display: flex;
     flex-direction: column;
@@ -570,14 +604,15 @@
     height: 4px;
     border-radius: 999px;
     background: var(--ink);
-    opacity: 0.18;
-    margin: 0 auto 3px;
+    opacity: 0.16;
+    margin: 0 auto 4px;
   }
 
   .sheet-title {
-    font-size: 17px;
-    font-weight: 750;
-    letter-spacing: -0.022em;
+    font-family: var(--serif);
+    font-size: 18px;
+    font-weight: 400;
+    letter-spacing: -0.008em;
     margin: 0;
   }
 
@@ -586,19 +621,20 @@
     justify-content: space-between;
     align-items: center;
     padding: 11px 13px;
-    background: var(--surface-2);
-    border-radius: 13px;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: var(--r-field);
     font-size: 13.5px;
   }
 
-  .field-label { color: var(--ink-3); font-size: 12.5px; }
+  .field-label { color: var(--ink-3); font-size: 12.5px; font-weight: 400; }
 
   .field-value {
-    font-weight: 650;
+    font-weight: 500;
     display: flex;
     align-items: center;
     gap: 7px;
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: tabular-nums lining-nums;
   }
 
   .cat-chip {
@@ -608,12 +644,12 @@
     padding: 4px 10px 4px 7px;
     border-radius: var(--r-chip);
     font-size: 12px;
-    font-weight: 620;
+    font-weight: 500;
   }
 
   .ask {
     background: var(--accent-soft);
-    border-radius: 15px;
+    border-radius: var(--r-card);
     padding: 13px 14px;
     display: flex;
     flex-direction: column;
@@ -621,20 +657,25 @@
   }
 
   .ask-head {
-    font-size: 12.5px;
-    line-height: 1.45;
+    font-family: var(--serif);
+    font-size: 13.5px;
+    line-height: 1.5;
     margin: 0;
     color: var(--ink);
   }
+
+  .ask-head b { font-weight: 600; }
 
   .check {
     display: flex;
     align-items: flex-start;
     gap: 9px;
     font-size: 12.5px;
-    line-height: 1.4;
+    line-height: 1.45;
     color: var(--ink-2);
   }
+
+  .check b { font-weight: 500; color: var(--ink); }
 
   .box {
     width: 17px;
@@ -645,8 +686,8 @@
     margin-top: 1px;
     display: grid;
     place-items: center;
-    font-size: 11px;
-    color: #fff;
+    font-size: 10px;
+    color: #fdfcfa;
   }
 
   .box.on {
@@ -656,19 +697,19 @@
 
   .btn {
     background: var(--accent);
-    color: #fff;
-    border-radius: 13px;
+    color: #fdfcfa;
+    border-radius: var(--r-btn);
     padding: 13px;
     text-align: center;
     font-size: 14.5px;
-    font-weight: 680;
-    letter-spacing: -0.01em;
+    font-weight: 500;
+    letter-spacing: 0;
   }
 
   .btn.ghost {
     background: transparent;
     color: var(--over);
-    font-weight: 620;
+    font-weight: 400;
     padding: 6px;
   }
 
@@ -681,8 +722,8 @@
     justify-content: space-between;
     font-size: 10px;
     color: var(--ink-3);
-    margin-top: 7px;
-    font-variant-numeric: tabular-nums;
+    margin-top: 8px;
+    font-variant-numeric: tabular-nums lining-nums;
   }
 
   .donut-wrap {
@@ -700,19 +741,21 @@
   }
 
   .donut-hole .dh-val {
-    font-size: 17px;
-    font-weight: 780;
-    letter-spacing: -0.03em;
-    font-variant-numeric: tabular-nums;
+    font-family: var(--serif);
+    font-size: 19px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    font-variant-numeric: tabular-nums lining-nums;
     line-height: 1.1;
   }
 
   .donut-hole .dh-lab {
-    font-size: 9px;
+    font-size: 8.5px;
     color: var(--ink-3);
-    letter-spacing: 0.07em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
-    font-weight: 620;
+    font-weight: 500;
+    margin-top: 1px;
   }
 
   .donut-box {
@@ -736,26 +779,27 @@
     display: grid;
     place-items: center;
     font-size: 13px;
-    font-weight: 700;
-    color: #fff;
+    font-weight: 500;
+    color: #fdfcfa;
     flex-shrink: 0;
   }
 
   .pill {
     font-size: 10.5px;
-    font-weight: 650;
+    font-weight: 500;
     padding: 3px 8px;
     border-radius: var(--r-chip);
-    letter-spacing: 0.01em;
+    display: inline-block;
+    margin-top: 3px;
   }
 
   .pill.late {
-    background: color-mix(in srgb, var(--over) 14%, transparent);
+    background: color-mix(in srgb, var(--over) 13%, transparent);
     color: var(--over);
   }
 
   .pill.ok {
-    background: color-mix(in srgb, var(--c-spesa) 15%, transparent);
+    background: color-mix(in srgb, var(--c-spesa) 14%, transparent);
     color: var(--c-spesa);
   }
 
@@ -763,64 +807,66 @@
 
   .palette-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
     gap: 10px;
   }
 
   .pal {
     background: var(--surface);
     border: 1px solid var(--hairline);
-    border-radius: 13px;
+    border-radius: var(--r-field);
     padding: 12px 13px;
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 11px;
   }
 
   .pal-dot {
     width: 22px;
     height: 22px;
-    border-radius: 7px;
+    border-radius: 6px;
     flex-shrink: 0;
   }
 
   .pal-name {
     font-size: 13px;
-    font-weight: 640;
-    letter-spacing: -0.008em;
+    font-weight: 500;
+    letter-spacing: 0;
   }
 
   .pal-hex {
     font-size: 10.5px;
     color: var(--ink-3);
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: tabular-nums lining-nums;
     letter-spacing: 0.02em;
-    margin-top: 1px;
+    margin-top: 2px;
   }
 
   /* ---------- note principi ---------- */
 
   .principles {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(238px, 1fr));
-    gap: 20px;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 22px;
   }
 
   .principle {
-    border-top: 2px solid var(--ink);
-    padding-top: 13px;
+    border-top: 1px solid var(--ink);
+    padding-top: 14px;
   }
 
   .principle h3 {
-    font-size: 14.5px;
-    font-weight: 700;
-    letter-spacing: -0.015em;
-    margin: 0 0 7px;
+    font-family: var(--serif);
+    font-size: 16px;
+    font-weight: 400;
+    letter-spacing: -0.005em;
+    margin: 0 0 8px;
   }
 
   .principle p {
-    font-size: 13.5px;
-    line-height: 1.58;
+    font-family: var(--serif);
+    font-size: 14.5px;
+    line-height: 1.62;
     color: var(--ink-2);
     margin: 0;
   }
@@ -828,17 +874,98 @@
   .callout {
     background: var(--surface);
     border: 1px solid var(--hairline);
-    border-radius: 15px;
-    padding: 18px 20px;
-    font-size: 14px;
-    line-height: 1.62;
+    border-radius: var(--r-card);
+    padding: 20px 22px;
+    font-family: var(--serif);
+    font-size: 15px;
+    line-height: 1.66;
     color: var(--ink-2);
   }
 
-  .callout strong { color: var(--ink); font-weight: 680; }
+  .callout strong { color: var(--ink); font-weight: 600; }
+
+
+  /* ---------- icone (Lucide, MIT) ---------- */
+
+  .ic {
+    width: 1em;
+    height: 1em;
+    display: block;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.75;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .tx-icon .ic { width: 17px; height: 17px; }
+  .tab-glyph .ic { width: 19px; height: 19px; stroke-width: 1.6; }
+  .fab .ic { width: 21px; height: 21px; stroke-width: 1.9; }
+  .month-nav .ic { width: 14px; height: 14px; }
+  .note-ic { width: 16px; height: 16px; flex-shrink: 0; margin-top: 1px; }
+  .box .ic { width: 11px; height: 11px; stroke-width: 3; }
+  .row-ic { width: 17px; height: 17px; flex-shrink: 0; }
+
+
+  /* ---------- schermata impostazioni ---------- */
+
+  .seg {
+    display: flex;
+    gap: 4px;
+    background: color-mix(in srgb, var(--ink) 6%, transparent);
+    border-radius: 11px;
+    padding: 4px;
+  }
+
+  .seg-opt {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 8px 4px;
+    border-radius: 8px;
+    font-size: 11.5px;
+    font-weight: 500;
+    color: var(--ink-3);
+  }
+
+  .seg-opt .ic { width: 13px; height: 13px; }
+
+  .seg-opt.on {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 1px 3px -1px rgb(20 20 19 / 0.18);
+  }
+
+  .set-row {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 13px 0;
+  }
+
+  .set-name { flex: 1; font-size: 13.5px; font-weight: 400; }
+
+  .set-val {
+    font-size: 12.5px;
+    color: var(--ink-3);
+    font-variant-numeric: tabular-nums lining-nums;
+  }
+
+  .set-div { height: 1px; background: var(--hairline); }
+
+  .set-foot {
+    font-family: var(--serif);
+    font-size: 12.5px;
+    line-height: 1.55;
+    color: var(--ink-3);
+    margin: 0;
+  }
 
   .scroll-x { overflow-x: auto; }
 </style>
+
 
 <div class="wrap">
 
@@ -876,7 +1003,7 @@
           <div class="app">
             <div class="app-head">
               <h3 class="app-title">Luglio</h3>
-              <span class="month-nav">‹ &nbsp;2026&nbsp; ›</span>
+              <span class="month-nav"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg><span>2026</span><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span>
             </div>
 
             <div>
@@ -963,7 +1090,7 @@
                   </div>
                   <div class="legend-row">
                     <span class="swatch" style="background:var(--c-altro)"></span>
-                    <span class="legend-name">Altro</span>
+                    <span class="legend-name">Impostazioni</span>
                     <span class="legend-val">90</span>
                     <span class="legend-pct">7%</span>
                   </div>
@@ -973,11 +1100,11 @@
           </div>
 
           <div class="tabbar">
-            <span class="tab active"><span class="tab-glyph">◈</span>Home</span>
-            <span class="tab"><span class="tab-glyph">≡</span>Spese</span>
-            <span class="fab">+</span>
-            <span class="tab"><span class="tab-glyph">◔</span>Statistiche</span>
-            <span class="tab"><span class="tab-glyph">⚙</span>Altro</span>
+            <span class="tab active"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Home</span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></svg></span>Spese</span>
+            <span class="fab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg></span>Statistiche</span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg></span>Impostazioni</span>
           </div>
           <div class="home-indicator"></div>
         </div>
@@ -1005,14 +1132,14 @@
           <div class="app">
             <div class="app-head">
               <h3 class="app-title">Spese</h3>
-              <span class="month-nav">Luglio ▾</span>
+              <span class="month-nav">Luglio <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
             </div>
 
             <div style="overflow:hidden">
               <p class="day-label">Oggi · 27 luglio</p>
 
               <div class="tx">
-                <span class="tx-icon" style="background:color-mix(in srgb, var(--c-spesa) 16%, transparent); color:var(--c-spesa)">▤</span>
+                <span class="tx-icon" style="background:color-mix(in srgb, var(--c-spesa) 16%, transparent); color:var(--c-spesa)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.05 2.05h2l2.66 12.42a2 2 0 0 0 2 1.58h9.78a2 2 0 0 0 1.95-1.57l1.65-7.43H5.12"/></svg></span>
                 <div class="tx-body">
                   <p class="tx-name">Esselunga</p>
                   <p class="tx-cat">Spesa</p>
@@ -1021,7 +1148,7 @@
               </div>
 
               <div class="tx">
-                <span class="tx-icon" style="background:color-mix(in srgb, var(--c-ristorazione) 16%, transparent); color:var(--c-ristorazione)">◗</span>
+                <span class="tx-icon" style="background:color-mix(in srgb, var(--c-ristorazione) 16%, transparent); color:var(--c-ristorazione)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg></span>
                 <div class="tx-body">
                   <p class="tx-name">Bar Centrale</p>
                   <p class="tx-cat">Ristorazione</p>
@@ -1032,7 +1159,7 @@
               <p class="day-label">Ieri · 26 luglio</p>
 
               <div class="tx">
-                <span class="tx-icon" style="background:color-mix(in srgb, var(--c-ristorazione) 16%, transparent); color:var(--c-ristorazione)">◗</span>
+                <span class="tx-icon" style="background:color-mix(in srgb, var(--c-ristorazione) 16%, transparent); color:var(--c-ristorazione)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2"/><path d="M7 2v20"/><path d="M21 15V2a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7"/></svg></span>
                 <div class="tx-body">
                   <p class="tx-name">Ristorante Da Mario</p>
                   <p class="tx-cat">Ristorazione · diviso in 4</p>
@@ -1041,7 +1168,7 @@
               </div>
 
               <div class="tx">
-                <span class="tx-icon" style="background:color-mix(in srgb, var(--c-trasporti) 16%, transparent); color:var(--c-trasporti)">▲</span>
+                <span class="tx-icon" style="background:color-mix(in srgb, var(--c-trasporti) 16%, transparent); color:var(--c-trasporti)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect width="16" height="16" x="4" y="3" rx="2"/><path d="M4 11h16"/><path d="M12 3v8"/><path d="m8 19-2 3"/><path d="m18 22-2-3"/><path d="M8 15h.01"/><path d="M16 15h.01"/></svg></span>
                 <div class="tx-body">
                   <p class="tx-name">Trenitalia</p>
                   <p class="tx-cat">Trasporti</p>
@@ -1050,7 +1177,7 @@
               </div>
 
               <div class="tx">
-                <span class="tx-icon" style="background:color-mix(in srgb, var(--c-altro) 16%, transparent); color:var(--c-altro)">?</span>
+                <span class="tx-icon" style="background:color-mix(in srgb, var(--c-altro) 16%, transparent); color:var(--c-altro)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
                 <div class="tx-body">
                   <p class="tx-name">PAYPAL *STEAM</p>
                   <p class="tx-cat">Da categorizzare</p>
@@ -1061,7 +1188,7 @@
               <p class="day-label">25 luglio</p>
 
               <div class="tx">
-                <span class="tx-icon" style="background:color-mix(in srgb, var(--c-abbonamenti) 16%, transparent); color:var(--c-abbonamenti)">↻</span>
+                <span class="tx-icon" style="background:color-mix(in srgb, var(--c-abbonamenti) 16%, transparent); color:var(--c-abbonamenti)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>
                 <div class="tx-body">
                   <p class="tx-name">Mutuo casa</p>
                   <p class="tx-cat">Casa · ricorrente</p>
@@ -1072,11 +1199,11 @@
           </div>
 
           <div class="tabbar">
-            <span class="tab"><span class="tab-glyph">◈</span>Home</span>
-            <span class="tab active"><span class="tab-glyph">≡</span>Spese</span>
-            <span class="fab">+</span>
-            <span class="tab"><span class="tab-glyph">◔</span>Statistiche</span>
-            <span class="tab"><span class="tab-glyph">⚙</span>Altro</span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Home</span>
+            <span class="tab active"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></svg></span>Spese</span>
+            <span class="fab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg></span>Statistiche</span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg></span>Impostazioni</span>
           </div>
           <div class="home-indicator"></div>
         </div>
@@ -1104,7 +1231,7 @@
           <div class="app">
             <div class="app-head">
               <h3 class="app-title">Statistiche</h3>
-              <span class="month-nav">Mese ▾</span>
+              <span class="month-nav">Mese <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
             </div>
 
             <div class="card">
@@ -1199,11 +1326,11 @@
           </div>
 
           <div class="tabbar">
-            <span class="tab"><span class="tab-glyph">◈</span>Home</span>
-            <span class="tab"><span class="tab-glyph">≡</span>Spese</span>
-            <span class="fab">+</span>
-            <span class="tab active"><span class="tab-glyph">◔</span>Statistiche</span>
-            <span class="tab"><span class="tab-glyph">⚙</span>Altro</span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Home</span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></svg></span>Spese</span>
+            <span class="fab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>
+            <span class="tab active"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg></span>Statistiche</span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg></span>Impostazioni</span>
           </div>
           <div class="home-indicator"></div>
         </div>
@@ -1231,10 +1358,10 @@
           <div class="app" style="opacity:0.45">
             <div class="app-head">
               <h3 class="app-title">Spese</h3>
-              <span class="month-nav">Luglio ▾</span>
+              <span class="month-nav">Luglio <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
             </div>
             <div class="tx">
-              <span class="tx-icon" style="background:color-mix(in srgb, var(--c-altro) 16%, transparent); color:var(--c-altro)">?</span>
+              <span class="tx-icon" style="background:color-mix(in srgb, var(--c-altro) 16%, transparent); color:var(--c-altro)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/></svg></span>
               <div class="tx-body">
                 <p class="tx-name">PAYPAL *STEAM</p>
                 <p class="tx-cat">Da categorizzare</p>
@@ -1269,11 +1396,11 @@
             <div class="ask">
               <p class="ask-head">Hai spostato <b>PAYPAL *STEAM</b> in Cultura.</p>
               <div class="check">
-                <span class="box on">✓</span>
+                <span class="box on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
                 <span>Applica anche alle altre <b>7 spese</b> di questo esercente</span>
               </div>
               <div class="check">
-                <span class="box on">✓</span>
+                <span class="box on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg></span>
                 <span>Ricorda per i pagamenti futuri</span>
               </div>
             </div>
@@ -1308,7 +1435,7 @@
           <div class="app">
             <div class="app-head">
               <h3 class="app-title">Limiti</h3>
-              <span class="month-nav">+ Nuovo</span>
+              <span class="month-nav"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg><span>Nuovo</span></span>
             </div>
 
             <div class="card">
@@ -1355,7 +1482,7 @@
 
             <div class="card" style="background:color-mix(in srgb, var(--over) 10%, transparent)">
               <div style="display:flex;gap:11px;align-items:flex-start">
-                <span style="font-size:16px;line-height:1.1">⚠</span>
+                <span class="note-ic" style="color:var(--over)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></span>
                 <div>
                   <p class="card-title" style="margin-bottom:4px">Limite Ristorazione superato</p>
                   <p style="font-size:12px;color:var(--ink-2);margin:0;line-height:1.45">
@@ -1368,11 +1495,11 @@
           </div>
 
           <div class="tabbar">
-            <span class="tab"><span class="tab-glyph">◈</span>Home</span>
-            <span class="tab"><span class="tab-glyph">≡</span>Spese</span>
-            <span class="fab">+</span>
-            <span class="tab"><span class="tab-glyph">◔</span>Statistiche</span>
-            <span class="tab active"><span class="tab-glyph">⚙</span>Altro</span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Home</span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></svg></span>Spese</span>
+            <span class="fab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg></span>Statistiche</span>
+            <span class="tab active"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg></span>Impostazioni</span>
           </div>
           <div class="home-indicator"></div>
         </div>
@@ -1400,7 +1527,7 @@
           <div class="app">
             <div class="app-head">
               <h3 class="app-title">Mi devono</h3>
-              <span class="month-nav">Tutti ▾</span>
+              <span class="month-nav">Tutti <svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m6 9 6 6 6-6"/></svg></span>
             </div>
 
             <div>
@@ -1453,7 +1580,7 @@
 
             <div class="card" style="background:var(--accent-soft)">
               <div style="display:flex;gap:11px;align-items:flex-start">
-                <span style="font-size:15px;line-height:1.2">🔔</span>
+                <span class="note-ic" style="color:var(--accent)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10.268 21a2 2 0 0 0 3.464 0"/><path d="M3.262 15.326A1 1 0 0 0 4 17h16a1 1 0 0 0 .74-1.673C19.41 13.956 18 12.499 18 8A6 6 0 0 0 6 8c0 4.499-1.411 5.956-2.738 7.326"/></svg></span>
                 <div>
                   <p class="card-title" style="margin-bottom:4px">Promemoria inviato</p>
                   <p style="font-size:12px;color:var(--ink-2);margin:0;line-height:1.45">
@@ -1466,11 +1593,11 @@
           </div>
 
           <div class="tabbar">
-            <span class="tab"><span class="tab-glyph">◈</span>Home</span>
-            <span class="tab"><span class="tab-glyph">≡</span>Spese</span>
-            <span class="fab">+</span>
-            <span class="tab"><span class="tab-glyph">◔</span>Statistiche</span>
-            <span class="tab active"><span class="tab-glyph">⚙</span>Altro</span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Home</span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></svg></span>Spese</span>
+            <span class="fab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg></span>Statistiche</span>
+            <span class="tab active"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg></span>Impostazioni</span>
           </div>
           <div class="home-indicator"></div>
         </div>
@@ -1483,6 +1610,100 @@
       </p>
     </div>
 
+
+    <!-- ============ 7. IMPOSTAZIONI ============ -->
+    <div class="screen-cell">
+      <div class="phone">
+        <div class="glass">
+          <div class="statusbar">
+            <span>9:41</span>
+            <span class="dots">
+              <i style="height:5px"></i><i style="height:7px"></i><i style="height:9px"></i><i style="height:11px"></i>
+              <span style="margin-left:5px;font-size:11px">100%</span>
+            </span>
+          </div>
+
+          <div class="app">
+            <div class="app-head">
+              <h3 class="app-title">Impostazioni</h3>
+            </div>
+
+            <div>
+              <p class="hero-label">Aspetto</p>
+              <div class="seg">
+                <span class="seg-opt"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg><span>Chiaro</span></span>
+                <span class="seg-opt"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg><span>Scuro</span></span>
+                <span class="seg-opt on"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect width="14" height="20" x="5" y="2" rx="2" ry="2"/><path d="M12 18h.01"/></svg><span>Sistema</span></span>
+              </div>
+            </div>
+
+            <div class="card" style="padding:4px 14px">
+              
+              <div class="set-row">
+                <span class="row-ic" style="color:var(--ink-3)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="13.5" cy="6.5" r=".5" fill="currentColor"/><circle cx="17.5" cy="10.5" r=".5" fill="currentColor"/><circle cx="6.5" cy="12.5" r=".5" fill="currentColor"/><circle cx="8.5" cy="7.5" r=".5" fill="currentColor"/><path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"/></svg></span>
+                <span class="set-name">Categorie</span>
+                <span class="set-val">12</span>
+                <span class="row-ic" style="color:var(--ink-3);width:14px;height:14px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span>
+              </div>
+              <div class="set-div"></div>
+              
+              <div class="set-row">
+                <span class="row-ic" style="color:var(--ink-3)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 14 4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/></svg></span>
+                <span class="set-name">Limiti di spesa</span>
+                <span class="set-val">3 attivi</span>
+                <span class="row-ic" style="color:var(--ink-3);width:14px;height:14px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span>
+              </div>
+              <div class="set-div"></div>
+              
+              <div class="set-row">
+                <span class="row-ic" style="color:var(--ink-3)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m17 2 4 4-4 4"/><path d="M3 11v-1a4 4 0 0 1 4-4h14"/><path d="m7 22-4-4 4-4"/><path d="M21 13v1a4 4 0 0 1-4 4H3"/></svg></span>
+                <span class="set-name">Spese ricorrenti</span>
+                <span class="set-val">2</span>
+                <span class="row-ic" style="color:var(--ink-3);width:14px;height:14px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span>
+              </div>
+              <div class="set-div"></div>
+              
+              <div class="set-row">
+                <span class="row-ic" style="color:var(--ink-3)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+                <span class="set-name">Persone</span>
+                <span class="set-val">3</span>
+                <span class="row-ic" style="color:var(--ink-3);width:14px;height:14px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span>
+              </div>
+            </div>
+
+            <div class="card" style="padding:4px 14px">
+              
+              <div class="set-row">
+                <span class="row-ic" style="color:var(--ink-3)"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4"/><path d="m21 2-9.6 9.6"/><circle cx="7.5" cy="15.5" r="5.5"/></svg></span>
+                <span class="set-name">Token Shortcut</span>
+                <span class="set-val">1 attivo</span>
+                <span class="row-ic" style="color:var(--ink-3);width:14px;height:14px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg></span>
+              </div>
+            </div>
+
+            <p class="set-foot">
+              Valuta, primo giorno della settimana e formato data si impostano
+              qui. L'aspetto segue il telefono se scegli Sistema.
+            </p>
+          </div>
+
+          <div class="tabbar">
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M15 21v-8a1 1 0 0 0-1-1h-4a1 1 0 0 0-1 1v8"/><path d="M3 10a2 2 0 0 1 .709-1.528l7-5.999a2 2 0 0 1 2.582 0l7 5.999A2 2 0 0 1 21 10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></span>Home</span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12h.01"/><path d="M3 18h.01"/><path d="M3 6h.01"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M8 6h13"/></svg></span>Spese</span>
+            <span class="fab"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"/><path d="M12 5v14"/></svg></span>
+            <span class="tab"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12c.552 0 1.005-.449.95-.998a10 10 0 0 0-8.953-8.951c-.55-.055-.998.398-.998.95v8a1 1 0 0 0 1 1z"/><path d="M21.21 15.89A10 10 0 1 1 8 2.83"/></svg></span>Statistiche</span>
+            <span class="tab active"><span class="tab-glyph"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M10 5H3"/><path d="M12 19H3"/><path d="M14 3v4"/><path d="M16 17v4"/><path d="M21 12h-9"/><path d="M21 19h-5"/><path d="M21 5h-7"/><path d="M8 10v4"/><path d="M8 12H3"/></svg></span>Impostazioni</span>
+          </div>
+          <div class="home-indicator"></div>
+        </div>
+      </div>
+      <p class="caption-title">Impostazioni — tutto ciò che si personalizza</p>
+      <p class="caption-body">
+        Tema, categorie, limiti, ricorrenti, persone e token in un unico posto.
+        L'aspetto segue di default il telefono, ma puoi forzarlo: è una
+        preferenza, non una decisione presa una volta per tutte.
+      </p>
+    </div>
   </div>
 
   <hr class="rule">
@@ -1556,11 +1777,16 @@
   <hr class="rule">
 
   <div class="callout">
-    <strong>Da decidere insieme.</strong> Le icone qui sono segnaposto geometrici —
-    per la versione vera servono icone di categoria disegnate (o una libreria come
-    SF Symbols, gratuita e nativa iOS). Inoltre: il mockup mostra il tema chiaro e
-    scuro seguendo le impostazioni del tuo telefono; dimmi se preferisci
-    <em>forzare</em> uno dei due invece di seguire il sistema.
+    <strong>Caratteri.</strong> Styrene e Tiempos sono su licenza Anthropic e non
+    ridistribuibili: gli stack qui li dichiarano per primi, con ripieghi di
+    sistema dalle proporzioni simili. Il carattere del sistema, però, non sta nei
+    font — sta nella misura: pesi bassi anche a corpo grande, crenatura quasi
+    neutra, fondo caldo, un solo accento. Quello è riprodotto per intero.
+    <br><br>
+    <strong>Icone.</strong> Lucide, licenza MIT: 1500 icone su griglia 24px con
+    spessore del tratto regolabile — impostato qui a 1,75 per restare coerente
+    con i pesi tipografici. Quelle che vedi sono già le icone vere, non
+    segnaposto.
   </div>
 
 </div>

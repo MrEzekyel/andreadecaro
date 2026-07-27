@@ -1,11 +1,11 @@
 // Edge Function: ingest-payment
 //
-// Riceve un pagamento (estratto da una notifica Wallet tramite una Shortcut iOS),
-// lo categorizza in base all'esercente e lo salva nella tabella `payments`.
+// Riceve un pagamento (estratto da una notifica Wallet tramite una Shortcut iOS
+// o dettato a Siri), risolve esercente e categoria, e lo salva in `payments`.
 //
 // Autenticazione: la Shortcut invia il proprio token nell'header
 // `x-ingest-token`. La function ne calcola l'hash SHA-256 e lo cerca in
-// `ingest_tokens` per risalire all'utente. Nessun segreto da configurare a mano.
+// `ingest_tokens` per risalire all'utente. Nessun segreto da configurare.
 //
 // Deploy: supabase functions deploy ingest-payment --no-verify-jwt
 
@@ -17,14 +17,17 @@ type IngestBody = {
   occurred_at?: string;
   raw_text?: string;
   dedup_key?: string;
+  source?: string;
 };
 
 // Finestra entro cui due pagamenti identici sono considerati un doppio invio
 // della stessa notifica Wallet.
 const DEDUP_WINDOW_MINUTES = 5;
 
+const ALLOWED_SOURCES = new Set(["shortcut", "siri", "manual", "recurring"]);
+
 function normalize(value: string) {
-  return value.trim().toLowerCase();
+  return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -145,6 +148,9 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "occurred_at is not a valid date" }, 400);
   }
 
+  const source =
+    body.source && ALLOWED_SOURCES.has(body.source) ? body.source : "shortcut";
+
   // Il token e' valido: segna l'uso senza bloccare l'ingestione se fallisce.
   await supabase
     .from("ingest_tokens")
@@ -177,27 +183,87 @@ Deno.serve(async (req) => {
     }
   }
 
-  // 1. le regole personalizzate dell'utente hanno priorita'
-  const { data: userRules } = await supabase
-    .from("merchant_categories")
-    .select("keyword, category")
-    .eq("user_id", userId);
+  // ── Esercente ─────────────────────────────────────────────────────────────
+  // Cerca l'esercente gia' noto, altrimenti lo crea. La riga porta con se'
+  // la categoria scelta dall'utente, se l'ha gia' corretta in passato.
+  let merchantId: string | null = null;
+  let categoryId: string | null = null;
 
-  let category =
-    userRules?.find((rule) =>
-      merchantNormalized.includes(normalize(rule.keyword))
-    )?.category ?? null;
+  const { data: existingMerchant } = await supabase
+    .from("merchants")
+    .select("id, category_id")
+    .eq("user_id", userId)
+    .eq("normalized_name", merchantNormalized)
+    .maybeSingle();
 
-  // 2. altrimenti si guarda l'elenco predefinito
-  if (!category) {
+  if (existingMerchant) {
+    merchantId = existingMerchant.id;
+    categoryId = existingMerchant.category_id;
+  } else {
+    const { data: created, error: merchantError } = await supabase
+      .from("merchants")
+      .insert({
+        user_id: userId,
+        normalized_name: merchantNormalized,
+        display_name: merchantRaw,
+      })
+      .select("id, category_id")
+      .single();
+
+    // Una richiesta concorrente puo' aver creato lo stesso esercente:
+    // in quel caso rileggo la riga vincente invece di fallire.
+    if (merchantError?.code === "23505") {
+      const { data: raced } = await supabase
+        .from("merchants")
+        .select("id, category_id")
+        .eq("user_id", userId)
+        .eq("normalized_name", merchantNormalized)
+        .maybeSingle();
+      merchantId = raced?.id ?? null;
+      categoryId = raced?.category_id ?? null;
+    } else if (merchantError) {
+      console.error("merchant upsert failed", merchantError);
+    } else {
+      merchantId = created.id;
+      categoryId = created.category_id;
+    }
+  }
+
+  // ── Categoria ─────────────────────────────────────────────────────────────
+  // 1. l'esercente e' gia' mappato -> certo, nessuna euristica
+  // 2. regole keyword dell'utente -> quasi certo
+  // 3. regole predefinite -> ipotesi
+  // 4. NULL -> resta da categorizzare
+  if (!categoryId) {
+    const { data: userRules } = await supabase
+      .from("merchant_categories")
+      .select("keyword, category_id")
+      .eq("user_id", userId);
+
+    categoryId =
+      userRules?.find((rule) =>
+        merchantNormalized.includes(normalize(rule.keyword))
+      )?.category_id ?? null;
+  }
+
+  if (!categoryId) {
     const { data: defaultRules } = await supabase
       .from("default_merchant_categories")
       .select("keyword, category");
 
-    category =
-      defaultRules?.find((rule) =>
-        merchantNormalized.includes(normalize(rule.keyword))
-      )?.category ?? null;
+    const guessedName = defaultRules?.find((rule) =>
+      merchantNormalized.includes(normalize(rule.keyword))
+    )?.category;
+
+    if (guessedName) {
+      const { data: category } = await supabase
+        .from("categories")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("name", guessedName)
+        .maybeSingle();
+      categoryId = category?.id ?? null;
+    }
   }
 
   const { data: inserted, error } = await supabase
@@ -207,10 +273,11 @@ Deno.serve(async (req) => {
       amount,
       merchant_raw: merchantRaw,
       merchant_name: merchantRaw,
-      category: category ?? "Da categorizzare",
+      merchant_id: merchantId,
+      category_id: categoryId,
       occurred_at: occurredAt.toISOString(),
       raw_notification_text: body.raw_text ?? null,
-      source: "shortcut",
+      source,
       dedup_key: body.dedup_key ?? null,
     })
     .select()

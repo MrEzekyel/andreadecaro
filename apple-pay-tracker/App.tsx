@@ -8,104 +8,189 @@ import {
   View,
 } from "react-native";
 import type { Session } from "@supabase/supabase-js";
+import { AddPaymentSheet } from "./components/AddPaymentSheet";
+import { Icon } from "./components/Icon";
+import { DataProvider, useData } from "./lib/DataContext";
+import { ThemeProvider, useTheme } from "./lib/ThemeContext";
 import { supabase } from "./lib/supabase";
+import { radius, space, type } from "./lib/theme";
 import AuthScreen from "./screens/AuthScreen";
+import HomeScreen from "./screens/HomeScreen";
 import PaymentsScreen from "./screens/PaymentsScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import StatsScreen from "./screens/StatsScreen";
 
-type Tab = "payments" | "stats" | "settings";
+type Tab = "home" | "payments" | "stats" | "settings";
 
-const TAB_TITLES: Record<Tab, string> = {
-  stats: "Statistiche",
-  payments: "Pagamenti",
-  settings: "Impostazioni",
-};
+const TABS: { key: Tab; label: string; icon: string }[] = [
+  { key: "home", label: "Home", icon: "house" },
+  { key: "payments", label: "Spese", icon: "list" },
+  { key: "stats", label: "Statistiche", icon: "chart-pie" },
+  { key: "settings", label: "Impostazioni", icon: "sliders-horizontal" },
+];
 
-export default function App() {
+function Shell() {
+  const { palette, dark } = useTheme();
+  const { reloadCategories } = useData();
+
+  const [tab, setTab] = useState<Tab>("home");
+  const [adding, setAdding] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: palette.ground }]}>
+      <View style={styles.content} key={reloadKey}>
+        {tab === "home" && <HomeScreen />}
+        {tab === "payments" && <PaymentsScreen />}
+        {tab === "stats" && <StatsScreen />}
+        {tab === "settings" && <SettingsScreen />}
+      </View>
+
+      <View
+        style={[
+          styles.tabbar,
+          { backgroundColor: palette.surface, borderTopColor: palette.hairline },
+        ]}
+      >
+        {TABS.slice(0, 2).map((item) => (
+          <TabButton
+            key={item.key}
+            item={item}
+            active={tab === item.key}
+            onPress={() => setTab(item.key)}
+          />
+        ))}
+
+        <TouchableOpacity
+          style={[styles.fab, { backgroundColor: palette.accent }]}
+          onPress={() => setAdding(true)}
+          accessibilityLabel="Aggiungi spesa"
+        >
+          <Icon name="plus" size={21} color={palette.onAccent} strokeWidth={1.9} />
+        </TouchableOpacity>
+
+        {TABS.slice(2).map((item) => (
+          <TabButton
+            key={item.key}
+            item={item}
+            active={tab === item.key}
+            onPress={() => setTab(item.key)}
+          />
+        ))}
+      </View>
+
+      <AddPaymentSheet
+        visible={adding}
+        onClose={() => setAdding(false)}
+        onSaved={() => {
+          reloadCategories();
+          setReloadKey((value) => value + 1);
+        }}
+      />
+
+      <StatusBar style={dark ? "light" : "dark"} />
+    </SafeAreaView>
+  );
+}
+
+function TabButton({
+  item,
+  active,
+  onPress,
+}: {
+  item: { key: Tab; label: string; icon: string };
+  active: boolean;
+  onPress: () => void;
+}) {
+  const { palette } = useTheme();
+  return (
+    <TouchableOpacity
+      style={styles.tab}
+      onPress={onPress}
+      accessibilityRole="tab"
+      accessibilityState={{ selected: active }}
+    >
+      <Icon
+        name={item.icon}
+        size={19}
+        color={active ? palette.accent : palette.ink3}
+        strokeWidth={1.6}
+      />
+      <Text
+        style={[
+          styles.tabLabel,
+          { color: active ? palette.accent : palette.ink3 },
+        ]}
+        numberOfLines={1}
+      >
+        {item.label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function Root() {
+  const { palette } = useTheme();
   const [session, setSession] = useState<Session | null>(null);
-  const [loadingSession, setLoadingSession] = useState(true);
-  const [tab, setTab] = useState<Tab>("stats");
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
-      setLoadingSession(false);
+      setLoading(false);
     });
 
     const { data: listener } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
-        setSession(newSession);
-      }
+      (_event, next) => setSession(next)
     );
 
     return () => listener.subscription.unsubscribe();
   }, []);
 
-  if (loadingSession) {
-    return <View style={styles.center} />;
+  if (loading) {
+    return <View style={{ flex: 1, backgroundColor: palette.ground }} />;
   }
 
-  if (!session) {
-    return <AuthScreen />;
-  }
+  if (!session) return <AuthScreen />;
 
+  // Il provider dei dati vive dentro la sessione: al logout la cache delle
+  // categorie viene smontata insieme a lui, senza restare appesa.
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{TAB_TITLES[tab]}</Text>
-        <TouchableOpacity onPress={() => supabase.auth.signOut()}>
-          <Text style={styles.logout}>Esci</Text>
-        </TouchableOpacity>
-      </View>
+    <DataProvider key={session.user.id}>
+      <Shell />
+    </DataProvider>
+  );
+}
 
-      <View style={styles.content}>
-        {tab === "stats" && <StatsScreen />}
-        {tab === "payments" && <PaymentsScreen />}
-        {tab === "settings" && <SettingsScreen />}
-      </View>
-
-      <View style={styles.tabBar}>
-        {(Object.keys(TAB_TITLES) as Tab[]).map((key) => (
-          <TouchableOpacity
-            key={key}
-            style={styles.tabButton}
-            onPress={() => setTab(key)}
-          >
-            <Text
-              style={[styles.tabLabel, tab === key && styles.tabLabelActive]}
-            >
-              {TAB_TITLES[key]}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-      <StatusBar style="auto" />
-    </SafeAreaView>
+export default function App() {
+  return (
+    <ThemeProvider>
+      <Root />
+    </ThemeProvider>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#fff" },
-  center: { flex: 1, backgroundColor: "#fff" },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: "#e5e5e5",
-  },
-  headerTitle: { fontSize: 20, fontWeight: "700" },
-  logout: { color: "#c00", fontSize: 14 },
+  container: { flex: 1 },
   content: { flex: 1 },
-  tabBar: {
+  tabbar: {
     flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-around",
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: "#e5e5e5",
+    paddingTop: 9,
+    paddingBottom: 6,
+    paddingHorizontal: space.md,
   },
-  tabButton: { flex: 1, alignItems: "center", paddingVertical: 12 },
-  tabLabel: { fontSize: 14, color: "#999" },
-  tabLabelActive: { color: "#111", fontWeight: "700" },
+  tab: { flex: 1, alignItems: "center", gap: 3 },
+  tabLabel: { fontSize: 9.5, fontWeight: "500" },
+  fab: {
+    width: 42,
+    height: 42,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -14,
+    marginHorizontal: space.sm,
+  },
 });

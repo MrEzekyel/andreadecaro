@@ -12,8 +12,8 @@ che hai chiesto. Tre cambiamenti strutturali:
 ### 1. `category` da testo libero a tabella
 
 Oggi `payments.category` è una stringa. Serve una tabella vera, perché vuoi
-poter **creare categorie tue** e perché il design Revolut ha bisogno di un
-**colore e un'icona per categoria**.
+poter **creare categorie tue** e perché il design ha bisogno di un **colore e
+un'icona per categoria**.
 
 ```sql
 categories (
@@ -48,7 +48,11 @@ Ordine di risoluzione della categoria diventa:
 1. `merchants.category_id` — l'esercente è già noto → **certo**
 2. `merchant_categories` — le tue regole keyword → **quasi certo**
 3. `default_merchant_categories` — le 96 regole predefinite → **ipotesi**
-4. fallback `Da categorizzare`
+4. `NULL` — resta da categorizzare
+
+"Da categorizzare" non è una categoria vera ma l'assenza di categoria, quindi è
+rappresentata da `NULL` e non da una riga: due rappresentazioni della stessa
+cosa si sarebbero disallineate al primo rinomina.
 
 ### 3. Import: separare "quanto ho pagato" da "quanto mi compete"
 
@@ -59,34 +63,36 @@ statistiche useranno `my_share`, non `amount` — altrimenti una cena divisa in
 
 ---
 
-## Fase 1 — Fondamenta + editing transazioni
+## Fase 1 — Fondamenta + editing transazioni ✅
 
-> Sblocca tutto il resto. Da fare per prima.
+> Completata. Migrazioni 0005–0008 applicate, Edge Function v3, app aggiornata.
 
-- [ ] Tabella `categories` + categorie di default per utente alla registrazione
-- [ ] Tabella `merchants` + collegamento da `payments`
-- [ ] Migrazione `payments.category` (testo) → `category_id`
-- [ ] **Modifica transazione**: categoria, importo, data, esercente, note
-- [ ] **Elimina transazione**
-- [ ] **Aggiunta manuale** di una transazione
-- [ ] **Categorie personalizzate**: crea, rinomina, colore, icona, elimina
-- [ ] Al cambio categoria, chiedere:
+- [x] Tabella `categories` + categorie di default per utente alla registrazione
+- [x] Tabella `merchants` + collegamento da `payments`
+- [x] Migrazione `payments.category` (testo) → `category_id`
+- [x] **Modifica transazione**: categoria, importo, data, esercente, note
+- [x] **Elimina transazione**
+- [x] **Aggiunta manuale** di una transazione
+- [x] **Categorie personalizzate**: crea, rinomina, colore, icona, elimina
+- [x] Al cambio categoria, chiedere:
   - *"Applicare anche alle altre N transazioni di «Esselunga»?"* → update massivo
   - *"Ricordare per i pagamenti futuri?"* → scrive `merchants.category_id`
 
 Le due domande sono indipendenti (posso volere una e non l'altra), quindi due
 checkbox in un unico foglio modale, non due alert in fila.
 
-## Fase 2 — Design Revolut + statistiche
+## Fase 2 — Statistiche complete
 
-> Da fare subito dopo la Fase 1, prima di aggiungere altre schermate: rifare
-> il design dopo costa il triplo.
+> Il design system è già applicato a tutte le schermate esistenti (Fase 1).
+> Qui restano le viste analitiche.
 
-- [ ] Design system: palette, tipografia, card, spaziature (vedi sezione Design)
+- [x] Design system: palette, tipografia, card, spaziature (vedi sezione Design)
+- [x] Line chart andamento cumulato del mese
+- [x] Ripartizione per categoria con percentuali
 - [ ] **Vista mensile**: un mese per schermata, swipe per cambiare mese, con
       tutte le spese e le statistiche di quel mese soltanto
-- [ ] **Line chart** andamento spese (giornaliero nel mese, mensile nell'anno)
-- [ ] **Donut chart** ripartizione per categoria, con percentuali
+- [ ] **Donut chart** al posto delle barre nella ripartizione
+- [ ] **Confronto tra mesi** a barre, con media
 - [ ] **Dettaglio categoria**: tutte le transazioni di quella categoria
 - [ ] **Dettaglio esercente**: totale speso, numero transazioni, storico,
       andamento nel tempo
@@ -144,21 +150,39 @@ parser sul server.
 
 ### Direzione
 
-Minimal ma colorato, riferimento Revolut. In concreto significa:
+Design system ripreso da quello di **Anthropic / Claude**, con la palette delle
+categorie a portare il colore.
 
-- **Sfondo neutro**, quasi bianco (o quasi nero in dark mode). Il colore non
-  sta mai nello sfondo.
-- **Il colore arriva dalle categorie**: ogni categoria ha un suo colore, che
-  compare nel pallino dell'icona, negli archi del donut, nelle barre. È lì che
-  l'app diventa colorata.
-- **Numeri grandi e grassi**: il totale del mese è l'elemento dominante della
-  schermata, tipograficamente enorme.
-- **Card con angoli molto arrotondati** (16–20px), ombre appena accennate.
-- **Nessun bordo dove basta lo spazio bianco.**
-- **Icona circolare colorata** a sinistra di ogni transazione, importo a destra
-  allineato, esercente in grassetto e categoria in grigio sotto.
-- **Grafici puliti**: niente griglie pesanti, assi ridotti al minimo, line chart
-  con riempimento a gradiente sotto la curva.
+I caratteri originali sono **Styrene B** (sans) e **Tiempos Text** (serif),
+entrambi commerciali e su licenza Anthropic: non sono ridistribuibili dentro
+l'app. Gli stack tipografici li dichiarano per primi, quindi se un giorno
+vengono licenziati e caricati con `expo-font` subentrano da soli senza toccare
+il codice. Nel frattempo si usano ripieghi di sistema dalle proporzioni simili.
+
+Il tratto distintivo del sistema, però, non sono i font — è la **misura**:
+
+- **Pesi bassi anche a corpo grande.** Il totale del mese è 42px di peso 500,
+  non 800. La scala fa il lavoro, non il grassetto. Nessun testo supera il 600.
+- **Fondo caldo, mai bianco puro.** Crema `#F0EEE6` in chiaro, nero caldo
+  `#141413` in scuro.
+- **Un solo accento**, argilla (`#C2613F` chiaro / `#D97757` scuro), riservato
+  agli elementi interattivi. Non compare mai come colore di un dato.
+- **Raggi contenuti**: 14px le card, 10px campi e pulsanti. Il sistema Anthropic
+  non è morbido.
+- **Crenatura quasi neutra**, mai le spaziature strette da titolo pubblicitario.
+- **Il colore arriva dalle categorie**: pallino dell'icona, barre, archi. È lì
+  che l'app diventa colorata senza diventare chiassosa.
+
+### Icone
+
+**Lucide** (licenza MIT, `lucide-react-native`): ~1500 icone su griglia 24px.
+Scelta per lo **spessore del tratto regolabile**, impostato a 1,75 per restare
+coerente con i pesi tipografici — con una libreria a spessore fisso le icone
+avrebbero pesato più del testo accanto.
+
+Le icone si risolvono per nome a runtime (`categories.icon` contiene lo slug),
+quindi una categoria creata da te può scegliere la propria icona senza che
+serva ricompilare nulla.
 
 ### Palette categorie
 
@@ -191,11 +215,14 @@ Passiamo da 3 a 4 tab, con il pulsante di aggiunta al centro:
 
 - **Home** — mese corrente: totale grande, avanzamento sul limite, ultime
   transazioni, ripartizione rapida
-- **Spese** — elenco completo, ricercabile e filtrabile, raggruppato per giorno
+- **Spese** — elenco completo raggruppato per giorno, con totale giornaliero
 - **( + )** — aggiunta manuale rapida
 - **Statistiche** — grafici, confronto tra mesi, dettagli per categoria e
   esercente
-- **Impostazioni** — categorie, limiti, ricorrenti, persone, token
+- **Impostazioni** — tema, categorie, limiti, ricorrenti, persone, token
+
+Il **tema** si sceglie qui: chiaro, scuro o Sistema (predefinito, segue il
+telefono). La preferenza è salvata sul dispositivo.
 
 ---
 
