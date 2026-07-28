@@ -31,11 +31,7 @@
       "url": "https://u.expo.dev/ec664e8b-65d6-42e7-b3db-2275f0bf7622"
     },
     "runtimeVersion": {
-<<<<<<< HEAD
-      "policy": "appVersion"
-=======
       "policy": "sdkVersion"
->>>>>>> aab89b1ce6df60b5020dd39a3c02cd0add68ee1d
     }
   }
 }
