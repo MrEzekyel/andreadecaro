@@ -30,6 +30,57 @@ function normalize(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
 }
 
+const ALPHANUM = /[\p{L}\p{N}]/u;
+
+/** Sotto questa lunghezza una chiave deve combaciare con una parola intera. */
+const PREFIX_MIN = 5;
+
+/**
+ * Verifica se una regola si applica al nome esercente.
+ *
+ * La chiave deve iniziare a INIZIO PAROLA: senza questo vincolo "eni"
+ * beccherebbe "tezenis" e "lime" beccherebbe "alimentari", assegnando
+ * categorie sbagliate — che sono peggio di nessuna categoria, perche' non
+ * si notano e falsano le statistiche.
+ *
+ * Le chiavi corte devono combaciare anche in coda ("ip" non deve prendere
+ * "iphone"), mentre quelle lunghe restano libere cosi' "supermercat" copre
+ * sia "supermercato" sia "supermercati".
+ */
+function keywordMatches(merchant: string, keyword: string) {
+  const needle = normalize(keyword);
+  if (!needle) return false;
+
+  const wholeWord =
+    needle.replace(/[^\p{L}\p{N}]/gu, "").length < PREFIX_MIN;
+
+  let from = 0;
+  for (;;) {
+    const at = merchant.indexOf(needle, from);
+    if (at === -1) return false;
+
+    const before = at === 0 ? "" : merchant[at - 1];
+    const after = merchant[at + needle.length] ?? "";
+
+    const startsWord = !before || !ALPHANUM.test(before);
+    const endsWord = !wholeWord || !after || !ALPHANUM.test(after);
+
+    if (startsWord && endsWord) return true;
+    from = at + 1;
+  }
+}
+
+/**
+ * Fra piu' regole che combaciano vince la piu' specifica, cioe' la piu'
+ * lunga: "uber eats" deve battere "uber", altrimenti una cena diventa un
+ * viaggio.
+ */
+function longestFirst<T extends { keyword: string }>(rules: T[]) {
+  return [...rules].sort(
+    (a, b) => b.keyword.trim().length - a.keyword.trim().length
+  );
+}
+
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -241,8 +292,8 @@ Deno.serve(async (req) => {
       .eq("user_id", userId);
 
     categoryId =
-      userRules?.find((rule) =>
-        merchantNormalized.includes(normalize(rule.keyword))
+      longestFirst(userRules ?? []).find((rule) =>
+        keywordMatches(merchantNormalized, rule.keyword)
       )?.category_id ?? null;
   }
 
@@ -251,8 +302,8 @@ Deno.serve(async (req) => {
       .from("default_merchant_categories")
       .select("keyword, category");
 
-    const guessedName = defaultRules?.find((rule) =>
-      merchantNormalized.includes(normalize(rule.keyword))
+    const guessedName = longestFirst(defaultRules ?? []).find((rule) =>
+      keywordMatches(merchantNormalized, rule.keyword)
     )?.category;
 
     if (guessedName) {
