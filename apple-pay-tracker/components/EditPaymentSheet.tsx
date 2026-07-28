@@ -2,10 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
-  Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -21,6 +18,7 @@ import { radius, space, type } from "../lib/theme";
 import { Payment } from "../lib/types";
 import { CategoryPicker } from "./CategoryPicker";
 import { Icon } from "./Icon";
+import { Sheet } from "./Sheet";
 
 type Props = {
   payment: Payment | null;
@@ -196,164 +194,137 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
   const showAsk = categoryChanged && !!payment?.merchant_id;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.dim} onPress={onClose} />
+    <Sheet visible={visible} onClose={onClose} title="Modifica spesa">
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Esercente
+        </Text>
+        <TextInput
+          value={merchant}
+          onChangeText={setMerchant}
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+      </View>
 
-      <View style={[styles.sheet, { backgroundColor: palette.ground }]}>
-        <View style={[styles.grabber, { backgroundColor: palette.ink3 }]} />
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Importo</Text>
+        <TextInput
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="decimal-pad"
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+      </View>
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Data</Text>
+        <TouchableOpacity
+          onPress={() => setShowDatePicker(true)}
+          style={[
+            styles.input,
+            styles.inputButton,
+            { backgroundColor: palette.surface, borderColor: palette.hairline },
+          ]}
         >
-          <Text style={[styles.title, { color: palette.ink }]}>
-            Modifica spesa
+          <Text style={{ color: palette.ink, ...type.body }}>
+            {formatDate(occurredAt.toISOString())}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={occurredAt}
+          mode="date"
+          display={Platform.OS === "ios" ? "inline" : "default"}
+          onChange={(_event, selected) => {
+            if (Platform.OS !== "ios") setShowDatePicker(false);
+            if (selected) setOccurredAt(selected);
+          }}
+        />
+      )}
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Categoria
+        </Text>
+        <CategoryPicker value={categoryId} onChange={setCategoryId} />
+      </View>
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Nota</Text>
+        <TextInput
+          value={note}
+          onChangeText={setNote}
+          placeholder="Facoltativa"
+          placeholderTextColor={palette.ink3}
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+      </View>
+
+      {showAsk && (
+        <View style={[styles.ask, { backgroundColor: palette.accentSoft }]}>
+          <Text style={[styles.askHead, { color: palette.ink }]}>
+            Hai spostato {payment?.merchant_name} in {newCategoryName}.
           </Text>
 
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Esercente
-            </Text>
-            <TextInput
-              value={merchant}
-              onChangeText={setMerchant}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                  color: palette.ink,
-                },
-              ]}
-            />
-          </View>
-
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Importo
-            </Text>
-            <TextInput
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-              style={[
-                styles.input,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                  color: palette.ink,
-                },
-              ]}
-            />
-          </View>
-
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Data</Text>
-            <TouchableOpacity
-              onPress={() => setShowDatePicker(true)}
-              style={[
-                styles.input,
-                styles.inputButton,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                },
-              ]}
-            >
-              <Text style={{ color: palette.ink, ...type.body }}>
-                {formatDate(occurredAt.toISOString())}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {showDatePicker && (
-            <DateTimePicker
-              value={occurredAt}
-              mode="date"
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              onChange={(_event, selected) => {
-                if (Platform.OS !== "ios") setShowDatePicker(false);
-                if (selected) setOccurredAt(selected);
-              }}
+          {siblingCount > 0 && (
+            <Checkbox
+              checked={applyToAll}
+              onToggle={() => setApplyToAll((v) => !v)}
+              label={`Applica anche alle altre ${siblingCount} spese di questo esercente`}
             />
           )}
 
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Categoria
-            </Text>
-            <CategoryPicker value={categoryId} onChange={setCategoryId} />
-          </View>
+          <Checkbox
+            checked={remember}
+            onToggle={() => setRemember((v) => !v)}
+            label="Ricorda per i pagamenti futuri"
+          />
+        </View>
+      )}
 
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Nota
-            </Text>
-            <TextInput
-              value={note}
-              onChangeText={setNote}
-              placeholder="Facoltativa"
-              placeholderTextColor={palette.ink3}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                  color: palette.ink,
-                },
-              ]}
-            />
-          </View>
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: palette.accent }]}
+        onPress={save}
+        disabled={saving}
+      >
+        {saving ? (
+          <ActivityIndicator color={palette.onAccent} />
+        ) : (
+          <Text style={[styles.buttonText, { color: palette.onAccent }]}>
+            Salva
+          </Text>
+        )}
+      </TouchableOpacity>
 
-          {showAsk && (
-            <View style={[styles.ask, { backgroundColor: palette.accentSoft }]}>
-              <Text style={[styles.askHead, { color: palette.ink }]}>
-                Hai spostato {payment?.merchant_name} in {newCategoryName}.
-              </Text>
-
-              {siblingCount > 0 && (
-                <Checkbox
-                  checked={applyToAll}
-                  onToggle={() => setApplyToAll((v) => !v)}
-                  label={`Applica anche alle altre ${siblingCount} spese di questo esercente`}
-                />
-              )}
-
-              <Checkbox
-                checked={remember}
-                onToggle={() => setRemember((v) => !v)}
-                label="Ricorda per i pagamenti futuri"
-              />
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: palette.accent }]}
-            onPress={save}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color={palette.onAccent} />
-            ) : (
-              <Text style={[styles.buttonText, { color: palette.onAccent }]}>
-                Salva
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.ghost} onPress={confirmDelete}>
-            <Text style={[styles.ghostText, { color: palette.over }]}>
-              Elimina spesa
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-    </Modal>
+      <TouchableOpacity style={styles.ghost} onPress={confirmDelete}>
+        <Text style={[styles.ghostText, { color: palette.over }]}>
+          Elimina spesa
+        </Text>
+      </TouchableOpacity>
+    </Sheet>
   );
 }
 
@@ -391,23 +362,6 @@ function Checkbox({
 }
 
 const styles = StyleSheet.create({
-  dim: { flex: 1, backgroundColor: "rgba(20,20,19,0.36)" },
-  sheet: {
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
-    maxHeight: "88%",
-    paddingTop: 10,
-  },
-  grabber: {
-    width: 34,
-    height: 4,
-    borderRadius: radius.pill,
-    opacity: 0.35,
-    alignSelf: "center",
-    marginBottom: space.sm,
-  },
-  content: { padding: space.lg, paddingBottom: space.xxl, gap: space.md },
-  title: { ...type.sheetTitle },
   fieldLabel: { ...type.caption, marginBottom: 6 },
   input: {
     borderWidth: 1,

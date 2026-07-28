@@ -2,10 +2,7 @@ import React, { useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
-  Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -18,6 +15,7 @@ import { formatDate } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
 import { CategoryPicker } from "./CategoryPicker";
+import { Sheet } from "./Sheet";
 
 type Props = {
   visible: boolean;
@@ -143,158 +141,117 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
   }
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.dim} onPress={onClose} />
-
-      <View style={[styles.sheet, { backgroundColor: palette.ground }]}>
-        <View style={[styles.grabber, { backgroundColor: palette.ink3 }]} />
-
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
-        >
-          <Text style={[styles.title, { color: palette.ink }]}>Nuova spesa</Text>
-
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Esercente
-            </Text>
-            <TextInput
-              value={merchant}
-              onChangeText={setMerchant}
-              placeholder="Es. Esselunga"
-              placeholderTextColor={palette.ink3}
-              autoFocus
-              style={[
-                styles.input,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                  color: palette.ink,
-                },
-              ]}
-            />
-          </View>
-
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Importo
-            </Text>
-            <TextInput
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-              placeholder="0,00"
-              placeholderTextColor={palette.ink3}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                  color: palette.ink,
-                },
-              ]}
-            />
-          </View>
-
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Data</Text>
-            <TouchableOpacity
-              onPress={() => setShowDatePicker(true)}
-              style={[
-                styles.input,
-                styles.inputButton,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                },
-              ]}
-            >
-              <Text style={{ color: palette.ink, ...type.body }}>
-                {formatDate(occurredAt.toISOString())}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {showDatePicker && (
-            <DateTimePicker
-              value={occurredAt}
-              mode="date"
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              onChange={(_event, selected) => {
-                if (Platform.OS !== "ios") setShowDatePicker(false);
-                if (selected) setOccurredAt(selected);
-              }}
-            />
-          )}
-
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Categoria
-            </Text>
-            <CategoryPicker value={categoryId} onChange={setCategoryId} />
-          </View>
-
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Nota</Text>
-            <TextInput
-              value={note}
-              onChangeText={setNote}
-              placeholder="Facoltativa"
-              placeholderTextColor={palette.ink3}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                  color: palette.ink,
-                },
-              ]}
-            />
-          </View>
-
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: palette.accent }]}
-            onPress={save}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color={palette.onAccent} />
-            ) : (
-              <Text style={[styles.buttonText, { color: palette.onAccent }]}>
-                Aggiungi
-              </Text>
-            )}
-          </TouchableOpacity>
-        </ScrollView>
+    <Sheet visible={visible} onClose={onClose} title="Nuova spesa">
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Esercente
+        </Text>
+        <TextInput
+          value={merchant}
+          onChangeText={setMerchant}
+          placeholder="Es. Esselunga"
+          placeholderTextColor={palette.ink3}
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
       </View>
-    </Modal>
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Importo</Text>
+        <TextInput
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="decimal-pad"
+          placeholder="0,00"
+          placeholderTextColor={palette.ink3}
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+      </View>
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Data</Text>
+        <TouchableOpacity
+          onPress={() => setShowDatePicker(true)}
+          style={[
+            styles.input,
+            styles.inputButton,
+            { backgroundColor: palette.surface, borderColor: palette.hairline },
+          ]}
+        >
+          <Text style={{ color: palette.ink, ...type.body }}>
+            {formatDate(occurredAt.toISOString())}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={occurredAt}
+          mode="date"
+          display={Platform.OS === "ios" ? "inline" : "default"}
+          onChange={(_event, selected) => {
+            if (Platform.OS !== "ios") setShowDatePicker(false);
+            if (selected) setOccurredAt(selected);
+          }}
+        />
+      )}
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Categoria
+        </Text>
+        <CategoryPicker value={categoryId} onChange={setCategoryId} />
+      </View>
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Nota</Text>
+        <TextInput
+          value={note}
+          onChangeText={setNote}
+          placeholder="Facoltativa"
+          placeholderTextColor={palette.ink3}
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+      </View>
+
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: palette.accent }]}
+        onPress={save}
+        disabled={saving}
+      >
+        {saving ? (
+          <ActivityIndicator color={palette.onAccent} />
+        ) : (
+          <Text style={[styles.buttonText, { color: palette.onAccent }]}>
+            Aggiungi
+          </Text>
+        )}
+      </TouchableOpacity>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  dim: { flex: 1, backgroundColor: "rgba(20,20,19,0.36)" },
-  sheet: {
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
-    maxHeight: "88%",
-    paddingTop: 10,
-  },
-  grabber: {
-    width: 34,
-    height: 4,
-    borderRadius: radius.pill,
-    opacity: 0.35,
-    alignSelf: "center",
-    marginBottom: space.sm,
-  },
-  content: { padding: space.lg, paddingBottom: space.xxl, gap: space.md },
-  title: { ...type.sheetTitle },
   fieldLabel: { ...type.caption, marginBottom: 6 },
   input: {
     borderWidth: 1,

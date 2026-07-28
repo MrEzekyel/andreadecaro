@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { Icon } from "../components/Icon";
 import { useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
@@ -21,6 +22,7 @@ export default function AuthScreen() {
   const [password, setPassword] = useState("");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   async function submit() {
     if (!email.includes("@") || password.length < 6) {
@@ -84,21 +86,41 @@ export default function AuthScreen() {
           ]}
         />
 
-        <TextInput
-          value={password}
-          onChangeText={setPassword}
-          placeholder="Password"
-          placeholderTextColor={palette.ink3}
-          secureTextEntry
+        <View
           style={[
             styles.input,
+            styles.passwordField,
             {
               backgroundColor: palette.surface,
               borderColor: palette.hairline,
-              color: palette.ink,
             },
           ]}
-        />
+        >
+          <TextInput
+            value={password}
+            onChangeText={setPassword}
+            placeholder="Password"
+            placeholderTextColor={palette.ink3}
+            secureTextEntry={!showPassword}
+            autoCapitalize="none"
+            autoComplete="password"
+            style={[styles.passwordInput, { color: palette.ink }]}
+          />
+          <TouchableOpacity
+            onPress={() => setShowPassword((v) => !v)}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={
+              showPassword ? "Nascondi la password" : "Mostra la password"
+            }
+          >
+            <Icon
+              name={showPassword ? "eye-off" : "eye"}
+              size={18}
+              color={palette.ink3}
+            />
+          </TouchableOpacity>
+        </View>
 
         <TouchableOpacity
           style={[styles.button, { backgroundColor: palette.accent }]}
@@ -138,6 +160,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: radius.field,
     paddingHorizontal: 14,
+    paddingVertical: 13,
+    ...type.body,
+    fontSize: 15,
+  },
+  passwordField: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 0,
+  },
+  passwordInput: {
+    flex: 1,
     paddingVertical: 13,
     ...type.body,
     fontSize: 15,
