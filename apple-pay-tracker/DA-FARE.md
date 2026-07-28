@@ -152,17 +152,57 @@ limiti sono già nel database.
 
 ---
 
-## 🟢 Quando vorrai pubblicare su App Store
+## 🟢 Installare l'app senza Expo Go (senza pubblicarla su App Store)
+
+> Correzione a quanto scritto prima al punto 8: serve l'Apple Developer
+> Program **anche solo per installare l'app sul tuo iPhone** fuori da Expo
+> Go, perché non hai un Mac. La via gratuita (Xcode, "Personal Team", 7
+> giorni di validità) esiste ma richiede un Mac per firmare e reinstallare
+> ogni settimana via cavo — non è percorribile con solo iPad e iPhone.
 
 ### 8. Apple Developer Program
 
 Costa **99$/anno** e deve essere intestato a te — non è automatizzabile.
 Iscrizione su [developer.apple.com/programs](https://developer.apple.com/programs/).
+L'approvazione richiede di solito poche ore, a volte fino a un giorno.
 
-Serve **solo** per pubblicare su App Store. Per usare l'app su un tuo
-telefono non serve.
+Ti serve anche un account **Expo** gratuito su [expo.dev](https://expo.dev)
+per usare EAS Build (le build girano nel loro cloud, non serve un Mac).
 
-### 9. Materiali per la scheda App Store
+### 8bis. Build e installazione via TestFlight (consigliato)
+
+Una volta iscritto, da un Codespace (o dal PC quando lo riavrai):
+
+```
+cd apple-pay-tracker
+npx eas-cli login              # account Expo
+npx eas-cli build:configure    # collega il progetto al tuo account Expo
+npx eas-cli build --platform ios --profile production
+```
+
+La prima volta EAS chiede le credenziali Apple e genera da solo certificato
+e provisioning profile — non serve toccare Xcode. A build finita:
+
+```
+npx eas-cli submit --platform ios
+```
+
+La carica su App Store Connect. Poi su
+[appstoreconnect.apple.com](https://appstoreconnect.apple.com) → TestFlight →
+aggiungiti come **tester interno** (il tuo stesso Apple ID) — nessuna review
+richiesta per i tester interni, è quasi immediato. Installi l'app **TestFlight**
+dall'App Store e da lì l'app vera, senza più Expo Go né tunnel.
+
+Gli aggiornamenti successivi sono lo stesso comando `build` + `submit`; se
+cambi solo JS (non moduli nativi) puoi anche usare `eas update` per spingere
+l'aggiornamento senza ricompilare.
+
+> Per l'Android che vorrai in futuro non serve nessun account a pagamento:
+> `npx eas-cli build --platform android --profile preview` genera un APK
+> scaricabile e installabile direttamente, gratis. Ha senso farlo solo
+> quando avrai davvero un telefono Android da testare.
+
+### 9. Se vorrai pubblicarla davvero sull'App Store (pubblico)
 
 Quando ci arriveremo ti servirà preparare:
 
