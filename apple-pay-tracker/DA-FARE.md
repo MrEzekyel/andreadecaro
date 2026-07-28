@@ -152,15 +152,41 @@ limiti sono già nel database.
 
 ---
 
-## 🟢 Installare l'app senza Expo Go (senza pubblicarla su App Store)
+## 🟢 Aprire l'app senza tunnel/PC — gratis, resta dentro Expo Go
 
-> Correzione a quanto scritto prima al punto 8: serve l'Apple Developer
-> Program **anche solo per installare l'app sul tuo iPhone** fuori da Expo
-> Go, perché non hai un Mac. La via gratuita (Xcode, "Personal Team", 7
-> giorni di validità) esiste ma richiede un Mac per firmare e reinstallare
-> ogni settimana via cavo — non è percorribile con solo iPad e iPhone.
+Giusto rimandare i 99$/anno finché non sai se l'app avrà altri utenti: non
+servono per questo. La app non usa nessun modulo nativo custom (solo cose già
+incluse in Expo Go), quindi si può **pubblicare il bundle JS sui server di
+Expo** (gratis, account Expo senza carta di credito) e continuare ad aprirla
+da **Expo Go** — la stessa app che hai già installato — con un link fisso,
+senza nessun PC o tunnel acceso. Esattamente l'idea del server cloud che
+proponevi, solo che il "server" te lo offre gratis Expo stesso.
 
-### 8. Apple Developer Program
+Ho già aggiunto la dipendenza `expo-updates` al progetto e pushato. Da un
+Codespace (serve solo una volta per collegare il progetto):
+
+```
+cd apple-pay-tracker
+npx eas-cli login                # account Expo, gratuito
+npx eas-cli update:configure      # collega il progetto, aggiorna app.json da solo
+npx eas-cli update --branch production --message "prima pubblicazione"
+```
+
+Alla fine il comando stampa un link (tipo `https://expo.dev/@tuo-account/apple-pay-tracker`
+o un QR): apri quel link e trovi un pulsante "Apri in Expo Go" / QR dedicato.
+Da lì in poi apri sempre l'app così, anche da iPhone/iPad, senza bisogno del
+mio sandbox né del tuo PC acceso.
+
+**Limite**: resti dentro Expo Go, quindi niente notifiche push né moduli
+nativi extra (comunque già rimandati). Quando fai una modifica al codice,
+rifaccio `eas update` e la prossima apertura dell'app prende la versione
+nuova — non serve ricompilare né reinstallare nulla.
+
+Quando in futuro deciderai come monetizzare (e se vale la pena investire i
+99$/anno), il passaggio a TestFlight è descritto qui sotto: resta tutto
+pronto, lo attiviamo quando vuoi.
+
+### 8. Apple Developer Program — solo quando deciderai di investire
 
 Costa **99$/anno** e deve essere intestato a te — non è automatizzabile.
 Iscrizione su [developer.apple.com/programs](https://developer.apple.com/programs/).
