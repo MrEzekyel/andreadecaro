@@ -18,7 +18,19 @@ type IngestBody = {
   raw_text?: string;
   dedup_key?: string;
   source?: string;
+  /** Campi opzionali dal trigger Transazione di iOS. */
+  card?: string;
+  name?: string;
+  city?: string;
+  country?: string;
 };
+
+/** Testo opzionale: normalizza il vuoto a NULL invece che a stringa vuota. */
+function optionalText(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed : null;
+}
 
 // Finestra entro cui due pagamenti identici sono considerati un doppio invio
 // della stessa notifica Wallet.
@@ -328,6 +340,10 @@ Deno.serve(async (req) => {
       category_id: categoryId,
       occurred_at: occurredAt.toISOString(),
       raw_notification_text: body.raw_text ?? null,
+      card_name: optionalText(body.card),
+      transaction_name: optionalText(body.name),
+      city: optionalText(body.city),
+      country: optionalText(body.country),
       source,
       dedup_key: body.dedup_key ?? null,
     })

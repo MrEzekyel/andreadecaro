@@ -78,11 +78,18 @@ input **gia' strutturata**, quindi non serve nessuna espressione regolare.
 Campi del corpo JSON (il valore e' la **variabile** della transazione, non
 testo scritto a mano — la scegli dal selettore variabili):
 
-| Chiave | Tipo | Valore |
-| --- | --- | --- |
-| `merchant` | Testo | variabile **Esercente** |
-| `amount` | Testo | variabile **Importo** |
-| `source` | Testo | `shortcut` |
+| Chiave | Tipo | Valore | |
+| --- | --- | --- | --- |
+| `merchant` | Testo | variabile **Esercente** | obbligatorio |
+| `amount` | Testo | variabile **Importo** | obbligatorio |
+| `source` | Testo | `shortcut` | consigliato |
+| `card` | Testo | variabile **Carta o biglietto** | facoltativo |
+| `name` | Testo | variabile **Nome** | facoltativo |
+| `city` | Testo | variabile **Città** | facoltativo |
+
+I tre facoltativi vengono salvati e mostrati nel dettaglio della spesa. La
+città serve anche per la mappa dei luoghi in cui hai speso — se per una
+transazione non è disponibile, il campo resta vuoto e non succede nulla.
 
 Non serve mandare la data: la function usa l'istante in cui riceve la
 chiamata, che per un trigger in tempo reale e' corretto.
