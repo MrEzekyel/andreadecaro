@@ -15,6 +15,8 @@ export type Merchant = {
   normalized_name: string;
   display_name: string;
   category_id: string | null;
+  /** Escluso dalle classifiche, ma non dai totali. */
+  excluded_from_stats: boolean;
   created_at: string;
 };
 
@@ -34,6 +36,13 @@ export type Payment = {
   occurred_at: string;
   raw_notification_text: string | null;
   note: string | null;
+  /** Campi opzionali dal trigger Transazione di iOS. */
+  card_name: string | null;
+  transaction_name: string | null;
+  city: string | null;
+  country: string | null;
+  /** Esclusa dalle classifiche, ma non dai totali. */
+  excluded_from_stats: boolean;
   source: string;
   dedup_key: string | null;
   created_at: string;
