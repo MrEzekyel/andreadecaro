@@ -50,39 +50,56 @@ Il token viene mostrato **una sola volta**. Copialo e tienilo da parte: serve
 in qualunque automazione decideremo di usare. Se lo perdi non è un dramma: ne
 generi un altro e revochi il vecchio.
 
-### 4. Dirmi cosa ti manda la banca quando paghi
+### 4. Creare l'automazione Wallet
 
-⚠️ **Correzione importante rispetto a quanto scritto prima.** Avevo indicato
-come trigger "quando Wallet riceve una notifica". **Quel trigger non esiste**:
-iOS non permette a nessuna app né a Comandi Rapidi di leggere le notifiche di
-altre app. È una cosa possibile su Android, non su iPhone.
+iOS ha un trigger dedicato alle transazioni Wallet: riceve la transazione come
+input **gia' strutturata**, quindi non serve nessuna espressione regolare.
 
-I trigger di comunicazione di Comandi Rapidi coprono **solo email e messaggi**
-([documentazione Apple](https://support.apple.com/guide/shortcuts/communication-triggers-apdd711f9dff/ios)).
-Quelli app coprono solo apertura e chiusura.
+> Nota storica: in una versione precedente di questo documento avevo scritto
+> prima "quando Wallet riceve una notifica" (trigger inesistente) e poi che
+> l'automazione non fosse possibile. Sbagliato in entrambi i casi: il trigger
+> giusto e' **Transazione**, rinominato **Wallet** da iOS 26.
 
-Quindi la domanda che sblocca tutto è: **quando paghi con Apple Pay, cosa ti
-arriva?**
+**Comandi Rapidi → Automazione → Nuova automazione → Transazione** (o Wallet).
 
-- Solo una **notifica push** dell'app della banca → l'automazione non è
-  possibile per questa via, si va di Open Banking o inserimento rapido
-- Un **SMS** → ✅ funziona, trigger "Messaggio"
-- Una **email** → ✅ funziona, trigger "Email"
+1. Seleziona la **carta** o le carte che usi con Apple Pay
+2. Attiva **Esegui immediatamente** — senza questo devi confermare ogni
+   pagamento a mano e l'automatismo perde senso
+3. La prima azione e' gia' **Ricevi transazione come input**
+4. Aggiungi l'azione **Ottieni contenuto URL** e configurala cosi':
 
-Molte banche italiane permettono di **attivare gli avvisi via email** nelle
-impostazioni, anche se di default mandano solo push. Vale la pena controllare:
-è la strada più semplice e gratuita.
+| Campo | Valore |
+| --- | --- |
+| URL | quello che trovi in **Impostazioni** dell'app, pronto da copiare |
+| Metodo | `POST` |
+| Intestazioni | `x-ingest-token` → il token del passo 3 |
+| Corpo richiesta | **JSON** |
 
-Dimmi la banca e cosa ricevi, e ti scrivo l'automazione passo per passo.
+Campi del corpo JSON (il valore e' la **variabile** della transazione, non
+testo scritto a mano — la scegli dal selettore variabili):
 
-### 5. Inserimento rapido con Siri (funziona comunque)
+| Chiave | Tipo | Valore |
+| --- | --- | --- |
+| `merchant` | Testo | variabile **Esercente** |
+| `amount` | Testo | variabile **Importo** |
+| `source` | Testo | `shortcut` |
 
-Indipendentemente dalla banca, questo si può fare subito e non dipende da
-nulla. Comando Rapido con frase di attivazione, che chiede importo ed
-esercente a voce e li manda all'app.
+Non serve mandare la data: la function usa l'istante in cui riceve la
+chiamata, che per un trigger in tempo reale e' corretto.
 
-Te lo preparo appena mi confermi il punto 4, così lo imposti una volta sola
-insieme all'altro.
+`Importo` arriva come "12,99 €" o simile: la function pulisce il simbolo di
+valuta e gestisce la virgola decimale italiana, quindi va bene cosi'.
+
+**Ordine dei passi**: prima `.env` → app → registrazione → token, poi
+l'automazione. Senza token la chiamata risponde 401.
+
+### 5. Inserimento rapido con Siri (facoltativo)
+
+Utile per contanti e pagamenti non Apple Pay. Comando Rapido con frase di
+attivazione, **Chiedi input** per importo ed esercente, stessa azione
+"Ottieni contenuto URL" del punto 4 ma con `"source": "siri"`.
+
+Te lo preparo quando vuoi.
 
 ---
 

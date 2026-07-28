@@ -143,29 +143,28 @@ esattamente la stessa cosa senza codice iOS nativo. Se poi vorremo la
 trascrizione libera ("ho speso 12 euro dal fruttivendolo"), aggiungiamo un
 parser sul server.
 
-Con la via della notifica Wallet esclusa (vedi sotto), l'inserimento a voce
-passa da comodità a **strada principale** finché non c'è una sorgente
-automatica: merita quindi di essere fatto prima del resto della Fase 4.
+Con il trigger Transazione che copre Apple Pay, l'inserimento a voce serve per
+quello che Apple Pay non vede: contanti, bonifici, pagamenti con carta fisica.
 
 ## Nota sull'ingestione automatica
 
-L'assunto iniziale — "una Shortcut si attiva sulla notifica di Wallet" — **è
-sbagliato**: iOS non consente a Comandi Rapidi né ad app di terze parti di
-leggere le notifiche di altre app. I trigger di comunicazione coprono solo
-**email e messaggi**.
+L'assunto iniziale era "una Shortcut si attiva sulla **notifica** di Wallet".
+Quel trigger non esiste — iOS non consente di leggere le notifiche di altre
+app. Ma esiste qualcosa di meglio: il trigger **Transazione** (rinominato
+**Wallet** da iOS 26), che riceve la transazione come input **gia'
+strutturata**.
 
-Le sorgenti automatiche realmente disponibili sono quindi:
+Conseguenza pratica: **niente espressioni regolari**. `Esercente` e `Importo`
+arrivano come variabili tipizzate, quindi non c'e' nessun formato di notifica
+da interpretare e nessuna fragilita' legata alla banca.
 
-1. **SMS della banca** → trigger "Messaggio". Gratis, nativo, funziona solo se
-   la banca manda un SMS per ogni pagamento.
-2. **Email della banca** → trigger "Email". Molte banche italiane permettono di
-   attivare gli avvisi email anche quando di default mandano solo push.
-3. **Open Banking (PSD2)** → dati strutturati e con MCC, ma richiede consenso
-   bancario e un provider. GoCardless/Nordigen, che aveva un piano gratuito per
-   i propri conti, non accetta più nuove iscrizioni da metà 2025.
+Resta un limite: la transazione Wallet non espone l'**MCC** (il codice
+categoria del commerciante), quindi la categorizzazione continua a basarsi sul
+nome esercente. Per avere l'MCC servirebbe un collegamento Open Banking.
 
-La Edge Function non cambia in nessuno dei tre casi: accetta una POST con
-importo, esercente e testo originale, da qualunque sorgente.
+Da tenere d'occhio: il trigger ha avuto
+[problemi di timeout](https://developer.apple.com/forums/thread/765516)
+segnalati su alcune versioni di iOS.
 
 ## Fase 5 — Spese divise
 

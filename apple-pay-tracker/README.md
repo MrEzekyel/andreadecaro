@@ -8,18 +8,17 @@ Apple Pay e li categorizza in base all'esercente.
 
 ## Come funziona
 
-Apple non espone un'API pubblica per leggere le transazioni Apple Pay/Wallet,
-e **iOS non permette a Comandi Rapidi di leggere le notifiche di altre app**
-(i trigger di comunicazione coprono solo email e messaggi). L'ingestione
-automatica quindi non può partire dalla notifica di Wallet.
-
-Quello che la Edge Function accetta è un pagamento da **qualunque** sorgente
-che sappia fare una POST:
+iOS espone un trigger dedicato alle transazioni Wallet: **Comandi Rapidi →
+Automazione → Transazione** (rinominato **Wallet** da iOS 26). L'automazione
+riceve la transazione come input gia' strutturata — esercente e importo sono
+variabili tipizzate, non testo da interpretare.
 
 ```
-Sorgente (SMS o email della banca via Comandi Rapidi,
-          dettatura Siri, inserimento manuale, Open Banking)
-        │  POST JSON + header x-ingest-token
+Pagamento con Apple Pay
+        │  trigger "Transazione" (Comandi Rapidi)
+        ▼
+Automazione: Ricevi transazione come input
+        │  POST JSON (Esercente, Importo) + header x-ingest-token
         ▼
 Supabase Edge Function "ingest-payment"
         │  risolve l'utente dal token, categorizza, deduplica, salva
@@ -30,14 +29,9 @@ Tabella payments (Postgres, RLS per utente)
 App Apple Pay Tracker → spese, statistiche, limiti
 ```
 
-Le sorgenti praticabili, in ordine di comodità:
-
-| Sorgente | Automatica | Costo | Requisito |
-| --- | --- | --- | --- |
-| SMS della banca | ✅ | gratis | la banca deve mandare SMS per ogni pagamento |
-| Email della banca | ✅ | gratis | avvisi email attivabili nell'home banking |
-| Open Banking | ✅ | dipende | consenso bancario, provider PSD2 |
-| Siri / manuale | ❌ | gratis | nessuno |
+La function accetta un pagamento da qualunque sorgente sappia fare una POST,
+quindi la stessa pipeline serve anche l'inserimento a voce con Siri
+(`"source": "siri"`) e quello manuale dall'app.
 
 L'autenticazione usa un **token per utente**: la function ne calcola l'hash
 SHA-256 e lo cerca in `ingest_tokens` per risalire all'utente. In tabella non
@@ -66,55 +60,47 @@ Apri l'app con **Expo Go** sul telefono (scan del QR code). Al primo avvio
 registrati con email + password: è il tuo account personale, e la RLS fa sì che
 nessun altro possa vedere i tuoi dati.
 
-## Collegare una sorgente automatica
+## Collegare l'automazione
 
 ### 1. Genera il token
 
 Nell'app, tab **Impostazioni** → *Genera nuovo token*. Il valore viene mostrato
 **una sola volta**: copialo subito. Nella stessa schermata trovi anche l'URL da
-usare, già pronto da copiare.
+usare, gia' pronto da copiare.
 
 ### 2. Crea l'automazione
 
-App **Comandi Rapidi → Automazione → Crea automazione personale**, e come
-trigger scegli quello che corrisponde a ciò che ti manda la banca:
+**Comandi Rapidi → Automazione → Nuova automazione → Transazione**:
 
-- **Messaggio** → mittente della banca, eventualmente con "Il messaggio
-  contiene" per filtrare i soli avvisi di pagamento
-- **Email** → stesso principio, sul mittente degli avvisi
-
-Poi, in entrambi i casi:
-
-1. Estrai importo ed esercente con l'azione **Abbina testo** (espressione
-   regolare). Le espressioni dipendono dal formato esatto del messaggio della
-   tua banca — per un testo tipo `Pagamento di 23,40 EUR presso ESSELUNGA`:
-   - importo: `([0-9]+[.,][0-9]{2})`
-   - esercente: `presso (.+?)(?:\.|$)`
-2. Azione **Ottieni contenuto URL**:
+1. Scegli la **carta** (o le carte) che usi con Apple Pay
+2. Attiva **Esegui immediatamente**, altrimenti ogni pagamento richiede una
+   conferma manuale
+3. La prima azione e' gia' **Ricevi transazione come input**
+4. Aggiungi **Ottieni contenuto URL**:
    - URL: quello copiato dalle Impostazioni dell'app
    - Metodo: **POST**
-   - Intestazioni: `x-ingest-token` → il token generato al passo 1
+   - Intestazioni: `x-ingest-token` → il token del passo 1
    - Corpo richiesta: **JSON**
-     ```json
-     {
-       "merchant": "<variabile esercente>",
-       "amount": "<variabile importo>",
-       "raw_text": "<testo completo del messaggio>"
-     }
-     ```
-3. Attiva **"Esegui immediatamente"** e disattiva la richiesta di conferma,
-   altrimenti l'automatismo perde senso.
 
-`amount` può essere inviato come stringa: la function gestisce il formato
-italiano (`23,40` e `1.234,56`). Manda sempre anche `raw_text`: se il parsing
-sbaglia, il testo originale resta salvato e permette di correggere a
-posteriori.
+| Chiave | Tipo | Valore |
+| --- | --- | --- |
+| `merchant` | Testo | variabile **Esercente** |
+| `amount` | Testo | variabile **Importo** |
+| `source` | Testo | `shortcut` |
+
+I valori sono le **variabili** della transazione, scelte dal selettore
+variabili — non testo digitato.
+
+`Importo` arriva come stringa con simbolo di valuta ("12,99 €"): la function
+la ripulisce e gestisce il formato italiano, virgola decimale inclusa. La data
+non serve inviarla: per un trigger in tempo reale l'istante della chiamata e'
+corretto.
 
 ### Inserimento a voce con Siri
 
 Un Comando Rapido con frase di attivazione ("Aggiungi spesa") che usa **Chiedi
 input** per importo ed esercente e chiama lo stesso URL con
-`"source": "siri"`. Non è automatico, ma non dipende da cosa manda la banca.
+`"source": "siri"`. Utile per contanti e pagamenti non Apple Pay.
 
 ### 3. Verifica
 
@@ -226,18 +212,14 @@ Ordine con cui la Edge Function assegna la categoria:
 
 ## Limiti noti
 
-- **iOS non permette di leggere le notifiche di altre app**, quindi non esiste
-  un modo di intercettare la notifica di Wallet. L'ingestione automatica
-  richiede che la banca mandi un SMS o una email, oppure un collegamento Open
-  Banking.
-- L'automazione dipende dal **formato del messaggio** della tua banca: se
-  cambia, vanno aggiornate le regex nella Shortcut. Il campo `raw_text` salva
-  il testo originale, utile per correggere il parsing a posteriori.
-- Gli avvisi della banca non contengono l'MCC (codice categoria del
-  commerciante), quindi la categorizzazione si basa sul nome. Per dati più
-  affidabili servirebbe un collegamento Open Banking.
-- L'app non registra i pagamenti fatti quando il telefono è offline: la Shortcut
-  scatta ma la POST fallisce.
-- GoCardless / Nordigen, che offriva un piano gratuito per l'accesso ai propri
-  conti, **non accetta più nuove iscrizioni** da metà 2025. Fra le alternative
-  self-serve c'è Enable Banking.
+- Il trigger Transazione ha avuto **problemi di timeout** segnalati su alcune
+  versioni di iOS ([forum sviluppatori Apple](https://developer.apple.com/forums/thread/765516)).
+  Se qualche pagamento non venisse registrato, e' la prima cosa da guardare.
+- Il nome esercente e' quello che passa il circuito di pagamento, che a volte
+  e' criptico (`PAYPAL *STEAM`). Per questo esiste la correzione con "ricorda
+  per il futuro": si sistema una volta e vale per sempre.
+- La transazione Wallet non espone l'MCC (codice categoria del commerciante),
+  quindi la categorizzazione si basa sul nome. Per dati più affidabili
+  servirebbe un collegamento Open Banking.
+- L'app non registra i pagamenti fatti quando il telefono è offline: la
+  Shortcut scatta ma la POST fallisce.
