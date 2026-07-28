@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 import {
   Alert,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +11,7 @@ import {
 import { Icon } from "../components/Icon";
 import { LimitCard } from "../components/LimitCard";
 import { CategoryPicker } from "../components/CategoryPicker";
+import { Sheet } from "../components/Sheet";
 import { useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
@@ -180,155 +179,132 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
         </Text>
       </ScrollView>
 
-      <Modal
+      <Sheet
         visible={open}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setOpen(false)}
+        onClose={() => setOpen(false)}
+        title={editing ? "Modifica limite" : "Nuovo limite"}
       >
-        <Pressable style={styles.dim} onPress={() => setOpen(false)} />
-        <View style={[styles.sheet, { backgroundColor: palette.ground }]}>
-          <View style={[styles.grabber, { backgroundColor: palette.ink3 }]} />
-
-          <ScrollView
-            contentContainerStyle={styles.sheetContent}
-            keyboardShouldPersistTaps="handled"
-          >
-            <Text style={[styles.sheetTitle, { color: palette.ink }]}>
-              {editing ? "Modifica limite" : "Nuovo limite"}
-            </Text>
-
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Periodo
-            </Text>
-            <View style={[styles.segment, { backgroundColor: palette.surface2 }]}>
-              {(["weekly", "monthly"] as const).map((option) => (
-                <TouchableOpacity
-                  key={option}
-                  onPress={() => setPeriod(option)}
-                  style={[
-                    styles.segmentOption,
-                    period === option && { backgroundColor: palette.surface },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.segmentLabel,
-                      {
-                        color: period === option ? palette.ink : palette.ink3,
-                      },
-                    ]}
-                  >
-                    {option === "weekly" ? "Settimanale" : "Mensile"}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Importo
-            </Text>
-            <TextInput
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-              placeholder="0,00"
-              placeholderTextColor={palette.ink3}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                  color: palette.ink,
-                },
-              ]}
-            />
-
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Si applica a
-            </Text>
-            <View style={[styles.segment, { backgroundColor: palette.surface2 }]}>
-              <TouchableOpacity
-                onPress={() => setScopeAll(true)}
-                style={[
-                  styles.segmentOption,
-                  scopeAll && { backgroundColor: palette.surface },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.segmentLabel,
-                    { color: scopeAll ? palette.ink : palette.ink3 },
-                  ]}
-                >
-                  Tutto
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => setScopeAll(false)}
-                style={[
-                  styles.segmentOption,
-                  !scopeAll && { backgroundColor: palette.surface },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.segmentLabel,
-                    { color: !scopeAll ? palette.ink : palette.ink3 },
-                  ]}
-                >
-                  Una categoria
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {!scopeAll && (
-              <CategoryPicker value={categoryId} onChange={setCategoryId} />
-            )}
-
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Primo avviso al
-            </Text>
-            <View style={styles.warnRow}>
-              {WARN_CHOICES.map((choice) => (
-                <TouchableOpacity
-                  key={choice}
-                  onPress={() => setWarnAt(choice)}
-                  style={[
-                    styles.warnChip,
-                    {
-                      backgroundColor:
-                        warnAt === choice ? palette.accent : palette.surface,
-                      borderColor:
-                        warnAt === choice ? palette.accent : palette.hairline,
-                    },
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.warnText,
-                      {
-                        color: warnAt === choice ? palette.onAccent : palette.ink2,
-                      },
-                    ]}
-                  >
-                    {choice}%
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Periodo</Text>
+        <View style={[styles.segment, { backgroundColor: palette.surface2 }]}>
+          {(["weekly", "monthly"] as const).map((option) => (
             <TouchableOpacity
-              style={[styles.button, { backgroundColor: palette.accent }]}
-              onPress={save}
+              key={option}
+              onPress={() => setPeriod(option)}
+              style={[
+                styles.segmentOption,
+                period === option && { backgroundColor: palette.surface },
+              ]}
             >
-              <Text style={[styles.buttonText, { color: palette.onAccent }]}>
-                Salva
+              <Text
+                style={[
+                  styles.segmentLabel,
+                  { color: period === option ? palette.ink : palette.ink3 },
+                ]}
+              >
+                {option === "weekly" ? "Settimanale" : "Mensile"}
               </Text>
             </TouchableOpacity>
-          </ScrollView>
+          ))}
         </View>
-      </Modal>
+
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Importo</Text>
+        <TextInput
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="decimal-pad"
+          placeholder="0,00"
+          placeholderTextColor={palette.ink3}
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Si applica a
+        </Text>
+        <View style={[styles.segment, { backgroundColor: palette.surface2 }]}>
+          <TouchableOpacity
+            onPress={() => setScopeAll(true)}
+            style={[
+              styles.segmentOption,
+              scopeAll && { backgroundColor: palette.surface },
+            ]}
+          >
+            <Text
+              style={[
+                styles.segmentLabel,
+                { color: scopeAll ? palette.ink : palette.ink3 },
+              ]}
+            >
+              Tutto
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={() => setScopeAll(false)}
+            style={[
+              styles.segmentOption,
+              !scopeAll && { backgroundColor: palette.surface },
+            ]}
+          >
+            <Text
+              style={[
+                styles.segmentLabel,
+                { color: !scopeAll ? palette.ink : palette.ink3 },
+              ]}
+            >
+              Una categoria
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {!scopeAll && (
+          <CategoryPicker value={categoryId} onChange={setCategoryId} />
+        )}
+
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Primo avviso al
+        </Text>
+        <View style={styles.warnRow}>
+          {WARN_CHOICES.map((choice) => (
+            <TouchableOpacity
+              key={choice}
+              onPress={() => setWarnAt(choice)}
+              style={[
+                styles.warnChip,
+                {
+                  backgroundColor:
+                    warnAt === choice ? palette.accent : palette.surface,
+                  borderColor:
+                    warnAt === choice ? palette.accent : palette.hairline,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.warnText,
+                  { color: warnAt === choice ? palette.onAccent : palette.ink2 },
+                ]}
+              >
+                {choice}%
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: palette.accent }]}
+          onPress={save}
+        >
+          <Text style={[styles.buttonText, { color: palette.onAccent }]}>
+            Salva
+          </Text>
+        </TouchableOpacity>
+      </Sheet>
     </View>
   );
 }
@@ -353,23 +329,6 @@ const styles = StyleSheet.create({
   deleteText: { ...type.small },
   empty: { ...type.body, lineHeight: 21, textAlign: "center", marginTop: space.xl },
   note: { ...type.small, lineHeight: 17 },
-  dim: { flex: 1, backgroundColor: "rgba(20,20,19,0.36)" },
-  sheet: {
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
-    maxHeight: "88%",
-    paddingTop: 10,
-  },
-  grabber: {
-    width: 34,
-    height: 4,
-    borderRadius: radius.pill,
-    opacity: 0.35,
-    alignSelf: "center",
-    marginBottom: space.sm,
-  },
-  sheetContent: { padding: space.lg, paddingBottom: space.xxl, gap: space.sm },
-  sheetTitle: { ...type.sheetTitle, marginBottom: space.xs },
   fieldLabel: { ...type.caption, marginTop: space.sm },
   input: {
     borderWidth: 1,

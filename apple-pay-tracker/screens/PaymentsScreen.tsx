@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { EditPaymentSheet } from "../components/EditPaymentSheet";
+import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
 import { PaymentRow } from "../components/PaymentRow";
 import { useData } from "../lib/DataContext";
@@ -24,7 +24,7 @@ export default function PaymentsScreen() {
   const [month, setMonth] = useState(() => new Date());
   const { payments, reload } = usePayments(month);
   const [refreshing, setRefreshing] = useState(false);
-  const [editing, setEditing] = useState<Payment | null>(null);
+  const explorer = useExplorer(reload);
 
   // Le spese arrivano gia' ordinate dal piu' recente: raggrupparle in
   // sequenza preserva l'ordine senza dover riordinare le sezioni.
@@ -44,7 +44,7 @@ export default function PaymentsScreen() {
       }
       const group = groups[groups.length - 1];
       group.data.push(payment);
-      group.total += Number(payment.amount);
+      group.total += Number(payment.effective_amount);
     }
 
     return groups;
@@ -64,6 +64,8 @@ export default function PaymentsScreen() {
     await reload();
     setRefreshing(false);
   }
+
+  if (explorer.isOpen) return <>{explorer.overlay}</>;
 
   return (
     <>
@@ -111,7 +113,7 @@ export default function PaymentsScreen() {
             <PaymentRow
               payment={item}
               category={categoryById(item.category_id)}
-              onPress={() => setEditing(item)}
+              onPress={() => explorer.openPayment(item)}
             />
           )}
           ListEmptyComponent={
@@ -122,12 +124,7 @@ export default function PaymentsScreen() {
         />
       </View>
 
-      <EditPaymentSheet
-        payment={editing}
-        visible={editing !== null}
-        onClose={() => setEditing(null)}
-        onSaved={reload}
-      />
+      {explorer.overlay}
     </>
   );
 }

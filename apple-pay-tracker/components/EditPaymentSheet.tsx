@@ -2,10 +2,7 @@ import React, { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Platform,
-  Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -21,6 +18,13 @@ import { radius, space, type } from "../lib/theme";
 import { Payment } from "../lib/types";
 import { CategoryPicker } from "./CategoryPicker";
 import { Icon } from "./Icon";
+import { Sheet } from "./Sheet";
+import {
+  computeSplit,
+  emptySplit,
+  SplitEditor,
+  SplitState,
+} from "./SplitEditor";
 
 type Props = {
   payment: Payment | null;
@@ -48,6 +52,7 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [split, setSplit] = useState<SplitState>(emptySplit);
   const [siblingCount, setSiblingCount] = useState(0);
   const [applyToAll, setApplyToAll] = useState(true);
   const [remember, setRemember] = useState(true);
@@ -65,6 +70,29 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
     setApplyToAll(true);
     setRemember(true);
     setSiblingCount(0);
+    setSplit(emptySplit);
+
+    // Le quote gia' salvate vanno ricaricate come importi esatti: e' l'unica
+    // modalita' che rappresenta fedelmente qualunque divisione precedente,
+    // anche se era stata fatta in parti uguali o a percentuale.
+    supabase
+      .from("payment_splits")
+      .select("person_id, amount_owed")
+      .eq("payment_id", payment.id)
+      .then(({ data }) => {
+        if (!data || data.length === 0) return;
+        setSplit({
+          enabled: true,
+          mode: "exact",
+          personIds: data.map((row) => row.person_id),
+          values: Object.fromEntries(
+            data.map((row) => [
+              row.person_id,
+              String(row.amount_owed).replace(".", ","),
+            ])
+          ),
+        });
+      });
   }, [payment]);
 
   // Quante altre spese dello stesso esercente verrebbero toccate.
@@ -104,6 +132,15 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
       return;
     }
 
+    const splitResult = computeSplit(parsedAmount, split);
+    if (!splitResult.valid) {
+      Alert.alert(
+        "Quote troppo alte",
+        "La somma delle quote altrui supera il totale pagato."
+      );
+      return;
+    }
+
     setSaving(true);
 
     const { error } = await supabase
@@ -114,6 +151,7 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
         category_id: categoryId,
         note: note.trim() || null,
         occurred_at: occurredAt.toISOString(),
+        my_share: split.enabled ? splitResult.myShare : null,
       })
       .eq("id", payment.id);
 
@@ -121,6 +159,33 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
       setSaving(false);
       Alert.alert("Errore", error.message);
       return;
+    }
+
+    // Le quote vengono riscritte da zero: gestire l'insieme differenziale
+    // (chi e' stato tolto, chi aggiunto, chi cambiato) sarebbe piu' codice
+    // per lo stesso risultato, e questa tabella e' piccola per definizione.
+    await supabase.from("payment_splits").delete().eq("payment_id", payment.id);
+
+    if (split.enabled && split.personIds.length > 0) {
+      const rows = split.personIds.map((personId) => ({
+        payment_id: payment.id,
+        person_id: personId,
+        amount_owed: splitResult.owed[personId] ?? 0,
+      }));
+      const { error: splitError } = await supabase
+        .from("payment_splits")
+        .insert(rows);
+
+      if (splitError) {
+        setSaving(false);
+        Alert.alert(
+          "Spesa salvata, ma non le quote",
+          `La divisione non e' stata registrata: ${splitError.message}`
+        );
+        onSaved();
+        onClose();
+        return;
+      }
     }
 
     // Le due scelte sono indipendenti: si possono volere entrambe, una sola,
@@ -196,164 +261,148 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
   const showAsk = categoryChanged && !!payment?.merchant_id;
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.dim} onPress={onClose} />
+    <Sheet visible={visible} onClose={onClose} title="Modifica spesa">
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Esercente
+        </Text>
+        <TextInput
+          value={merchant}
+          onChangeText={setMerchant}
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+      </View>
 
-      <View style={[styles.sheet, { backgroundColor: palette.ground }]}>
-        <View style={[styles.grabber, { backgroundColor: palette.ink3 }]} />
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Importo</Text>
+        <TextInput
+          value={amount}
+          onChangeText={setAmount}
+          keyboardType="decimal-pad"
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+      </View>
 
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled"
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Data</Text>
+        <TouchableOpacity
+          onPress={() => setShowDatePicker(true)}
+          style={[
+            styles.input,
+            styles.inputButton,
+            { backgroundColor: palette.surface, borderColor: palette.hairline },
+          ]}
         >
-          <Text style={[styles.title, { color: palette.ink }]}>
-            Modifica spesa
+          <Text style={{ color: palette.ink, ...type.body }}>
+            {formatDate(occurredAt.toISOString())}
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {showDatePicker && (
+        <DateTimePicker
+          value={occurredAt}
+          mode="date"
+          display={Platform.OS === "ios" ? "inline" : "default"}
+          onChange={(_event, selected) => {
+            if (Platform.OS !== "ios") setShowDatePicker(false);
+            if (selected) setOccurredAt(selected);
+          }}
+        />
+      )}
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Categoria
+        </Text>
+        <CategoryPicker value={categoryId} onChange={setCategoryId} />
+      </View>
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Nota</Text>
+        <TextInput
+          value={note}
+          onChangeText={setNote}
+          placeholder="Facoltativa"
+          placeholderTextColor={palette.ink3}
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+      </View>
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Divisione
+        </Text>
+        <SplitEditor
+          total={parseAmountInput(amount) ?? 0}
+          split={split}
+          onChange={setSplit}
+        />
+      </View>
+
+      {showAsk && (
+        <View style={[styles.ask, { backgroundColor: palette.accentSoft }]}>
+          <Text style={[styles.askHead, { color: palette.ink }]}>
+            Hai spostato {payment?.merchant_name} in {newCategoryName}.
           </Text>
 
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Esercente
-            </Text>
-            <TextInput
-              value={merchant}
-              onChangeText={setMerchant}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                  color: palette.ink,
-                },
-              ]}
-            />
-          </View>
-
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Importo
-            </Text>
-            <TextInput
-              value={amount}
-              onChangeText={setAmount}
-              keyboardType="decimal-pad"
-              style={[
-                styles.input,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                  color: palette.ink,
-                },
-              ]}
-            />
-          </View>
-
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Data</Text>
-            <TouchableOpacity
-              onPress={() => setShowDatePicker(true)}
-              style={[
-                styles.input,
-                styles.inputButton,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                },
-              ]}
-            >
-              <Text style={{ color: palette.ink, ...type.body }}>
-                {formatDate(occurredAt.toISOString())}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {showDatePicker && (
-            <DateTimePicker
-              value={occurredAt}
-              mode="date"
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              onChange={(_event, selected) => {
-                if (Platform.OS !== "ios") setShowDatePicker(false);
-                if (selected) setOccurredAt(selected);
-              }}
+          {siblingCount > 0 && (
+            <Checkbox
+              checked={applyToAll}
+              onToggle={() => setApplyToAll((v) => !v)}
+              label={`Applica anche alle altre ${siblingCount} spese di questo esercente`}
             />
           )}
 
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Categoria
-            </Text>
-            <CategoryPicker value={categoryId} onChange={setCategoryId} />
-          </View>
+          <Checkbox
+            checked={remember}
+            onToggle={() => setRemember((v) => !v)}
+            label="Ricorda per i pagamenti futuri"
+          />
+        </View>
+      )}
 
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Nota
-            </Text>
-            <TextInput
-              value={note}
-              onChangeText={setNote}
-              placeholder="Facoltativa"
-              placeholderTextColor={palette.ink3}
-              style={[
-                styles.input,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                  color: palette.ink,
-                },
-              ]}
-            />
-          </View>
+      <TouchableOpacity
+        style={[styles.button, { backgroundColor: palette.accent }]}
+        onPress={save}
+        disabled={saving}
+      >
+        {saving ? (
+          <ActivityIndicator color={palette.onAccent} />
+        ) : (
+          <Text style={[styles.buttonText, { color: palette.onAccent }]}>
+            Salva
+          </Text>
+        )}
+      </TouchableOpacity>
 
-          {showAsk && (
-            <View style={[styles.ask, { backgroundColor: palette.accentSoft }]}>
-              <Text style={[styles.askHead, { color: palette.ink }]}>
-                Hai spostato {payment?.merchant_name} in {newCategoryName}.
-              </Text>
-
-              {siblingCount > 0 && (
-                <Checkbox
-                  checked={applyToAll}
-                  onToggle={() => setApplyToAll((v) => !v)}
-                  label={`Applica anche alle altre ${siblingCount} spese di questo esercente`}
-                />
-              )}
-
-              <Checkbox
-                checked={remember}
-                onToggle={() => setRemember((v) => !v)}
-                label="Ricorda per i pagamenti futuri"
-              />
-            </View>
-          )}
-
-          <TouchableOpacity
-            style={[styles.button, { backgroundColor: palette.accent }]}
-            onPress={save}
-            disabled={saving}
-          >
-            {saving ? (
-              <ActivityIndicator color={palette.onAccent} />
-            ) : (
-              <Text style={[styles.buttonText, { color: palette.onAccent }]}>
-                Salva
-              </Text>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.ghost} onPress={confirmDelete}>
-            <Text style={[styles.ghostText, { color: palette.over }]}>
-              Elimina spesa
-            </Text>
-          </TouchableOpacity>
-        </ScrollView>
-      </View>
-    </Modal>
+      <TouchableOpacity style={styles.ghost} onPress={confirmDelete}>
+        <Text style={[styles.ghostText, { color: palette.over }]}>
+          Elimina spesa
+        </Text>
+      </TouchableOpacity>
+    </Sheet>
   );
 }
 
@@ -391,23 +440,6 @@ function Checkbox({
 }
 
 const styles = StyleSheet.create({
-  dim: { flex: 1, backgroundColor: "rgba(20,20,19,0.36)" },
-  sheet: {
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
-    maxHeight: "88%",
-    paddingTop: 10,
-  },
-  grabber: {
-    width: 34,
-    height: 4,
-    borderRadius: radius.pill,
-    opacity: 0.35,
-    alignSelf: "center",
-    marginBottom: space.sm,
-  },
-  content: { padding: space.lg, paddingBottom: space.xxl, gap: space.md },
-  title: { ...type.sheetTitle },
   fieldLabel: { ...type.caption, marginBottom: 6 },
   input: {
     borderWidth: 1,

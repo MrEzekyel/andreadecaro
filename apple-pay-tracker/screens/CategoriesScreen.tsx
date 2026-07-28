@@ -1,8 +1,6 @@
 import React, { useState } from "react";
 import {
   Alert,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   Text,
@@ -11,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Icon } from "../components/Icon";
+import { Sheet } from "../components/Sheet";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
@@ -38,7 +37,7 @@ const ICON_CHOICES = [
 
 export default function CategoriesScreen({ onBack }: { onBack: () => void }) {
   const { palette, dark } = useTheme();
-  const { categories, reloadCategories } = useData();
+  const { categories, reload } = useData();
 
   const [editing, setEditing] = useState<Category | null>(null);
   const [creating, setCreating] = useState(false);
@@ -105,7 +104,7 @@ export default function CategoriesScreen({ onBack }: { onBack: () => void }) {
     }
 
     setCreating(false);
-    await reloadCategories();
+    await reload();
   }
 
   function confirmDelete(category: Category) {
@@ -126,7 +125,7 @@ export default function CategoriesScreen({ onBack }: { onBack: () => void }) {
               Alert.alert("Errore", error.message);
               return;
             }
-            await reloadCategories();
+            await reload();
           },
         },
       ]
@@ -203,101 +202,82 @@ export default function CategoriesScreen({ onBack }: { onBack: () => void }) {
         </Text>
       </ScrollView>
 
-      <Modal
+      <Sheet
         visible={creating}
-        animationType="slide"
-        transparent
-        onRequestClose={() => setCreating(false)}
+        onClose={() => setCreating(false)}
+        title={editing ? "Modifica categoria" : "Nuova categoria"}
       >
-        <Pressable style={styles.dim} onPress={() => setCreating(false)} />
-        <View style={[styles.sheet, { backgroundColor: palette.ground }]}>
-          <View style={[styles.grabber, { backgroundColor: palette.ink3 }]} />
+        <TextInput
+          value={name}
+          onChangeText={setName}
+          placeholder="Nome"
+          placeholderTextColor={palette.ink3}
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
 
-          <ScrollView contentContainerStyle={styles.sheetContent}>
-            <Text style={[styles.sheetTitle, { color: palette.ink }]}>
-              {editing ? "Modifica categoria" : "Nuova categoria"}
-            </Text>
-
-            <TextInput
-              value={name}
-              onChangeText={setName}
-              placeholder="Nome"
-              placeholderTextColor={palette.ink3}
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Colore</Text>
+        <View style={styles.grid}>
+          {COLOR_CHOICES.map((choice) => (
+            <TouchableOpacity
+              key={choice}
+              onPress={() => setColor(choice)}
               style={[
-                styles.input,
+                styles.colorDot,
                 {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                  color: palette.ink,
+                  backgroundColor: categoryColor(choice, dark),
+                  borderColor: color === choice ? palette.ink : "transparent",
                 },
               ]}
+              accessibilityLabel={`Colore ${choice}`}
             />
-
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Colore
-            </Text>
-            <View style={styles.grid}>
-              {COLOR_CHOICES.map((choice) => (
-                <TouchableOpacity
-                  key={choice}
-                  onPress={() => setColor(choice)}
-                  style={[
-                    styles.colorDot,
-                    {
-                      backgroundColor: categoryColor(choice, dark),
-                      borderColor:
-                        color === choice ? palette.ink : "transparent",
-                    },
-                  ]}
-                  accessibilityLabel={`Colore ${choice}`}
-                />
-              ))}
-            </View>
-
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Icona
-            </Text>
-            <View style={styles.grid}>
-              {ICON_CHOICES.map((choice) => (
-                <TouchableOpacity
-                  key={choice}
-                  onPress={() => setIcon(choice)}
-                  style={[
-                    styles.iconChoice,
-                    {
-                      backgroundColor:
-                        icon === choice
-                          ? tint(categoryColor(color, dark), dark)
-                          : palette.surface,
-                      borderColor:
-                        icon === choice
-                          ? categoryColor(color, dark)
-                          : palette.hairline,
-                    },
-                  ]}
-                >
-                  <Icon
-                    name={choice}
-                    size={17}
-                    color={
-                      icon === choice ? categoryColor(color, dark) : palette.ink3
-                    }
-                  />
-                </TouchableOpacity>
-              ))}
-            </View>
-
-            <TouchableOpacity
-              style={[styles.button, { backgroundColor: palette.accent }]}
-              onPress={save}
-            >
-              <Text style={[styles.buttonText, { color: palette.onAccent }]}>
-                Salva
-              </Text>
-            </TouchableOpacity>
-          </ScrollView>
+          ))}
         </View>
-      </Modal>
+
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Icona</Text>
+        <View style={styles.grid}>
+          {ICON_CHOICES.map((choice) => (
+            <TouchableOpacity
+              key={choice}
+              onPress={() => setIcon(choice)}
+              style={[
+                styles.iconChoice,
+                {
+                  backgroundColor:
+                    icon === choice
+                      ? tint(categoryColor(color, dark), dark)
+                      : palette.surface,
+                  borderColor:
+                    icon === choice
+                      ? categoryColor(color, dark)
+                      : palette.hairline,
+                },
+              ]}
+            >
+              <Icon
+                name={choice}
+                size={17}
+                color={icon === choice ? categoryColor(color, dark) : palette.ink3}
+              />
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: palette.accent }]}
+          onPress={save}
+        >
+          <Text style={[styles.buttonText, { color: palette.onAccent }]}>
+            Salva
+          </Text>
+        </TouchableOpacity>
+      </Sheet>
     </View>
   );
 }
@@ -335,23 +315,6 @@ const styles = StyleSheet.create({
   },
   rowName: { ...type.body },
   note: { ...type.small, lineHeight: 17 },
-  dim: { flex: 1, backgroundColor: "rgba(20,20,19,0.36)" },
-  sheet: {
-    borderTopLeftRadius: radius.sheet,
-    borderTopRightRadius: radius.sheet,
-    maxHeight: "85%",
-    paddingTop: 10,
-  },
-  grabber: {
-    width: 34,
-    height: 4,
-    borderRadius: radius.pill,
-    opacity: 0.35,
-    alignSelf: "center",
-    marginBottom: space.sm,
-  },
-  sheetContent: { padding: space.lg, paddingBottom: space.xxl, gap: space.md },
-  sheetTitle: { ...type.sheetTitle },
   fieldLabel: { ...type.caption },
   input: {
     borderWidth: 1,

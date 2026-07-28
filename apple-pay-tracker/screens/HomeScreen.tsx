@@ -7,7 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { EditPaymentSheet } from "../components/EditPaymentSheet";
+import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
 import { LimitCard } from "../components/LimitCard";
 import { PaymentRow } from "../components/PaymentRow";
@@ -15,7 +15,6 @@ import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, monthName, splitAmount } from "../lib/format";
 import { categoryColor, radius, space, type } from "../lib/theme";
-import { Payment } from "../lib/types";
 import { useLimits } from "../lib/useLimits";
 import { usePayments } from "../lib/usePayments";
 
@@ -27,7 +26,7 @@ export default function HomeScreen() {
   const { payments, reload } = usePayments(month);
   const { monthlyOverall, alerts, reload: reloadLimits } = useLimits();
   const [refreshing, setRefreshing] = useState(false);
-  const [editing, setEditing] = useState<Payment | null>(null);
+  const explorer = useExplorer(reload);
 
   // I limiti valgono sempre sul periodo corrente: mostrarli mentre si
   // sfoglia un mese passato darebbe un confronto senza senso.
@@ -36,7 +35,7 @@ export default function HomeScreen() {
     month.getMonth() === new Date().getMonth();
 
   const total = useMemo(
-    () => payments.reduce((sum, p) => sum + Number(p.amount), 0),
+    () => payments.reduce((sum, p) => sum + Number(p.effective_amount), 0),
     [payments]
   );
 
@@ -44,7 +43,7 @@ export default function HomeScreen() {
     const map = new Map<string | null, number>();
     for (const payment of payments) {
       const key = payment.category_id;
-      map.set(key, (map.get(key) ?? 0) + Number(payment.amount));
+      map.set(key, (map.get(key) ?? 0) + Number(payment.effective_amount));
     }
     return Array.from(map.entries())
       .map(([id, amount]) => ({ id, amount }))
@@ -68,6 +67,8 @@ export default function HomeScreen() {
     await Promise.all([reload(), reloadLimits()]);
     setRefreshing(false);
   }
+
+  if (explorer.isOpen) return <>{explorer.overlay}</>;
 
   return (
     <>
@@ -216,7 +217,7 @@ export default function HomeScreen() {
                 key={payment.id}
                 payment={payment}
                 category={categoryById(payment.category_id)}
-                onPress={() => setEditing(payment)}
+                onPress={() => explorer.openPayment(payment)}
               />
             ))}
           </View>
@@ -230,12 +231,7 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
-      <EditPaymentSheet
-        payment={editing}
-        visible={editing !== null}
-        onClose={() => setEditing(null)}
-        onSaved={reload}
-      />
+      {explorer.overlay}
     </>
   );
 }
