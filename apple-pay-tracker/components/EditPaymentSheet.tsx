@@ -19,6 +19,12 @@ import { Payment } from "../lib/types";
 import { CategoryPicker } from "./CategoryPicker";
 import { Icon } from "./Icon";
 import { Sheet } from "./Sheet";
+import {
+  computeSplit,
+  emptySplit,
+  SplitEditor,
+  SplitState,
+} from "./SplitEditor";
 
 type Props = {
   payment: Payment | null;
@@ -46,6 +52,7 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
 
+  const [split, setSplit] = useState<SplitState>(emptySplit);
   const [siblingCount, setSiblingCount] = useState(0);
   const [applyToAll, setApplyToAll] = useState(true);
   const [remember, setRemember] = useState(true);
@@ -63,6 +70,29 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
     setApplyToAll(true);
     setRemember(true);
     setSiblingCount(0);
+    setSplit(emptySplit);
+
+    // Le quote gia' salvate vanno ricaricate come importi esatti: e' l'unica
+    // modalita' che rappresenta fedelmente qualunque divisione precedente,
+    // anche se era stata fatta in parti uguali o a percentuale.
+    supabase
+      .from("payment_splits")
+      .select("person_id, amount_owed")
+      .eq("payment_id", payment.id)
+      .then(({ data }) => {
+        if (!data || data.length === 0) return;
+        setSplit({
+          enabled: true,
+          mode: "exact",
+          personIds: data.map((row) => row.person_id),
+          values: Object.fromEntries(
+            data.map((row) => [
+              row.person_id,
+              String(row.amount_owed).replace(".", ","),
+            ])
+          ),
+        });
+      });
   }, [payment]);
 
   // Quante altre spese dello stesso esercente verrebbero toccate.
@@ -102,6 +132,15 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
       return;
     }
 
+    const splitResult = computeSplit(parsedAmount, split);
+    if (!splitResult.valid) {
+      Alert.alert(
+        "Quote troppo alte",
+        "La somma delle quote altrui supera il totale pagato."
+      );
+      return;
+    }
+
     setSaving(true);
 
     const { error } = await supabase
@@ -112,6 +151,7 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
         category_id: categoryId,
         note: note.trim() || null,
         occurred_at: occurredAt.toISOString(),
+        my_share: split.enabled ? splitResult.myShare : null,
       })
       .eq("id", payment.id);
 
@@ -119,6 +159,33 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
       setSaving(false);
       Alert.alert("Errore", error.message);
       return;
+    }
+
+    // Le quote vengono riscritte da zero: gestire l'insieme differenziale
+    // (chi e' stato tolto, chi aggiunto, chi cambiato) sarebbe piu' codice
+    // per lo stesso risultato, e questa tabella e' piccola per definizione.
+    await supabase.from("payment_splits").delete().eq("payment_id", payment.id);
+
+    if (split.enabled && split.personIds.length > 0) {
+      const rows = split.personIds.map((personId) => ({
+        payment_id: payment.id,
+        person_id: personId,
+        amount_owed: splitResult.owed[personId] ?? 0,
+      }));
+      const { error: splitError } = await supabase
+        .from("payment_splits")
+        .insert(rows);
+
+      if (splitError) {
+        setSaving(false);
+        Alert.alert(
+          "Spesa salvata, ma non le quote",
+          `La divisione non e' stata registrata: ${splitError.message}`
+        );
+        onSaved();
+        onClose();
+        return;
+      }
     }
 
     // Le due scelte sono indipendenti: si possono volere entrambe, una sola,
@@ -280,6 +347,17 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
               color: palette.ink,
             },
           ]}
+        />
+      </View>
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Divisione
+        </Text>
+        <SplitEditor
+          total={parseAmountInput(amount) ?? 0}
+          split={split}
+          onChange={setSplit}
         />
       </View>
 

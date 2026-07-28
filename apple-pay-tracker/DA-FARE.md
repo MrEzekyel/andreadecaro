@@ -93,13 +93,31 @@ valuta e gestisce la virgola decimale italiana, quindi va bene cosi'.
 **Ordine dei passi**: prima `.env` → app → registrazione → token, poi
 l'automazione. Senza token la chiamata risponde 401.
 
-### 5. Inserimento rapido con Siri (facoltativo)
+### 5. Comando Siri per l'inserimento a voce
 
-Utile per contanti e pagamenti non Apple Pay. Comando Rapido con frase di
-attivazione, **Chiedi input** per importo ed esercente, stessa azione
-"Ottieni contenuto URL" del punto 4 ma con `"source": "siri"`.
+Serve per quello che Apple Pay non vede: contanti, bonifici, carta fisica.
+Non e' un'automazione ma un **comando rapido** che lanci a voce.
 
-Te lo preparo quando vuoi.
+**Comandi Rapidi → + (nuovo comando) →** aggiungi in ordine:
+
+1. **Chiedi input** → Tipo: **Numero** → Richiesta: `Quanto hai speso?`
+2. **Chiedi input** → Tipo: **Testo** → Richiesta: `Dove?`
+3. **Ottieni contenuto URL** — stessa configurazione del punto 4, con il
+   corpo JSON:
+
+| Chiave | Tipo | Valore |
+| --- | --- | --- |
+| `merchant` | Testo | risultato della **seconda** Chiedi input |
+| `amount` | Testo | risultato della **prima** Chiedi input |
+| `source` | Testo | `siri` |
+
+⚠️ Attenzione all'ordine: nel selettore variabili le due "Chiedi input" si
+chiamano uguale, e scambiarle manda l'importo come esercente.
+
+4. Rinomina il comando **Aggiungi spesa** (il nome e' la frase che dirai)
+5. Dettagli comando → attiva **Mostra in Siri**
+
+Poi ti basta dire *"Ehi Siri, aggiungi spesa"*.
 
 ---
 
@@ -172,8 +190,8 @@ Quando ci arriveremo ti servirà preparare:
 
 Solo per chiarezza, questi sono già fatti e non richiedono niente da te:
 
-- ✅ Schema del database (9 migration applicate, RLS attiva ovunque)
-- ✅ 96 regole di categorizzazione predefinite già caricate
+- ✅ Schema del database (15 migration applicate, RLS attiva ovunque)
+- ✅ 206 regole di categorizzazione predefinite già caricate
 - ✅ Edge Function deployata e attiva
 - ✅ Sistema di token (generazione, revoca, hashing)
 - ✅ App: login, Home, elenco spese, statistiche, impostazioni
@@ -181,3 +199,7 @@ Solo per chiarezza, questi sono già fatti e non richiedono niente da te:
 - ✅ Categorie personalizzate con colore e icona
 - ✅ Limiti settimanali e mensili con avvisi in-app
 - ✅ Tema chiaro / scuro / sistema
+- ✅ Spese ricorrenti generate ogni notte (mutuo, rata auto)
+- ✅ Spese divise, con schermata "Mi devono" e crediti in ritardo
+- ✅ Statistiche per settimana / mese / anno
+- ✅ Dettaglio per esercente e per categoria

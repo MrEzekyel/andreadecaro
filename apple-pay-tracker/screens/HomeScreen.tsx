@@ -36,7 +36,7 @@ export default function HomeScreen() {
     month.getMonth() === new Date().getMonth();
 
   const total = useMemo(
-    () => payments.reduce((sum, p) => sum + Number(p.amount), 0),
+    () => payments.reduce((sum, p) => sum + Number(p.effective_amount), 0),
     [payments]
   );
 
@@ -44,7 +44,7 @@ export default function HomeScreen() {
     const map = new Map<string | null, number>();
     for (const payment of payments) {
       const key = payment.category_id;
-      map.set(key, (map.get(key) ?? 0) + Number(payment.amount));
+      map.set(key, (map.get(key) ?? 0) + Number(payment.effective_amount));
     }
     return Array.from(map.entries())
       .map(([id, amount]) => ({ id, amount }))

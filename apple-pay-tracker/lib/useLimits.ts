@@ -42,7 +42,7 @@ export function evaluateLimit(
       }
       return true;
     })
-    .reduce((sum, payment) => sum + Number(payment.amount), 0);
+    .reduce((sum, payment) => sum + Number(payment.effective_amount), 0);
 
   const amount = Number(limit.amount);
   const ratio = amount > 0 ? spent / amount : 0;

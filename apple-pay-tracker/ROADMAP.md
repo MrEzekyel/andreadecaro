@@ -81,22 +81,22 @@ statistiche useranno `my_share`, non `amount` — altrimenti una cena divisa in
 Le due domande sono indipendenti (posso volere una e non l'altra), quindi due
 checkbox in un unico foglio modale, non due alert in fila.
 
-## Fase 2 — Statistiche complete
+## Fase 2 — Statistiche complete ✅
 
-> Il design system è già applicato a tutte le schermate esistenti (Fase 1).
-> Qui restano le viste analitiche.
+> Resta solo il donut, che è una preferenza estetica: le barre danno la
+> stessa informazione e sono più leggibili quando le categorie sono molte.
 
 - [x] Design system: palette, tipografia, card, spaziature (vedi sezione Design)
 - [x] Line chart andamento cumulato del mese
 - [x] Ripartizione per categoria con percentuali
-- [ ] **Vista mensile**: un mese per schermata, swipe per cambiare mese, con
-      tutte le spese e le statistiche di quel mese soltanto
+- [x] **Vista per periodo**: un periodo per schermata, con navigazione avanti
+      e indietro, e tutte le statistiche di quel periodo soltanto
+- [x] **Dettaglio categoria**: tutte le transazioni di quella categoria
+- [x] **Dettaglio esercente**: totale speso, numero transazioni, media a
+      spesa, media mensile, storico completo
+- [x] **Dove spendi di più**: classifica esercenti del periodo
+- [x] Toggle settimana / mese / anno
 - [ ] **Donut chart** al posto delle barre nella ripartizione
-- [ ] **Confronto tra mesi** a barre, con media
-- [ ] **Dettaglio categoria**: tutte le transazioni di quella categoria
-- [ ] **Dettaglio esercente**: totale speso, numero transazioni, storico,
-      andamento nel tempo
-- [ ] Toggle settimana / mese / anno
 
 ## Fase 3 — Limiti di spesa ✅ (avvisi in-app)
 
@@ -126,16 +126,21 @@ Note di implementazione:
 > ⚠️ Le notifiche push richiedono una **development build** — vedi punto 7 di
 > `DA-FARE.md`.
 
-## Fase 4 — Transazioni ricorrenti + Siri
+## Fase 4 — Transazioni ricorrenti + Siri ✅
 
-- [ ] Tabella `recurring_rules` (etichetta, importo, categoria, frequenza,
+- [x] Tabella `recurring_rules` (etichetta, importo, categoria, frequenza,
       giorno, data inizio/fine, prossima esecuzione)
-- [ ] Job schedulato (pg_cron) che materializza le transazioni dovute
-- [ ] Schermata gestione ricorrenti: crea, sospendi, modifica, elimina
-- [ ] Le ricorrenti generate sono marcate `source = 'recurring'` e restano
+- [x] Job schedulato (pg_cron) che materializza le transazioni dovute,
+      ogni notte alle 03:00 UTC
+- [x] Schermata gestione ricorrenti: crea, sospendi, modifica, elimina
+- [x] Le ricorrenti generate sono marcate `source = 'recurring'` e restano
       modificabili come le altre
-- [ ] **Shortcut Siri** "Aggiungi spesa": chiede importo ed esercente a voce e
-      chiama la stessa Edge Function con `source = 'siri'`
+- [x] **Comando Siri** "Aggiungi spesa" (istruzioni in `DA-FARE.md`)
+
+Sui giorni di fine mese: una regola impostata al 31 cade sul 28 a febbraio ma
+**torna al 31** a marzo, perché il giorno resta memorizzato sulla regola e
+viene limitato solo al momento del calcolo. La generazione è idempotente per
+giorno, quindi un recupero dopo un fermo non duplica nulla.
 
 Sul punto Siri: non serve integrazione nativa. Un Comando Rapido con "Chiedi
 input" e frase di attivazione personalizzata ("Ehi Siri, aggiungi spesa") fa
@@ -166,19 +171,23 @@ Da tenere d'occhio: il trigger ha avuto
 [problemi di timeout](https://developer.apple.com/forums/thread/765516)
 segnalati su alcune versioni di iOS.
 
-## Fase 5 — Spese divise
+## Fase 5 — Spese divise ✅ (tranne le push)
 
-- [ ] Tabella `people` (i tuoi contatti ricorrenti: Leonardo, Marco, …)
-- [ ] Tabella `payment_splits` (persona, tipo quota, valore, importo dovuto,
-      saldato sì/no, data saldo)
-- [ ] Tre modalità di divisione: **equa** (n persone), **percentuale**,
+- [x] Tabella `people` (i tuoi contatti ricorrenti: Leonardo, Marco, …)
+- [x] Tabella `payment_splits` (persona, importo dovuto, saldato, data saldo)
+- [x] Tre modalità di divisione: **equa** (n persone), **percentuale**,
       **importo esatto**
-- [ ] Calcolo automatico di `my_share` sulla transazione
-- [ ] Schermata "Mi devono": elenco crediti aperti per persona
-- [ ] Segna come saldato (totale o parziale)
-- [ ] Promemoria automatico dopo N giorni: *"Leonardo non ti ha ancora pagato
-      12,50 € per Ristorante Da Mario"*
-- [ ] Statistiche calcolate su `my_share`, non su `amount`
+- [x] Calcolo automatico di `my_share` sulla transazione
+- [x] Schermata "Mi devono": crediti aperti per persona, con evidenza sui
+      ritardi oltre 3 giorni
+- [x] Segna come saldato, e annulla il saldo se sbagli
+- [x] Statistiche calcolate su `my_share`, non su `amount`
+- [ ] Promemoria **push** dopo N giorni *(rimandato con le altre push)*
+
+Nota sul calcolo: in modalità equa il totale si divide fra te **e** le altre
+persone, quindi il divisore è `persone + 1`. La colonna `effective_amount` del
+database è generata come `coalesce(my_share, amount)`, così il calcolo sta in
+un posto solo e nessuna query può dimenticarsene.
 
 ---
 

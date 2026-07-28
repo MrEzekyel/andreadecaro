@@ -44,7 +44,7 @@ export default function PaymentsScreen() {
       }
       const group = groups[groups.length - 1];
       group.data.push(payment);
-      group.total += Number(payment.amount);
+      group.total += Number(payment.effective_amount);
     }
 
     return groups;

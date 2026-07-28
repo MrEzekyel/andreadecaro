@@ -31,7 +31,7 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 
 function Shell() {
   const { palette, dark } = useTheme();
-  const { reloadCategories } = useData();
+  const { reload } = useData();
 
   const [tab, setTab] = useState<Tab>("home");
   const [adding, setAdding] = useState(false);
@@ -83,7 +83,7 @@ function Shell() {
         visible={adding}
         onClose={() => setAdding(false)}
         onSaved={() => {
-          reloadCategories();
+          reload();
           setReloadKey((value) => value + 1);
         }}
       />

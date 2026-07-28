@@ -21,7 +21,12 @@ export type Merchant = {
 export type Payment = {
   id: string;
   user_id: string;
+  /** Quanto e' uscito dal conto. */
   amount: number;
+  /** Quanto compete a me quando la spesa e' divisa. NULL = non divisa. */
+  my_share: number | null;
+  /** coalesce(my_share, amount), calcolato dal database. Usalo nelle somme. */
+  effective_amount: number;
   merchant_raw: string;
   merchant_name: string;
   merchant_id: string | null;
@@ -31,6 +36,48 @@ export type Payment = {
   note: string | null;
   source: string;
   dedup_key: string | null;
+  created_at: string;
+};
+
+export type Person = {
+  id: string;
+  user_id: string;
+  name: string;
+  color: string;
+  created_at: string;
+};
+
+export type PaymentSplit = {
+  id: string;
+  payment_id: string;
+  person_id: string;
+  amount_owed: number;
+  settled_at: string | null;
+  reminder_sent_at: string | null;
+  created_at: string;
+};
+
+/** Una quota con accanto la spesa e la persona a cui si riferisce. */
+export type OpenCredit = PaymentSplit & {
+  person: Person;
+  payment: Pick<Payment, "id" | "merchant_name" | "occurred_at" | "amount">;
+};
+
+export type RecurringFrequency = "weekly" | "monthly" | "yearly";
+
+export type RecurringRule = {
+  id: string;
+  user_id: string;
+  label: string;
+  amount: number;
+  category_id: string | null;
+  frequency: RecurringFrequency;
+  day_of_month: number | null;
+  weekday: number | null;
+  start_on: string;
+  end_on: string | null;
+  next_run_on: string;
+  active: boolean;
   created_at: string;
 };
 

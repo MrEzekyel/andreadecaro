@@ -7,12 +7,14 @@ import React, {
   useState,
 } from "react";
 import { supabase } from "./supabase";
-import { Category } from "./types";
+import { Category, Person } from "./types";
 
 type DataContextValue = {
   categories: Category[];
   categoryById: (id: string | null) => Category | undefined;
-  reloadCategories: () => Promise<void>;
+  people: Person[];
+  personById: (id: string | null) => Person | undefined;
+  reload: () => Promise<void>;
   loading: boolean;
 };
 
@@ -20,36 +22,49 @@ const DataContext = createContext<DataContextValue | null>(null);
 
 export function DataProvider({ children }: { children: React.ReactNode }) {
   const [categories, setCategories] = useState<Category[]>([]);
+  const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const reloadCategories = useCallback(async () => {
-    const { data, error } = await supabase
-      .from("categories")
-      .select("*")
-      .order("sort_order", { ascending: true });
+  const reload = useCallback(async () => {
+    const [categoriesResult, peopleResult] = await Promise.all([
+      supabase.from("categories").select("*").order("sort_order"),
+      supabase.from("people").select("*").order("name"),
+    ]);
 
-    if (!error && data) setCategories(data as Category[]);
+    if (categoriesResult.data) setCategories(categoriesResult.data as Category[]);
+    if (peopleResult.data) setPeople(peopleResult.data as Person[]);
     setLoading(false);
   }, []);
 
   useEffect(() => {
-    reloadCategories();
-  }, [reloadCategories]);
+    reload();
+  }, [reload]);
 
-  const index = useMemo(() => {
+  const categoryIndex = useMemo(() => {
     const map = new Map<string, Category>();
     for (const category of categories) map.set(category.id, category);
     return map;
   }, [categories]);
 
+  const peopleIndex = useMemo(() => {
+    const map = new Map<string, Person>();
+    for (const person of people) map.set(person.id, person);
+    return map;
+  }, [people]);
+
   const categoryById = useCallback(
-    (id: string | null) => (id ? index.get(id) : undefined),
-    [index]
+    (id: string | null) => (id ? categoryIndex.get(id) : undefined),
+    [categoryIndex]
+  );
+
+  const personById = useCallback(
+    (id: string | null) => (id ? peopleIndex.get(id) : undefined),
+    [peopleIndex]
   );
 
   const value = useMemo(
-    () => ({ categories, categoryById, reloadCategories, loading }),
-    [categories, categoryById, reloadCategories, loading]
+    () => ({ categories, categoryById, people, personById, reload, loading }),
+    [categories, categoryById, people, personById, reload, loading]
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

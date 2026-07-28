@@ -37,7 +37,7 @@ const ICON_CHOICES = [
 
 export default function CategoriesScreen({ onBack }: { onBack: () => void }) {
   const { palette, dark } = useTheme();
-  const { categories, reloadCategories } = useData();
+  const { categories, reload } = useData();
 
   const [editing, setEditing] = useState<Category | null>(null);
   const [creating, setCreating] = useState(false);
@@ -104,7 +104,7 @@ export default function CategoriesScreen({ onBack }: { onBack: () => void }) {
     }
 
     setCreating(false);
-    await reloadCategories();
+    await reload();
   }
 
   function confirmDelete(category: Category) {
@@ -125,7 +125,7 @@ export default function CategoriesScreen({ onBack }: { onBack: () => void }) {
               Alert.alert("Errore", error.message);
               return;
             }
-            await reloadCategories();
+            await reload();
           },
         },
       ]
