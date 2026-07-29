@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useLayoutEffect, useRef, useState } from "react";
 import {
   Animated,
   LayoutChangeEvent,
@@ -35,17 +35,23 @@ export function MonthWheel({ months, value, onChange }: Props) {
   const scrollX = useRef(new Animated.Value(0)).current;
   const ref = useRef<Animated.FlatList<Date>>(null);
   const [width, setWidth] = useState(0);
+  const positioned = useRef(false);
 
   const sidePad = width > 0 ? Math.max((width - ITEM_W) / 2, 0) : 0;
 
-  // Quando la selezione cambia da fuori (per esempio toccando una colonna del
-  // grafico) la ghiera deve seguirla, non restare indietro.
-  useEffect(() => {
+  // Il primo posizionamento avviene senza animazione (la ghiera deve aprirsi
+  // gia' sul mese giusto, non farlo vedere e poi correggersi); i successivi
+  // — per esempio quando si tocca una colonna del grafico — scorrono invece
+  // in modo visibile. `useLayoutEffect` per evitare anche solo un fotogramma
+  // nella posizione sbagliata.
+  useLayoutEffect(() => {
     if (width === 0) return;
+    const animated = positioned.current;
+    positioned.current = true;
     // Il ref di un componente animato non sempre espone i metodi della lista
     // sottostante: se manca, la ghiera resta dov'e' invece di far cadere la
     // schermata.
-    ref.current?.scrollToOffset?.({ offset: value * ITEM_W, animated: true });
+    ref.current?.scrollToOffset?.({ offset: value * ITEM_W, animated });
   }, [value, width]);
 
   function onMomentumEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
@@ -72,11 +78,15 @@ export function MonthWheel({ months, value, onChange }: Props) {
           keyExtractor={(item) => String((item as Date).getTime())}
           contentContainerStyle={{ paddingHorizontal: sidePad }}
           getItemLayout={(_, index) => ({
+            // Deve includere il padding laterale: e' la posizione REALE
+            // dell'elemento nel contenuto, non lo scroll che lo centra —
+            // usarlo come scroll (come faceva initialScrollIndex prima di
+            // questa versione) sbagliava il punto d'arrivo di un intero
+            // padding, visibile su liste corte come "parte dal primo mese".
             length: ITEM_W,
-            offset: ITEM_W * index,
+            offset: sidePad + ITEM_W * index,
             index,
           })}
-          initialScrollIndex={Math.min(Math.max(value, 0), months.length - 1)}
           onMomentumScrollEnd={onMomentumEnd}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { x: scrollX } } }],

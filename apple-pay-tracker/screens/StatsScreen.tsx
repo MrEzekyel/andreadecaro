@@ -235,11 +235,17 @@ export default function StatsScreen() {
   }, [kind, period, donutMonths]);
 
   const donutPool = useMemo(() => {
-    if (donutScope === "all") return categoryHistory;
-    const month = donutMonths[donutMonthIndex];
-    if (!month) return [];
-    return categoryHistory.filter((p) => sameMonth(new Date(p.occurred_at), month));
-  }, [categoryHistory, donutScope, donutMonths, donutMonthIndex]);
+    const scoped =
+      donutScope === "all"
+        ? categoryHistory
+        : (() => {
+            const month = donutMonths[donutMonthIndex];
+            return month
+              ? categoryHistory.filter((p) => sameMonth(new Date(p.occurred_at), month))
+              : [];
+          })();
+    return applyExclusion(scoped);
+  }, [categoryHistory, donutScope, donutMonths, donutMonthIndex, applyExclusion]);
 
   const byCategory = useMemo(() => {
     const map = new Map<string | null, number>();
