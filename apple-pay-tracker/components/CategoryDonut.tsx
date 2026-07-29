@@ -1,26 +1,14 @@
-import React, { useState } from "react";
-import {
-  LayoutChangeEvent,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import React from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Circle, G, Path } from "react-native-svg";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount } from "../lib/format";
-import { space, type } from "../lib/theme";
+import { radius, space, tint, type } from "../lib/theme";
 import { Icon } from "./Icon";
 
-const SIZE = 168;
-const R_OUTER = 84;
-const R_INNER = 52;
-/** Distanza dal centro a cui appoggiare le etichette. */
-const R_LABEL = 104;
-const HEIGHT = 246;
-/** Sotto questa quota l'etichetta non ci sta senza accavallarsi. */
-const MIN_LABEL_SHARE = 0.055;
-const LABEL_W = 74;
+const SIZE = 128;
+const R_OUTER = 62;
+const R_INNER = 38;
 
 export type DonutSlice = {
   id: string | null;
@@ -38,12 +26,7 @@ type Props = {
 };
 
 /** Spicchio di corona circolare, con lo zero a ore 12 e verso orario. */
-function arcPath(
-  cx: number,
-  cy: number,
-  start: number,
-  end: number
-): string {
+function arcPath(cx: number, cy: number, start: number, end: number): string {
   const point = (r: number, angle: number) => [
     cx + r * Math.sin(angle),
     cy - r * Math.cos(angle),
@@ -65,23 +48,18 @@ function arcPath(
 }
 
 /**
- * Ripartizione a ciambella con le icone appoggiate accanto al proprio
- * spicchio.
+ * Ripartizione con l'anello a sinistra e le categorie a destra.
  *
- * Le etichette stanno fuori dalla corona invece che in una legenda laterale:
- * cosi' il colore non deve essere ricordato: icona, percentuale e importo
- * sono gia' li' dove serve guardare. Gli spicchi troppo sottili per reggere
- * un'etichetta restano comunque toccabili sull'arco.
+ * L'anello resta un riferimento visivo puro — quanto e' grande ogni fetta
+ * rispetto alle altre — mentre l'elenco a destra e' dove si legge il
+ * dettaglio: icona di categoria al posto del colore, importo, percentuale
+ * piccola accanto. Colore e forma bastano a distinguere le fette nell'anello;
+ * ripeterli identici nell'elenco non aggiungerebbe informazione.
  */
 export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
-  const { palette } = useTheme();
-  const [width, setWidth] = useState(0);
+  const { palette, dark } = useTheme();
 
   const total = slices.reduce((sum, slice) => sum + slice.value, 0);
-
-  function onLayout(event: LayoutChangeEvent) {
-    setWidth(event.nativeEvent.layout.width);
-  }
 
   if (total <= 0) {
     return (
@@ -94,21 +72,20 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
   const cx = SIZE / 2;
   const cy = SIZE / 2;
 
-  // Geometria degli spicchi, riusata sia per il disegno che per le etichette.
   let cursor = 0;
   const arcs = slices.map((slice) => {
     const share = slice.value / total;
     const start = cursor * Math.PI * 2;
     cursor += share;
     const end = cursor * Math.PI * 2;
-    return { slice, share, start, end, mid: (start + end) / 2 };
+    return { slice, share, start, end };
   });
 
   const single = arcs.length === 1;
 
   return (
-    <View style={[styles.wrap, { height: HEIGHT }]} onLayout={onLayout}>
-      <View style={styles.canvas}>
+    <View style={styles.wrap}>
+      <View style={styles.ring}>
         <Svg width={SIZE} height={SIZE}>
           <G>
             {single ? (
@@ -153,62 +130,80 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
         </View>
       </View>
 
-      {width > 0 &&
-        arcs.map(({ slice, share, mid }) => {
-          if (share < MIN_LABEL_SHARE) return null;
-
-          const x = width / 2 + R_LABEL * Math.sin(mid);
-          const y = HEIGHT / 2 - R_LABEL * Math.cos(mid);
-
-          // Le etichette restano dentro il riquadro: quelle sui fianchi
-          // finirebbero altrimenti mezze fuori dalla scheda.
-          const left = Math.min(
-            Math.max(x - LABEL_W / 2, 0),
-            Math.max(width - LABEL_W, 0)
-          );
-
+      <View style={styles.list}>
+        {slices.map((slice) => {
+          const pct = total > 0 ? (slice.value / total) * 100 : 0;
           return (
             <TouchableOpacity
-              key={`label-${slice.id ?? "none"}`}
-              style={[styles.label, { left, top: y - 20, width: LABEL_W }]}
+              key={slice.id ?? "none"}
+              style={styles.row}
               onPress={() => onSelect?.(slice)}
               accessibilityRole="button"
-              accessibilityLabel={`${slice.label}, ${Math.round(
-                share * 100
-              )} percento, ${formatAmount(slice.value)}`}
+              accessibilityLabel={`${slice.label}, ${formatAmount(
+                slice.value
+              )}, ${Math.round(pct)} percento`}
             >
-              <View style={styles.labelHead}>
-                <Icon name={slice.icon} size={13} color={slice.color} />
-                <Text style={[styles.labelPct, { color: palette.ink }]}>
-                  {Math.round(share * 100)}%
-                </Text>
+              <View
+                style={[styles.iconWrap, { backgroundColor: tint(slice.color, dark) }]}
+              >
+                <Icon name={slice.icon} size={14} color={slice.color} />
               </View>
-              <Text style={[styles.labelValue, { color: palette.ink3 }]}>
+
+              <Text
+                style={[styles.rowLabel, { color: palette.ink2 }]}
+                numberOfLines={1}
+              >
+                {slice.label}
+              </Text>
+
+              <Text style={[styles.rowValue, { color: palette.ink }]}>
                 {formatAmount(slice.value)}
+              </Text>
+              <Text style={[styles.rowPct, { color: palette.ink3 }]}>
+                {pct >= 1 ? Math.round(pct) : pct.toFixed(1)}%
               </Text>
             </TouchableOpacity>
           );
         })}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: { width: "100%", justifyContent: "center" },
-  canvas: { alignItems: "center", justifyContent: "center", flex: 1 },
+  wrap: { flexDirection: "row", alignItems: "flex-start", gap: space.lg },
+  ring: {
+    width: SIZE,
+    height: SIZE,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   center: { position: "absolute", alignItems: "center" },
   centerValue: {
     ...type.bodyMedium,
-    fontSize: 15,
+    fontSize: 13.5,
     fontVariant: ["tabular-nums"],
   },
-  centerLabel: { ...type.small, fontSize: 10, marginTop: 2 },
-  label: { position: "absolute", alignItems: "center", gap: 1 },
-  labelHead: { flexDirection: "row", alignItems: "center", gap: 4 },
-  labelPct: { ...type.caption, fontWeight: "600", fontVariant: ["tabular-nums"] },
-  labelValue: {
+  centerLabel: { ...type.small, fontSize: 9.5, marginTop: 2 },
+  list: { flex: 1, gap: 10, paddingTop: 2 },
+  row: { flexDirection: "row", alignItems: "center", gap: 9 },
+  iconWrap: {
+    width: 26,
+    height: 26,
+    borderRadius: radius.pill,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  rowLabel: { ...type.caption, flex: 1 },
+  rowValue: {
+    ...type.caption,
+    fontWeight: "500",
+    fontVariant: ["tabular-nums"],
+  },
+  rowPct: {
     ...type.small,
-    fontSize: 10,
+    width: 34,
+    textAlign: "right",
     fontVariant: ["tabular-nums"],
   },
   empty: { ...type.caption, lineHeight: 19, paddingVertical: space.sm },

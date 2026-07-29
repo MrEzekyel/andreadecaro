@@ -13,6 +13,7 @@ import { ChartCarousel, ChartPage } from "../components/ChartCarousel";
 import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
 import { LetterToggle } from "../components/LetterToggle";
+import { MonthWheel } from "../components/MonthWheel";
 import { TrendChart, TrendPoint } from "../components/TrendChart";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
@@ -24,7 +25,16 @@ import {
   buildPeriod,
   PeriodKind,
 } from "../lib/period";
-import { Bucket, bucketize, Grain, paymentsIn } from "../lib/aggregate";
+import {
+  Bucket,
+  bucketAverage,
+  bucketRange,
+  bucketize,
+  Grain,
+  monthsBetween,
+  paymentsIn,
+  sameMonth,
+} from "../lib/aggregate";
 import { supabase } from "../lib/supabase";
 import { categoryColor, radius, space, tint, type } from "../lib/theme";
 import { Merchant, Payment } from "../lib/types";
@@ -46,6 +56,11 @@ const GRAIN_OPTIONS = [
   { value: "month" as Grain, letter: "M", label: "Per mese" },
 ];
 
+const DONUT_SCOPE_OPTIONS = [
+  { value: "month" as const, letter: "M", label: "Un mese alla volta" },
+  { value: "all" as const, letter: "A", label: "Tutto lo storico" },
+];
+
 export default function StatsScreen() {
   const { palette, dark } = useTheme();
   const { categoryById } = useData();
@@ -57,12 +72,16 @@ export default function StatsScreen() {
   const [rankable, setRankable] = useState<Payment[]>([]);
   /** Storico lungo, indipendente dal periodo: alimenta i grafici a colonne. */
   const [history, setHistory] = useState<Payment[]>([]);
+  /** Storico completo, per la ripartizione per categoria in modalita' M/ALL. */
+  const [categoryHistory, setCategoryHistory] = useState<Payment[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [grain, setGrain] = useState<Grain>("month");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   /** null = tutte le categorie. */
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
+  const [donutScope, setDonutScope] = useState<"month" | "all">("month");
+  const [donutMonthIndex, setDonutMonthIndex] = useState(0);
 
   const period = useMemo(() => buildPeriod(kind, offset), [kind, offset]);
 
@@ -78,31 +97,42 @@ export default function StatsScreen() {
 
     // `rankable_payments` esclude gia' cio' che hai tolto dalle classifiche.
     // I totali restano su `payments`, perche' mutuo e rate sono spese vere.
-    const [paymentsResult, rankableResult, historyResult, merchantsResult] =
-      await Promise.all([
-        supabase
-          .from("payments")
-          .select("*")
-          .gte("occurred_at", period.start.toISOString())
-          .lt("occurred_at", period.end.toISOString())
-          .order("occurred_at"),
-        supabase
-          .from("rankable_payments")
-          .select("*")
-          .gte("occurred_at", period.start.toISOString())
-          .lt("occurred_at", period.end.toISOString())
-          .order("occurred_at"),
-        supabase
-          .from("rankable_payments")
-          .select("*")
-          .gte("occurred_at", historyStart.toISOString())
-          .order("occurred_at"),
-        supabase.from("merchants").select("*"),
-      ]);
+    const [
+      paymentsResult,
+      rankableResult,
+      historyResult,
+      categoryHistoryResult,
+      merchantsResult,
+    ] = await Promise.all([
+      supabase
+        .from("payments")
+        .select("*")
+        .gte("occurred_at", period.start.toISOString())
+        .lt("occurred_at", period.end.toISOString())
+        .order("occurred_at"),
+      supabase
+        .from("rankable_payments")
+        .select("*")
+        .gte("occurred_at", period.start.toISOString())
+        .lt("occurred_at", period.end.toISOString())
+        .order("occurred_at"),
+      supabase
+        .from("rankable_payments")
+        .select("*")
+        .gte("occurred_at", historyStart.toISOString())
+        .order("occurred_at"),
+      // Nessun limite di tempo: la ripartizione per categoria puo' guardare
+      // a un mese qualunque da quando esiste il primo movimento, o a tutto
+      // lo storico in blocco.
+      supabase.from("payments").select("*").order("occurred_at"),
+      supabase.from("merchants").select("*"),
+    ]);
 
     if (paymentsResult.data) setPayments(paymentsResult.data as Payment[]);
     if (rankableResult.data) setRankable(rankableResult.data as Payment[]);
     if (historyResult.data) setHistory(historyResult.data as Payment[]);
+    if (categoryHistoryResult.data)
+      setCategoryHistory(categoryHistoryResult.data as Payment[]);
     if (merchantsResult.data) setMerchants(merchantsResult.data as Merchant[]);
   }, [period]);
 
@@ -152,9 +182,40 @@ export default function StatsScreen() {
     return points;
   }, [payments, period]);
 
+  /** Mesi disponibili per la ghiera della ripartizione, dal primo movimento a oggi. */
+  const donutMonths = useMemo(() => {
+    if (categoryHistory.length === 0) return [];
+    const earliest = categoryHistory.reduce(
+      (min, p) => (new Date(p.occurred_at) < min ? new Date(p.occurred_at) : min),
+      new Date(categoryHistory[0].occurred_at)
+    );
+    return monthsBetween(earliest, new Date());
+  }, [categoryHistory]);
+
+  // Di default la ghiera sta sul mese corrente, l'ultimo della lista.
+  useEffect(() => {
+    if (donutMonths.length > 0) setDonutMonthIndex(donutMonths.length - 1);
+  }, [donutMonths.length]);
+
+  // Cambiare il mese principale in cima alla pagina sposta anche la
+  // ripartizione sullo stesso mese: due controlli che scelgono "il mese"
+  // indipendentemente sarebbero una fonte costante di disallineamento.
+  useEffect(() => {
+    if (kind !== "month" || donutMonths.length === 0) return;
+    const index = donutMonths.findIndex((m) => sameMonth(m, period.start));
+    if (index !== -1) setDonutMonthIndex(index);
+  }, [kind, period, donutMonths]);
+
+  const donutPool = useMemo(() => {
+    if (donutScope === "all") return categoryHistory;
+    const month = donutMonths[donutMonthIndex];
+    if (!month) return [];
+    return categoryHistory.filter((p) => sameMonth(new Date(p.occurred_at), month));
+  }, [categoryHistory, donutScope, donutMonths, donutMonthIndex]);
+
   const byCategory = useMemo(() => {
     const map = new Map<string | null, number>();
-    for (const payment of payments) {
+    for (const payment of donutPool) {
       map.set(
         payment.category_id,
         (map.get(payment.category_id) ?? 0) + Number(payment.effective_amount)
@@ -163,7 +224,7 @@ export default function StatsScreen() {
     return Array.from(map.entries())
       .map(([id, amount]) => ({ id, amount }))
       .sort((a, b) => b.amount - a.amount);
-  }, [payments]);
+  }, [donutPool]);
 
   const slices = useMemo<DonutSlice[]>(
     () =>
@@ -264,6 +325,18 @@ export default function StatsScreen() {
     buckets.find((bucket) => bucket.key === selectedKey) ??
     buckets[buckets.length - 1];
 
+  // Stessa sincronizzazione del mese principale, per il grafico a colonne:
+  // cambiare mese in cima alla pagina sposta anche la colonna selezionata,
+  // qualunque sia il grado (settimana/mese) scelto per quel grafico.
+  useEffect(() => {
+    if (kind !== "month") return;
+    const match = buckets.find((bucket) => {
+      const { start, end } = bucketRange(bucket, grain);
+      return period.start >= start && period.start < end;
+    });
+    if (match) setSelectedKey(match.key);
+  }, [kind, period, buckets, grain]);
+
   const selectedPayments = useMemo(
     () => (selected ? paymentsIn(historyPool, selected, grain) : []),
     [historyPool, selected, grain]
@@ -281,12 +354,8 @@ export default function StatsScreen() {
     ? selectedTotal / selectedPayments.length
     : 0;
 
-  const averageTotal = buckets.length
-    ? buckets.reduce((sum, b) => sum + b.total, 0) / buckets.length
-    : 0;
-  const averageCount = buckets.length
-    ? buckets.reduce((sum, b) => sum + b.count, 0) / buckets.length
-    : 0;
+  const averageTotal = bucketAverage(buckets, "total");
+  const averageCount = bucketAverage(buckets, "count");
 
   async function onRefresh() {
     setRefreshing(true);
@@ -666,10 +735,26 @@ export default function StatsScreen() {
       )}
 
       <View>
-        <Text style={[styles.label, { color: palette.ink3 }]}>Per categoria</Text>
+        <View style={styles.donutHead}>
+          <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
+            Per categoria
+          </Text>
+          <LetterToggle
+            options={DONUT_SCOPE_OPTIONS}
+            value={donutScope}
+            onChange={setDonutScope}
+          />
+        </View>
+
         <CategoryDonut
           slices={slices}
-          centerLabel={period.label.toLowerCase()}
+          centerLabel={
+            donutScope === "all"
+              ? "tutto lo storico"
+              : donutMonths[donutMonthIndex]?.toLocaleDateString("it-IT", {
+                  month: "long",
+                }) ?? ""
+          }
           onSelect={(slice) =>
             explorer.openDetail({
               kind: "category",
@@ -678,6 +763,14 @@ export default function StatsScreen() {
             })
           }
         />
+
+        {donutScope === "month" && donutMonths.length > 0 && (
+          <MonthWheel
+            months={donutMonths}
+            value={donutMonthIndex}
+            onChange={setDonutMonthIndex}
+          />
+        )}
       </View>
 
       {byMerchant.length > 0 && (
@@ -765,7 +858,12 @@ const styles = StyleSheet.create({
   catValue: { ...type.caption, fontWeight: "500", fontVariant: ["tabular-nums"] },
   barTrack: { height: 6, borderRadius: radius.pill, overflow: "hidden" },
   barFill: { height: 6, borderRadius: radius.pill },
-  merchantRow: { flexDirection: "row", alignItems: "center", gap: 11 },
+  merchantRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    paddingVertical: 8,
+  },
   merchantIcon: {
     width: 32,
     height: 32,
@@ -780,6 +878,12 @@ const styles = StyleSheet.create({
   filterHead: {
     flexDirection: "row",
     alignItems: "baseline",
+    justifyContent: "space-between",
+    marginBottom: space.sm,
+  },
+  donutHead: {
+    flexDirection: "row",
+    alignItems: "center",
     justifyContent: "space-between",
     marginBottom: space.sm,
   },

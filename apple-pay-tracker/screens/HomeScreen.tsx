@@ -1,4 +1,4 @@
-import React, { useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   PanResponder,
   RefreshControl,
@@ -12,6 +12,7 @@ import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
 import { LimitCard } from "../components/LimitCard";
 import { PaymentRow } from "../components/PaymentRow";
+import { RecurringSummary } from "../components/RecurringSummary";
 import { TrendChart, TrendPoint } from "../components/TrendChart";
 import { useData } from "../lib/DataContext";
 import { useNav } from "../lib/NavContext";
@@ -24,6 +25,7 @@ import {
   splitAmount,
 } from "../lib/format";
 import { categoryColor, radius, space, type } from "../lib/theme";
+import { supabase } from "../lib/supabase";
 import { useLimits } from "../lib/useLimits";
 import { comparisonCutoff, isCurrentMonth, usePayments } from "../lib/usePayments";
 
@@ -37,6 +39,29 @@ export default function HomeScreen() {
   const { monthlyOverall, alerts, reload: reloadLimits } = useLimits();
   const [refreshing, setRefreshing] = useState(false);
   const explorer = useExplorer(reload);
+
+  const [recurring, setRecurring] = useState({ count: 0, monthlyTotal: 0 });
+
+  // Le rate configurate non dipendono dal mese guardato: cambiano solo
+  // quando le regole cambiano, non quando si sfoglia il calendario.
+  const loadRecurring = useCallback(async () => {
+    const { data } = await supabase
+      .from("recurring_rules")
+      .select("amount")
+      .eq("active", true)
+      .eq("frequency", "monthly");
+
+    if (data) {
+      setRecurring({
+        count: data.length,
+        monthlyTotal: data.reduce((sum, r) => sum + Number(r.amount), 0),
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    loadRecurring();
+  }, [loadRecurring]);
 
   // I limiti valgono sempre sul periodo corrente: mostrarli mentre si
   // sfoglia un mese passato darebbe un confronto senza senso.
@@ -130,7 +155,7 @@ export default function HomeScreen() {
 
   async function onRefresh() {
     setRefreshing(true);
-    await Promise.all([reload(), reloadLimits()]);
+    await Promise.all([reload(), reloadLimits(), loadRecurring()]);
     setRefreshing(false);
   }
 
@@ -274,6 +299,15 @@ export default function HomeScreen() {
                 })
               }
             />
+
+            <View style={{ marginTop: space.lg }}>
+              <RecurringSummary
+                count={recurring.count}
+                monthlyTotal={recurring.monthlyTotal}
+                monthTotal={total}
+                onPress={() => openSettings("recurring")}
+              />
+            </View>
           </View>
         )}
 

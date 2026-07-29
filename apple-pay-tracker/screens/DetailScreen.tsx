@@ -18,10 +18,13 @@ import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import {
   Bucket,
+  bucketAverage,
   bucketize,
   Grain,
   groupByMonth,
+  monthsBetween,
   paymentsIn,
+  sameMonth,
 } from "../lib/aggregate";
 import { formatAmount, monthName, splitAmount } from "../lib/format";
 import { supabase } from "../lib/supabase";
@@ -56,10 +59,6 @@ const SCOPE_OPTIONS = [
   { value: "month" as ShareScope, letter: "M", label: "Un mese alla volta" },
   { value: "all" as ShareScope, letter: "A", label: "Tutto lo storico" },
 ];
-
-function sameMonth(a: Date, b: Date) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
-}
 
 export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
   const { palette, dark } = useTheme();
@@ -170,25 +169,26 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
     : 0;
 
   /** Media per intervallo, tracciata come linea di riferimento nel grafico. */
-  const averageTotal = buckets.length
-    ? buckets.reduce((sum, b) => sum + b.total, 0) / buckets.length
-    : 0;
-  const averageCount = buckets.length
-    ? buckets.reduce((sum, b) => sum + b.count, 0) / buckets.length
-    : 0;
+  const averageTotal = bucketAverage(buckets, "total");
+  const averageCount = bucketAverage(buckets, "count");
 
-  /** Mesi disponibili per la ghiera del peso nella categoria, dal piu' vecchio. */
+  /**
+   * Mesi per la ghiera del peso nella categoria: dal primo movimento a
+   * oggi, senza saltare quelli senza dati. Includere sempre il mese
+   * corrente e' cio' che fa aprire la ghiera su "adesso" anche se in
+   * questo mese non e' ancora stato speso nulla in questa categoria.
+   */
   const shareMonths = useMemo(() => {
-    const keys = new Map<string, Date>();
-    for (const row of siblingRows) {
-      const date = new Date(row.occurred_at);
-      const anchor = new Date(date.getFullYear(), date.getMonth(), 1);
-      keys.set(`${anchor.getFullYear()}-${anchor.getMonth()}`, anchor);
-    }
-    return Array.from(keys.values()).sort((a, b) => a.getTime() - b.getTime());
+    if (siblingRows.length === 0) return [];
+    const earliest = siblingRows.reduce(
+      (min, row) =>
+        new Date(row.occurred_at) < min ? new Date(row.occurred_at) : min,
+      new Date(siblingRows[0].occurred_at)
+    );
+    return monthsBetween(earliest, new Date());
   }, [siblingRows]);
 
-  // Di default la ghiera sta sull'ultimo mese con dati, non sul primo.
+  // Di default la ghiera sta sul mese corrente, l'ultimo della lista.
   useEffect(() => {
     if (shareMonths.length > 0) setShareMonthIndex(shareMonths.length - 1);
   }, [shareMonths.length]);

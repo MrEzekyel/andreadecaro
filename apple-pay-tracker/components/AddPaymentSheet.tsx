@@ -14,6 +14,7 @@ import { useTheme } from "../lib/ThemeContext";
 import { formatDate } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
+import { CardPicker } from "./CardPicker";
 import { CategoryPicker } from "./CategoryPicker";
 import { Sheet } from "./Sheet";
 
@@ -40,6 +41,7 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [card, setCard] = useState("");
   const [occurredAt, setOccurredAt] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -49,6 +51,7 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
     setAmount("");
     setNote("");
     setCategoryId(null);
+    setCard("");
     setOccurredAt(new Date());
   }
 
@@ -125,6 +128,7 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
       category_id: categoryId ?? merchantRow?.category_id ?? null,
       occurred_at: occurredAt.toISOString(),
       note: note.trim() || null,
+      card_name: card.trim() || null,
       source: "manual",
     });
 
@@ -214,6 +218,13 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
           Categoria
         </Text>
         <CategoryPicker value={categoryId} onChange={setCategoryId} />
+      </View>
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Metodo di pagamento
+        </Text>
+        <CardPicker value={card} onChange={setCard} />
       </View>
 
       <View>

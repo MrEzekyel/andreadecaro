@@ -102,6 +102,25 @@ export function bucketize(
   return buckets;
 }
 
+/**
+ * Media per intervallo, contando solo da dove i dati iniziano davvero.
+ *
+ * `bucketize` restituisce sempre una finestra di lunghezza fissa (8-10),
+ * riempita con bucket a zero per i mesi precedenti al primo movimento: se
+ * quel merchant esiste da due mesi e la finestra ne guarda indietro otto,
+ * dividere per la lunghezza intera schiaccerebbe la media verso il basso.
+ * I mesi vuoti DOPO il primo movimento restano nel conto: un mese senza
+ * spese in quell'esercente e' un dato vero, non un buco della finestra.
+ */
+export function bucketAverage(buckets: Bucket[], metric: "total" | "count") {
+  const start = buckets.findIndex((b) => b.total > 0 || b.count > 0);
+  if (start === -1) return 0;
+
+  const active = buckets.slice(start);
+  const sum = active.reduce((total, b) => total + b[metric], 0);
+  return sum / active.length;
+}
+
 /** Estremi dell'intervallo coperto da un bucket; la fine e' esclusiva. */
 export function bucketRange(bucket: Bucket, grain: Grain) {
   const start = new Date(bucket.start);
@@ -118,6 +137,29 @@ export function paymentsIn(payments: Payment[], bucket: Bucket, grain: Grain) {
     const at = new Date(payment.occurred_at);
     return at >= start && at < end;
   });
+}
+
+export function sameMonth(a: Date, b: Date) {
+  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
+}
+
+/**
+ * Mesi consecutivi dal primo al secondo, estremi inclusi.
+ *
+ * Usata per le ghiere di selezione mese: elencare solo i mesi che hanno
+ * dati lascerebbe fuori il mese corrente quando non c'e' ancora stata una
+ * spesa, e la ghiera aprirebbe su un mese passato invece che su "adesso".
+ */
+export function monthsBetween(earliest: Date, latest: Date) {
+  const months: Date[] = [];
+  const cursor = new Date(earliest.getFullYear(), earliest.getMonth(), 1);
+  const end = new Date(latest.getFullYear(), latest.getMonth(), 1);
+
+  while (cursor <= end) {
+    months.push(new Date(cursor));
+    cursor.setMonth(cursor.getMonth() + 1);
+  }
+  return months;
 }
 
 /** Raggruppa per mese di calendario, dal piu' recente. Per gli elenchi. */

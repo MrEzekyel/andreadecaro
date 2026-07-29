@@ -117,10 +117,10 @@ export default function TransactionDetailScreen({
       icon: category?.icon ?? "circle-help",
       iconColor: color,
     },
-    // La carta compare sempre, anche vuota: sapere che il dato non e'
+    // Il metodo compare sempre, anche vuoto: sapere che il dato non e'
     // arrivato e' un'informazione, cercarlo invano no. Le spese importate
-    // dagli estratti conto non la portano con se'.
-    { label: "Carta", value: payment.card_name ?? "—" },
+    // dagli estratti conto non lo portano con se'.
+    { label: "Metodo di pagamento", value: payment.card_name ?? "—" },
     { label: "Origine", value: SOURCE_LABEL[payment.source] ?? payment.source },
   ];
   if (payment.city) rows.push({ label: "Città", value: payment.city });

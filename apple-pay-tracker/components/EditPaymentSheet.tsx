@@ -16,6 +16,7 @@ import { formatDate } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
 import { Payment } from "../lib/types";
+import { CardPicker } from "./CardPicker";
 import { CategoryPicker } from "./CategoryPicker";
 import { Icon } from "./Icon";
 import { Sheet } from "./Sheet";
@@ -48,6 +49,7 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [card, setCard] = useState("");
   const [occurredAt, setOccurredAt] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -66,6 +68,7 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
     setAmount(String(payment.amount).replace(".", ","));
     setNote(payment.note ?? "");
     setCategoryId(payment.category_id);
+    setCard(payment.card_name ?? "");
     setOccurredAt(new Date(payment.occurred_at));
     setApplyToAll(true);
     setRemember(true);
@@ -150,6 +153,7 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
         amount: parsedAmount,
         category_id: categoryId,
         note: note.trim() || null,
+        card_name: card.trim() || null,
         occurred_at: occurredAt.toISOString(),
         my_share: split.enabled ? splitResult.myShare : null,
       })
@@ -330,6 +334,13 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
           Categoria
         </Text>
         <CategoryPicker value={categoryId} onChange={setCategoryId} />
+      </View>
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Metodo di pagamento
+        </Text>
+        <CardPicker value={card} onChange={setCard} />
       </View>
 
       <View>

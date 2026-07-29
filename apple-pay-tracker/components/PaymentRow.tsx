@@ -37,15 +37,24 @@ export function PaymentRow({ payment, category, onPress }: Props) {
       </View>
 
       <View style={styles.body}>
-        <Text
-          style={[styles.name, { color: palette.ink }]}
-          numberOfLines={1}
-        >
-          {payment.merchant_name}
-        </Text>
+        <View style={styles.nameRow}>
+          <Text
+            style={[styles.name, { color: palette.ink }]}
+            numberOfLines={1}
+          >
+            {payment.merchant_name}
+          </Text>
+          {isRecurring && (
+            <Icon
+              name="repeat"
+              size={12}
+              color={palette.ink3}
+              strokeWidth={2}
+            />
+          )}
+        </View>
         <Text style={[styles.meta, { color: palette.ink3 }]} numberOfLines={1}>
           {categoryName}
-          {isRecurring ? " · ricorrente" : ""}
         </Text>
       </View>
 
@@ -71,7 +80,8 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   body: { flex: 1, minWidth: 0 },
-  name: { ...type.bodyMedium },
+  nameRow: { flexDirection: "row", alignItems: "center", gap: 5 },
+  name: { ...type.bodyMedium, flexShrink: 1 },
   meta: { ...type.caption, marginTop: 2 },
   amount: { ...type.amount, fontVariant: ["tabular-nums"] },
 });
