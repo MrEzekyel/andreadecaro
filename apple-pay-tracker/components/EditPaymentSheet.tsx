@@ -32,6 +32,8 @@ type Props = {
   visible: boolean;
   onClose: () => void;
   onSaved: () => void;
+  /** Apre gia' con la divisione attiva, per chi arriva dal tasto "Dividi". */
+  focusSplit?: boolean;
 };
 
 /** Accetta sia "12,99" sia "12.99", come li scrive chi digita in italiano. */
@@ -41,7 +43,13 @@ function parseAmountInput(value: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) {
+export function EditPaymentSheet({
+  payment,
+  visible,
+  onClose,
+  onSaved,
+  focusSplit,
+}: Props) {
   const { palette, dark } = useTheme();
   const { categoryById } = useData();
 
@@ -73,7 +81,7 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
     setApplyToAll(true);
     setRemember(true);
     setSiblingCount(0);
-    setSplit(emptySplit);
+    setSplit(focusSplit ? { ...emptySplit, enabled: true } : emptySplit);
 
     // Le quote gia' salvate vanno ricaricate come importi esatti: e' l'unica
     // modalita' che rappresenta fedelmente qualunque divisione precedente,
@@ -96,7 +104,7 @@ export function EditPaymentSheet({ payment, visible, onClose, onSaved }: Props) 
           ),
         });
       });
-  }, [payment]);
+  }, [payment, focusSplit]);
 
   // Quante altre spese dello stesso esercente verrebbero toccate.
   useEffect(() => {

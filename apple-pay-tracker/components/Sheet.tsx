@@ -1,15 +1,19 @@
 import React from "react";
 import {
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useTheme } from "../lib/ThemeContext";
 import { radius, space, type } from "../lib/theme";
+import { Icon } from "./Icon";
 
 type Props = {
   visible: boolean;
@@ -19,12 +23,14 @@ type Props = {
 };
 
 /**
- * Foglio modale ancorato in ALTO.
+ * Foglio modale ancorato in BASSO, che si alza sopra la tastiera.
  *
- * La tastiera occupa la metà bassa dello schermo: un foglio ancorato in basso
- * finisce sotto i tasti e diventa impossibile da compilare. Ancorandolo in
- * cima, i campi restano sempre visibili sopra la tastiera senza bisogno di
- * spostamenti automatici, che su iOS sono fragili dentro una Modal.
+ * `KeyboardAvoidingView` aggiunge il padding necessario quando la tastiera si
+ * apre, spingendo il foglio (ancorato in basso dentro di essa) verso l'alto;
+ * lo `ScrollView` interno permette di raggiungere comunque i campi che
+ * restassero coperti. Il tasto Indietro nell'intestazione e' l'unico modo
+ * esplicito di annullare: toccare fuori dal foglio resta possibile ma non
+ * deve essere l'unica via.
  */
 export function Sheet({ visible, onClose, title, children }: Props) {
   const { palette } = useTheme();
@@ -37,23 +43,46 @@ export function Sheet({ visible, onClose, title, children }: Props) {
       onRequestClose={onClose}
     >
       <View style={styles.wrap}>
-        <SafeAreaView
-          style={[styles.sheet, { backgroundColor: palette.ground }]}
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={onClose}
+          accessibilityLabel="Chiudi"
+        />
+
+        <KeyboardAvoidingView
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          style={styles.avoider}
+          pointerEvents="box-none"
         >
-          <ScrollView
-            contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="handled"
-            keyboardDismissMode="interactive"
+          <SafeAreaView
+            style={[styles.sheet, { backgroundColor: palette.ground }]}
           >
-            <Text style={[styles.title, { color: palette.ink }]}>{title}</Text>
-            {children}
-          </ScrollView>
+            <View style={[styles.grabber, { backgroundColor: palette.ink3 }]} />
 
-          <View style={[styles.grabber, { backgroundColor: palette.ink3 }]} />
-        </SafeAreaView>
+            <View style={styles.head}>
+              <TouchableOpacity
+                onPress={onClose}
+                style={styles.back}
+                accessibilityLabel="Indietro"
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              >
+                <Icon name="chevron-left" size={20} color={palette.ink} />
+              </TouchableOpacity>
+              <Text style={[styles.title, { color: palette.ink }]} numberOfLines={1}>
+                {title}
+              </Text>
+              <View style={styles.back} />
+            </View>
 
-        {/* Tocca fuori dal foglio per chiudere. */}
-        <Pressable style={styles.dim} onPress={onClose} />
+            <ScrollView
+              contentContainerStyle={styles.content}
+              keyboardShouldPersistTaps="handled"
+              keyboardDismissMode="interactive"
+            >
+              {children}
+            </ScrollView>
+          </SafeAreaView>
+        </KeyboardAvoidingView>
       </View>
     </Modal>
   );
@@ -61,25 +90,33 @@ export function Sheet({ visible, onClose, title, children }: Props) {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
+  avoider: { flex: 1, justifyContent: "flex-end" },
   sheet: {
-    maxHeight: "80%",
-    borderBottomLeftRadius: radius.sheet,
-    borderBottomRightRadius: radius.sheet,
+    maxHeight: "92%",
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
   },
-  content: {
-    paddingHorizontal: space.lg,
-    paddingTop: space.sm,
-    paddingBottom: space.lg,
-    gap: space.md,
-  },
-  title: { ...type.sheetTitle, marginBottom: space.xs },
   grabber: {
     width: 34,
     height: 4,
     borderRadius: radius.pill,
     opacity: 0.3,
     alignSelf: "center",
-    marginBottom: space.sm,
+    marginTop: space.sm,
   },
-  dim: { flex: 1, backgroundColor: "rgba(20,20,19,0.36)" },
+  head: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: space.sm,
+    paddingTop: space.sm,
+  },
+  back: { width: 32, height: 32, alignItems: "center", justifyContent: "center" },
+  title: { ...type.sheetTitle, flex: 1, textAlign: "center" },
+  content: {
+    paddingHorizontal: space.lg,
+    paddingTop: space.sm,
+    paddingBottom: space.xxl,
+    gap: space.md,
+  },
 });

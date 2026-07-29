@@ -1,10 +1,12 @@
-import React from "react";
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import React, { useState } from "react";
+import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount } from "../lib/format";
+import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
 import { Icon } from "./Icon";
+import { NamePromptSheet } from "./NamePromptSheet";
 
 export type SplitMode = "equal" | "percent" | "exact";
 
@@ -84,7 +86,8 @@ const MODE_LABEL: Record<SplitMode, string> = {
 
 export function SplitEditor({ total, split, onChange }: Props) {
   const { palette, dark } = useTheme();
-  const { people } = useData();
+  const { people, reload } = useData();
+  const [addingPerson, setAddingPerson] = useState(false);
 
   const result = computeSplit(total, split);
 
@@ -98,11 +101,63 @@ export function SplitEditor({ total, split, onChange }: Props) {
     });
   }
 
+  async function createPerson(name: string) {
+    const { data: session } = await supabase.auth.getSession();
+    const userId = session.session?.user.id;
+    if (!userId) {
+      Alert.alert("Sessione scaduta", "Accedi di nuovo.");
+      return;
+    }
+
+    const { data, error } = await supabase
+      .from("people")
+      .insert({ user_id: userId, name })
+      .select()
+      .single();
+
+    if (error || !data) {
+      Alert.alert(
+        "Errore",
+        error?.code === "23505"
+          ? "Hai già una persona con questo nome."
+          : error?.message ?? "Salvataggio non riuscito."
+      );
+      return;
+    }
+
+    await reload();
+    setAddingPerson(false);
+    onChange({
+      ...split,
+      enabled: true,
+      personIds: [...split.personIds, data.id],
+    });
+  }
+
+  const addPersonRow = (
+    <TouchableOpacity style={styles.addPerson} onPress={() => setAddingPerson(true)}>
+      <Icon name="user-plus" size={15} color={palette.accent} />
+      <Text style={[styles.addPersonLabel, { color: palette.accent }]}>
+        Aggiungi persona
+      </Text>
+    </TouchableOpacity>
+  );
+
   if (people.length === 0) {
     return (
-      <Text style={[styles.hint, { color: palette.ink3 }]}>
-        Per dividere una spesa aggiungi prima qualcuno in Impostazioni → Persone.
-      </Text>
+      <View style={styles.wrap}>
+        <Text style={[styles.hint, { color: palette.ink3 }]}>
+          Per dividere una spesa aggiungi prima qualcuno con cui condividerla.
+        </Text>
+        {addPersonRow}
+        <NamePromptSheet
+          visible={addingPerson}
+          title="Nuova persona"
+          placeholder="Nome"
+          onClose={() => setAddingPerson(false)}
+          onSubmit={createPerson}
+        />
+      </View>
     );
   }
 
@@ -220,6 +275,8 @@ export function SplitEditor({ total, split, onChange }: Props) {
             );
           })}
 
+          {addPersonRow}
+
           <View
             style={[
               styles.summary,
@@ -246,6 +303,14 @@ export function SplitEditor({ total, split, onChange }: Props) {
           </View>
         </>
       )}
+
+      <NamePromptSheet
+        visible={addingPerson}
+        title="Nuova persona"
+        placeholder="Nome"
+        onClose={() => setAddingPerson(false)}
+        onSubmit={createPerson}
+      />
     </View>
   );
 }
@@ -300,4 +365,6 @@ const styles = StyleSheet.create({
   },
   summaryLabel: { ...type.caption, flex: 1 },
   summaryValue: { ...type.bodyMedium, fontVariant: ["tabular-nums"] },
+  addPerson: { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 4 },
+  addPersonLabel: { ...type.caption, fontWeight: "500" },
 });

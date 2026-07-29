@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Circle, G, Path } from "react-native-svg";
 import { useTheme } from "../lib/ThemeContext";
@@ -63,6 +63,9 @@ function arcPath(cx: number, cy: number, start: number, end: number): string {
  */
 export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
   const { palette, dark } = useTheme();
+  const [expanded, setExpanded] = useState(false);
+
+  const hidden = slices.length > MAX_VISIBLE ? slices.slice(MAX_VISIBLE) : [];
 
   const display = useMemo(() => {
     if (slices.length <= MAX_VISIBLE) return slices;
@@ -133,7 +136,9 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
                     d={arcPath(cx, cy, start, end - gap)}
                     fill={slice.color}
                     onPress={() =>
-                      slice.id !== OTHER_ID && onSelect?.(slice)
+                      slice.id === OTHER_ID
+                        ? setExpanded((v) => !v)
+                        : onSelect?.(slice)
                     }
                   />
                 );
@@ -160,38 +165,96 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
           const isOther = slice.id === OTHER_ID;
 
           return (
-            <TouchableOpacity
-              key={slice.id ?? "none"}
-              style={styles.row}
-              onPress={() => onSelect?.(slice)}
-              disabled={isOther}
-              accessibilityRole="button"
-              accessibilityLabel={`${slice.label}, ${formatAmount(
-                slice.value
-              )}, ${Math.round(pct)} percento`}
-            >
-              <View
-                style={[styles.iconWrap, { backgroundColor: tint(slice.color, dark) }]}
+            <View key={slice.id ?? "none"}>
+              <TouchableOpacity
+                style={styles.row}
+                onPress={() =>
+                  isOther ? setExpanded((v) => !v) : onSelect?.(slice)
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`${slice.label}, ${formatAmount(
+                  slice.value
+                )}, ${Math.round(pct)} percento`}
               >
-                <Icon name={slice.icon} size={11} color={slice.color} />
-              </View>
-
-              <View style={styles.rowLabelWrap}>
-                <Text
-                  style={[styles.rowLabel, { color: palette.ink2 }]}
-                  numberOfLines={1}
+                <View
+                  style={[styles.iconWrap, { backgroundColor: tint(slice.color, dark) }]}
                 >
-                  {slice.label}
-                </Text>
-                <Text style={[styles.rowPct, { color: palette.ink3 }]}>
-                  {pct >= 1 ? Math.round(pct) : pct.toFixed(1)}%
-                </Text>
-              </View>
+                  <Icon name={slice.icon} size={11} color={slice.color} />
+                </View>
 
-              <Text style={[styles.rowValue, { color: palette.ink }]}>
-                {formatAmount(slice.value)}
-              </Text>
-            </TouchableOpacity>
+                <View style={styles.rowLabelWrap}>
+                  <Text
+                    style={[styles.rowLabel, { color: palette.ink2 }]}
+                    numberOfLines={1}
+                  >
+                    {slice.label}
+                  </Text>
+                  <Text style={[styles.rowPct, { color: palette.ink3 }]}>
+                    {pct >= 1 ? Math.round(pct) : pct.toFixed(1)}%
+                  </Text>
+                </View>
+
+                <Text style={[styles.rowValue, { color: palette.ink }]}>
+                  {formatAmount(slice.value)}
+                </Text>
+
+                {isOther && (
+                  <Icon
+                    name={expanded ? "chevron-up" : "chevron-down"}
+                    size={13}
+                    color={palette.ink3}
+                  />
+                )}
+              </TouchableOpacity>
+
+              {/* Le categorie oltre le prime 5, sbloccate dall'"Altro":
+                  crescono da qui, non in un popover a parte, cosi' restano
+                  dentro il normale flusso della pagina invece di doverlo
+                  interrompere. */}
+              {isOther && expanded && (
+                <View
+                  style={[styles.hiddenList, { borderLeftColor: palette.hairline }]}
+                >
+                  {hidden.map((h) => {
+                    const hPct = total > 0 ? (h.value / total) * 100 : 0;
+                    return (
+                      <TouchableOpacity
+                        key={h.id ?? "none"}
+                        style={styles.row}
+                        onPress={() => onSelect?.(h)}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${h.label}, ${formatAmount(
+                          h.value
+                        )}, ${Math.round(hPct)} percento`}
+                      >
+                        <View
+                          style={[
+                            styles.iconWrap,
+                            { backgroundColor: tint(h.color, dark) },
+                          ]}
+                        >
+                          <Icon name={h.icon} size={11} color={h.color} />
+                        </View>
+                        <View style={styles.rowLabelWrap}>
+                          <Text
+                            style={[styles.rowLabel, { color: palette.ink2 }]}
+                            numberOfLines={1}
+                          >
+                            {h.label}
+                          </Text>
+                          <Text style={[styles.rowPct, { color: palette.ink3 }]}>
+                            {hPct >= 1 ? Math.round(hPct) : hPct.toFixed(1)}%
+                          </Text>
+                        </View>
+                        <Text style={[styles.rowValue, { color: palette.ink }]}>
+                          {formatAmount(h.value)}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              )}
+            </View>
           );
         })}
       </View>
@@ -216,6 +279,13 @@ const styles = StyleSheet.create({
   centerLabel: { ...type.small, fontSize: 9.5, marginTop: 2 },
   list: { flex: 1, gap: 8 },
   row: { flexDirection: "row", alignItems: "center", gap: 7 },
+  hiddenList: {
+    gap: 8,
+    marginTop: 8,
+    marginLeft: 10,
+    paddingLeft: 10,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+  },
   iconWrap: {
     width: 20,
     height: 20,

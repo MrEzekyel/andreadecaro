@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import { categoryColor, radius, tint, type } from "../lib/theme";
+import { Category } from "../lib/types";
+import { CategoryFormSheet } from "./CategoryFormSheet";
 import { Icon } from "./Icon";
 
 type Props = {
@@ -11,8 +13,15 @@ type Props = {
 };
 
 export function CategoryPicker({ value, onChange }: Props) {
-  const { categories } = useData();
+  const { categories, reload } = useData();
   const { palette, dark } = useTheme();
+  const [creating, setCreating] = useState(false);
+
+  async function onCreated(category: Category) {
+    setCreating(false);
+    await reload();
+    onChange(category.id);
+  }
 
   return (
     <ScrollView
@@ -74,6 +83,23 @@ export function CategoryPicker({ value, onChange }: Props) {
           Nessuna
         </Text>
       </TouchableOpacity>
+
+      <TouchableOpacity
+        onPress={() => setCreating(true)}
+        style={[styles.chip, { backgroundColor: palette.surface, borderColor: palette.hairline }]}
+        accessibilityRole="button"
+        accessibilityLabel="Nuova categoria"
+      >
+        <Icon name="plus" size={14} color={palette.accent} />
+        <Text style={[styles.label, { color: palette.accent }]}>Nuova</Text>
+      </TouchableOpacity>
+
+      <CategoryFormSheet
+        visible={creating}
+        onClose={() => setCreating(false)}
+        editing={null}
+        onSaved={onCreated}
+      />
     </ScrollView>
   );
 }

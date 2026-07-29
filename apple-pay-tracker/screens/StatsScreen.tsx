@@ -3,6 +3,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TouchableOpacity,
   View,
@@ -69,7 +70,6 @@ export default function StatsScreen() {
   const [kind, setKind] = useState<PeriodKind>("month");
   const [offset, setOffset] = useState(0);
   const [payments, setPayments] = useState<Payment[]>([]);
-  const [rankable, setRankable] = useState<Payment[]>([]);
   /** Storico lungo, indipendente dal periodo: alimenta i grafici a colonne. */
   const [history, setHistory] = useState<Payment[]>([]);
   /** Storico completo, per la ripartizione per categoria in modalita' M/ALL. */
@@ -82,6 +82,11 @@ export default function StatsScreen() {
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [donutScope, setDonutScope] = useState<"month" | "all">("month");
   const [donutMonthIndex, setDonutMonthIndex] = useState(0);
+  // Le classifiche (colonne e "dove spendi di piu'") escludono di default
+  // cio' che hai marcato come non rappresentativo — mutuo, rate: importi
+  // fissi che schiaccerebbero il resto. Il toggle lo rende una scelta
+  // invece di un comportamento fisso.
+  const [excludeMarked, setExcludeMarked] = useState(true);
   // Diventa vero solo DOPO che l'indice e' stato corretto sull'ultimo mese:
   // senza questo cancello, la ghiera monterebbe nello stesso render in cui
   // i mesi diventano disponibili, con l'indice ancora a 0 (il primo mese),
@@ -100,41 +105,30 @@ export default function StatsScreen() {
     historyStart.setDate(1);
     historyStart.setHours(0, 0, 0, 0);
 
-    // `rankable_payments` esclude gia' cio' che hai tolto dalle classifiche.
-    // I totali restano su `payments`, perche' mutuo e rate sono spese vere.
-    const [
-      paymentsResult,
-      rankableResult,
-      historyResult,
-      categoryHistoryResult,
-      merchantsResult,
-    ] = await Promise.all([
-      supabase
-        .from("payments")
-        .select("*")
-        .gte("occurred_at", period.start.toISOString())
-        .lt("occurred_at", period.end.toISOString())
-        .order("occurred_at"),
-      supabase
-        .from("rankable_payments")
-        .select("*")
-        .gte("occurred_at", period.start.toISOString())
-        .lt("occurred_at", period.end.toISOString())
-        .order("occurred_at"),
-      supabase
-        .from("rankable_payments")
-        .select("*")
-        .gte("occurred_at", historyStart.toISOString())
-        .order("occurred_at"),
-      // Nessun limite di tempo: la ripartizione per categoria puo' guardare
-      // a un mese qualunque da quando esiste il primo movimento, o a tutto
-      // lo storico in blocco.
-      supabase.from("payments").select("*").order("occurred_at"),
-      supabase.from("merchants").select("*"),
-    ]);
+    // I totali restano sempre su tutte le spese, perche' mutuo e rate sono
+    // spese vere; l'esclusione si applica solo a valle, sulle classifiche,
+    // con il filtro client-side controllato dal toggle.
+    const [paymentsResult, historyResult, categoryHistoryResult, merchantsResult] =
+      await Promise.all([
+        supabase
+          .from("payments")
+          .select("*")
+          .gte("occurred_at", period.start.toISOString())
+          .lt("occurred_at", period.end.toISOString())
+          .order("occurred_at"),
+        supabase
+          .from("payments")
+          .select("*")
+          .gte("occurred_at", historyStart.toISOString())
+          .order("occurred_at"),
+        // Nessun limite di tempo: la ripartizione per categoria puo' guardare
+        // a un mese qualunque da quando esiste il primo movimento, o a tutto
+        // lo storico in blocco.
+        supabase.from("payments").select("*").order("occurred_at"),
+        supabase.from("merchants").select("*"),
+      ]);
 
     if (paymentsResult.data) setPayments(paymentsResult.data as Payment[]);
-    if (rankableResult.data) setRankable(rankableResult.data as Payment[]);
     if (historyResult.data) setHistory(historyResult.data as Payment[]);
     if (categoryHistoryResult.data)
       setCategoryHistory(categoryHistoryResult.data as Payment[]);
@@ -146,6 +140,31 @@ export default function StatsScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  // Una spesa e' esclusa dalle classifiche se lo e' lei o il suo esercente:
+  // la stessa regola che prima viveva nella vista `rankable_payments`, ora
+  // qui perche' il toggle deve poterla accendere o spegnere a piacere.
+  const excludedMerchantIds = useMemo(
+    () => new Set(merchants.filter((m) => m.excluded_from_stats).map((m) => m.id)),
+    [merchants]
+  );
+
+  const applyExclusion = useCallback(
+    (list: Payment[]) => {
+      if (!excludeMarked) return list;
+      return list.filter(
+        (p) =>
+          !p.excluded_from_stats &&
+          !(p.merchant_id && excludedMerchantIds.has(p.merchant_id))
+      );
+    },
+    [excludeMarked, excludedMerchantIds]
+  );
+
+  const rankable = useMemo(
+    () => applyExclusion(payments),
+    [payments, applyExclusion]
+  );
 
   const total = payments.reduce((sum, p) => sum + Number(p.effective_amount), 0);
 
@@ -317,13 +336,12 @@ export default function StatsScreen() {
   }, [rankedPool, merchants]);
 
   /** Storico filtrato come le classifiche, per i grafici a colonne. */
-  const historyPool = useMemo(
-    () =>
-      filterCategory === null
-        ? history
-        : history.filter((p) => p.category_id === filterCategory),
-    [history, filterCategory]
-  );
+  const historyPool = useMemo(() => {
+    const excluded = applyExclusion(history);
+    return filterCategory === null
+      ? excluded
+      : excluded.filter((p) => p.category_id === filterCategory);
+  }, [history, filterCategory, applyExclusion]);
 
   const buckets = useMemo(
     () => bucketize(historyPool, grain, grain === "week" ? 10 : 8),
@@ -670,9 +688,21 @@ export default function StatsScreen() {
           <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
             Classifiche
           </Text>
-          <Text style={[styles.filterNote, { color: palette.ink3 }]}>
-            esclusi i costi fissi
-          </Text>
+          <TouchableOpacity
+            style={styles.excludeToggle}
+            onPress={() => setExcludeMarked((v) => !v)}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: excludeMarked }}
+          >
+            <Text style={[styles.filterNote, { color: palette.ink3 }]}>
+              escludi costi fissi
+            </Text>
+            <Switch
+              value={excludeMarked}
+              onValueChange={setExcludeMarked}
+              trackColor={{ true: palette.accent, false: palette.hairline }}
+            />
+          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -897,6 +927,7 @@ const styles = StyleSheet.create({
     marginBottom: space.sm,
   },
   filterNote: { ...type.small, fontSize: 10.5 },
+  excludeToggle: { flexDirection: "row", alignItems: "center", gap: 7 },
   filterRow: { gap: 7, paddingRight: space.lg },
   filterChip: {
     paddingVertical: 7,

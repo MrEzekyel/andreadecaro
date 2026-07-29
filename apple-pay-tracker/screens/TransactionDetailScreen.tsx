@@ -50,6 +50,7 @@ export default function TransactionDetailScreen({
 
   const [payment, setPayment] = useState(initial);
   const [editing, setEditing] = useState(false);
+  const [splitIntent, setSplitIntent] = useState(false);
   const [splits, setSplits] = useState<PaymentSplit[]>([]);
   const [merchantTotal, setMerchantTotal] = useState<{
     count: number;
@@ -176,6 +177,19 @@ export default function TransactionDetailScreen({
                 quota tua su {formatAmount(Number(payment.amount))} pagati
               </Text>
             )}
+
+            <TouchableOpacity
+              style={[styles.splitBtn, { borderColor: palette.hairline }]}
+              onPress={() => {
+                setSplitIntent(true);
+                setEditing(true);
+              }}
+            >
+              <Icon name="split" size={14} color={palette.accent} />
+              <Text style={[styles.splitBtnText, { color: palette.accent }]}>
+                {isSplit || splits.length > 0 ? "Modifica divisione" : "Dividi con altri"}
+              </Text>
+            </TouchableOpacity>
           </View>
 
           <View style={styles.rows}>
@@ -309,7 +323,11 @@ export default function TransactionDetailScreen({
       <EditPaymentSheet
         payment={editing ? payment : null}
         visible={editing}
-        onClose={() => setEditing(false)}
+        focusSplit={splitIntent}
+        onClose={() => {
+          setEditing(false);
+          setSplitIntent(false);
+        }}
         onSaved={() => {
           load();
           onChanged();
@@ -347,6 +365,17 @@ const styles = StyleSheet.create({
   cents: { ...type.heroCents },
   when: { ...type.caption, marginTop: -2 },
   splitNote: { ...type.small },
+  splitBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingVertical: 7,
+    paddingHorizontal: 14,
+    marginTop: 4,
+  },
+  splitBtnText: { ...type.caption, fontWeight: "500" },
   rows: {},
   divider: { height: StyleSheet.hairlineWidth },
   row: {

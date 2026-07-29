@@ -1,16 +1,10 @@
 import React, { useEffect, useState } from "react";
-import {
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
 import { radius, space, tint, type } from "../lib/theme";
 import { Icon } from "./Icon";
+import { NamePromptSheet } from "./NamePromptSheet";
 
 const CASH = "Contanti";
 
@@ -20,16 +14,17 @@ type Props = {
 };
 
 /**
- * Metodo di pagamento: le carte gia' viste in altre spese, "Contanti", e un
- * campo libero per una carta nuova.
+ * Metodo di pagamento: le carte gia' viste in altre spese, "Contanti", e
+ * "Aggiungi" per registrarne uno nuovo.
  *
- * E' un vocabolario aperto — non c'e' un elenco fisso di carte come per le
- * categorie — quindi i chip sono scorciatoie per riempire il campo, non
- * l'unica scelta possibile.
+ * Niente campo di testo libero accanto ai chip: un metodo nuovo si crea con
+ * lo stesso gesto di categorie e persone, invece di restare un campo sempre
+ * aperto che finiva per confondersi con la scelta fra i chip.
  */
 export function CardPicker({ value, onChange }: Props) {
   const { palette, dark } = useTheme();
   const [known, setKnown] = useState<string[]>([]);
+  const [adding, setAdding] = useState(false);
 
   useEffect(() => {
     supabase
@@ -45,6 +40,14 @@ export function CardPicker({ value, onChange }: Props) {
         setKnown(Array.from(names).sort());
       });
   }, []);
+
+  function addMethod(name: string) {
+    setKnown((current) =>
+      current.includes(name) ? current : [...current, name].sort()
+    );
+    onChange(name);
+    setAdding(false);
+  }
 
   const chips = [CASH, ...known];
 
@@ -91,28 +94,31 @@ export function CardPicker({ value, onChange }: Props) {
             </TouchableOpacity>
           );
         })}
+
+        <TouchableOpacity
+          onPress={() => setAdding(true)}
+          style={[styles.chip, { backgroundColor: palette.surface, borderColor: palette.hairline }]}
+          accessibilityRole="button"
+          accessibilityLabel="Nuovo metodo di pagamento"
+        >
+          <Icon name="plus" size={13} color={palette.accent} />
+          <Text style={[styles.chipText, { color: palette.accent }]}>Aggiungi</Text>
+        </TouchableOpacity>
       </ScrollView>
 
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder="Oppure scrivi il nome della carta"
-        placeholderTextColor={palette.ink3}
-        style={[
-          styles.input,
-          {
-            backgroundColor: palette.surface,
-            borderColor: palette.hairline,
-            color: palette.ink,
-          },
-        ]}
+      <NamePromptSheet
+        visible={adding}
+        title="Nuovo metodo di pagamento"
+        placeholder="Es. Postepay"
+        onClose={() => setAdding(false)}
+        onSubmit={(name) => addMethod(name)}
       />
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  strip: { gap: 8, paddingVertical: 2, paddingBottom: space.sm, paddingRight: 8 },
+  strip: { gap: 8, paddingVertical: 2, paddingRight: 8 },
   chip: {
     flexDirection: "row",
     alignItems: "center",
@@ -123,11 +129,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipText: { ...type.caption, fontWeight: "500" },
-  input: {
-    borderWidth: 1,
-    borderRadius: radius.field,
-    paddingHorizontal: 13,
-    paddingVertical: 12,
-    ...type.body,
-  },
 });

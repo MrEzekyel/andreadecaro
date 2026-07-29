@@ -1,6 +1,12 @@
 import React, { createContext, useContext } from "react";
 
-export type SettingsPage = "root" | "categories" | "limits" | "recurring" | "people";
+export type SettingsPage =
+  | "root"
+  | "categories"
+  | "limits"
+  | "recurring"
+  | "people"
+  | "automations";
 
 type Nav = {
   /** Porta alla scheda Impostazioni gia' aperta su una sua sottopagina. */

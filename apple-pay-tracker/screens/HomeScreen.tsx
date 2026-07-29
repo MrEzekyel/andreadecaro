@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  Animated,
   PanResponder,
   RefreshControl,
   ScrollView,
@@ -76,19 +77,74 @@ export default function HomeScreen() {
     });
   }
 
-  // Lo scorrimento orizzontale sull'intestazione cambia mese. Il responder si
-  // attiva solo quando il gesto e' nettamente orizzontale, altrimenti
-  // ruberebbe lo scorrimento verticale della pagina.
+  // Lo scorrimento orizzontale sull'intestazione cambia mese, con
+  // un'anteprima che compare gradualmente man mano che si trascina invece
+  // di scattare solo al rilascio: non c'e' bisogno di vedere il mese
+  // opposto, solo quello verso cui si sta scorrendo.
+  const HEAD_TRAVEL = 60;
+  const dragX = useRef(new Animated.Value(0)).current;
+  /** 1 = verso il mese successivo (trascinamento a sinistra), -1 = precedente. */
+  const [dragDir, setDragDir] = useState<0 | 1 | -1>(0);
+
   const pan = useRef(
     PanResponder.create({
       onMoveShouldSetPanResponder: (_event, gesture) =>
-        Math.abs(gesture.dx) > 14 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.6,
+        Math.abs(gesture.dx) > 10 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.6,
+      onPanResponderGrant: () => dragX.setValue(0),
+      onPanResponderMove: (_event, gesture) => {
+        dragX.setValue(gesture.dx);
+        setDragDir(gesture.dx < 0 ? 1 : gesture.dx > 0 ? -1 : 0);
+      },
       onPanResponderRelease: (_event, gesture) => {
-        if (gesture.dx <= -40) shiftMonth(1);
-        else if (gesture.dx >= 40) shiftMonth(-1);
+        if (Math.abs(gesture.dx) >= HEAD_TRAVEL) {
+          const dir = gesture.dx < 0 ? 1 : -1;
+          Animated.timing(dragX, {
+            toValue: -dir * HEAD_TRAVEL,
+            duration: 90,
+            useNativeDriver: true,
+          }).start(() => {
+            shiftMonth(dir);
+            dragX.setValue(0);
+            setDragDir(0);
+          });
+        } else {
+          Animated.spring(dragX, {
+            toValue: 0,
+            useNativeDriver: true,
+            bounciness: 4,
+          }).start(() => setDragDir(0));
+        }
       },
     })
   ).current;
+
+  const outgoingOpacity = dragX.interpolate({
+    inputRange: [-HEAD_TRAVEL, 0, HEAD_TRAVEL],
+    outputRange: [0, 1, 0],
+    extrapolate: "clamp",
+  });
+  const outgoingTranslate = dragX.interpolate({
+    inputRange: [-HEAD_TRAVEL, 0, HEAD_TRAVEL],
+    outputRange: [-HEAD_TRAVEL * 0.4, 0, HEAD_TRAVEL * 0.4],
+    extrapolate: "clamp",
+  });
+  const incomingOpacity = dragX.interpolate({
+    inputRange: [-HEAD_TRAVEL, 0, HEAD_TRAVEL],
+    outputRange: dragDir === 1 ? [1, 0, 0] : [0, 0, 1],
+    extrapolate: "clamp",
+  });
+  const incomingTranslate = dragX.interpolate({
+    inputRange: [-HEAD_TRAVEL, 0, HEAD_TRAVEL],
+    outputRange:
+      dragDir === 1 ? [0, HEAD_TRAVEL, HEAD_TRAVEL] : [-HEAD_TRAVEL, -HEAD_TRAVEL, 0],
+    extrapolate: "clamp",
+  });
+
+  const incomingMonth = new Date(
+    month.getFullYear(),
+    month.getMonth() + dragDir,
+    1
+  );
 
   const byCategory = useMemo(() => {
     const map = new Map<string | null, number>();
@@ -185,12 +241,42 @@ export default function HomeScreen() {
             if (event.nativeEvent.actionName === "decrement") shiftMonth(-1);
           }}
         >
-          <Text style={[styles.title, { color: palette.ink }]}>
-            {monthTitle(month)}
-          </Text>
-          <Text style={[styles.year, { color: palette.ink3 }]}>
-            {month.getFullYear()}
-          </Text>
+          <Animated.View
+            style={[
+              styles.headPair,
+              {
+                opacity: outgoingOpacity,
+                transform: [{ translateX: outgoingTranslate }],
+              },
+            ]}
+          >
+            <Text style={[styles.title, { color: palette.ink }]}>
+              {monthTitle(month)}
+            </Text>
+            <Text style={[styles.year, { color: palette.ink3 }]}>
+              {month.getFullYear()}
+            </Text>
+          </Animated.View>
+
+          {dragDir !== 0 && (
+            <Animated.View
+              style={[
+                styles.headPair,
+                styles.headIncoming,
+                {
+                  opacity: incomingOpacity,
+                  transform: [{ translateX: incomingTranslate }],
+                },
+              ]}
+            >
+              <Text style={[styles.title, { color: palette.ink }]}>
+                {monthTitle(incomingMonth)}
+              </Text>
+              <Text style={[styles.year, { color: palette.ink3 }]}>
+                {incomingMonth.getFullYear()}
+              </Text>
+            </Animated.View>
+          )}
         </View>
 
         <View>
@@ -342,12 +428,15 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.xl },
-  head: {
+  head: {},
+  headPair: {
     flexDirection: "row",
     alignItems: "baseline",
     justifyContent: "space-between",
+    width: "100%",
     paddingVertical: space.sm,
   },
+  headIncoming: { position: "absolute", left: 0, top: 0, right: 0 },
   title: { ...type.title, fontSize: 27, letterSpacing: -0.3 },
   year: { ...type.body, fontWeight: "500" },
   label: { ...type.label, marginBottom: space.sm },
