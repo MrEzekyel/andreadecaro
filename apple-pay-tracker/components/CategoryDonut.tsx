@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import Svg, { Circle, G, Path } from "react-native-svg";
 import { useTheme } from "../lib/ThemeContext";
@@ -6,9 +6,15 @@ import { formatAmount } from "../lib/format";
 import { radius, space, tint, type } from "../lib/theme";
 import { Icon } from "./Icon";
 
-const SIZE = 128;
-const R_OUTER = 62;
-const R_INNER = 38;
+const SIZE = 156;
+const R_OUTER = 76;
+const R_INNER = 47;
+
+/** Oltre questa quota le categorie minori si raccolgono in "Altro". */
+const MAX_VISIBLE = 5;
+/** Segnaposto per lo spicchio aggregato: distinto dall'id null delle spese
+ * senza categoria, che e' un valore legittimo e cliccabile. */
+const OTHER_ID = "__other__";
 
 export type DonutSlice = {
   id: string | null;
@@ -50,16 +56,32 @@ function arcPath(cx: number, cy: number, start: number, end: number): string {
 /**
  * Ripartizione con l'anello a sinistra e le categorie a destra.
  *
- * L'anello resta un riferimento visivo puro — quanto e' grande ogni fetta
- * rispetto alle altre — mentre l'elenco a destra e' dove si legge il
- * dettaglio: icona di categoria al posto del colore, importo, percentuale
- * piccola accanto. Colore e forma bastano a distinguere le fette nell'anello;
- * ripeterli identici nell'elenco non aggiungerebbe informazione.
+ * Oltre le prime 5 (l'elenco arriva gia' ordinato per importo) le categorie
+ * minori si raccolgono in una voce "Altro": sia l'anello che l'elenco a
+ * fianco restano leggibili anche con dieci categorie configurate, invece di
+ * diluirsi in spicchi e righe troppo sottili per portare informazione.
  */
 export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
   const { palette, dark } = useTheme();
 
-  const total = slices.reduce((sum, slice) => sum + slice.value, 0);
+  const display = useMemo(() => {
+    if (slices.length <= MAX_VISIBLE) return slices;
+    const visible = slices.slice(0, MAX_VISIBLE);
+    const rest = slices.slice(MAX_VISIBLE);
+    const otherValue = rest.reduce((sum, s) => sum + s.value, 0);
+    return [
+      ...visible,
+      {
+        id: OTHER_ID,
+        label: "Altro",
+        value: otherValue,
+        color: palette.ink3,
+        icon: "ellipsis",
+      },
+    ];
+  }, [slices, palette.ink3]);
+
+  const total = display.reduce((sum, slice) => sum + slice.value, 0);
 
   if (total <= 0) {
     return (
@@ -73,7 +95,7 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
   const cy = SIZE / 2;
 
   let cursor = 0;
-  const arcs = slices.map((slice) => {
+  const arcs = display.map((slice) => {
     const share = slice.value / total;
     const start = cursor * Math.PI * 2;
     cursor += share;
@@ -110,7 +132,9 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
                     key={slice.id ?? "none"}
                     d={arcPath(cx, cy, start, end - gap)}
                     fill={slice.color}
-                    onPress={() => onSelect?.(slice)}
+                    onPress={() =>
+                      slice.id !== OTHER_ID && onSelect?.(slice)
+                    }
                   />
                 );
               })
@@ -131,13 +155,16 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
       </View>
 
       <View style={styles.list}>
-        {slices.map((slice) => {
+        {display.map((slice) => {
           const pct = total > 0 ? (slice.value / total) * 100 : 0;
+          const isOther = slice.id === OTHER_ID;
+
           return (
             <TouchableOpacity
               key={slice.id ?? "none"}
               style={styles.row}
               onPress={() => onSelect?.(slice)}
+              disabled={isOther}
               accessibilityRole="button"
               accessibilityLabel={`${slice.label}, ${formatAmount(
                 slice.value
@@ -146,21 +173,23 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
               <View
                 style={[styles.iconWrap, { backgroundColor: tint(slice.color, dark) }]}
               >
-                <Icon name={slice.icon} size={14} color={slice.color} />
+                <Icon name={slice.icon} size={11} color={slice.color} />
               </View>
 
-              <Text
-                style={[styles.rowLabel, { color: palette.ink2 }]}
-                numberOfLines={1}
-              >
-                {slice.label}
-              </Text>
+              <View style={styles.rowLabelWrap}>
+                <Text
+                  style={[styles.rowLabel, { color: palette.ink2 }]}
+                  numberOfLines={1}
+                >
+                  {slice.label}
+                </Text>
+                <Text style={[styles.rowPct, { color: palette.ink3 }]}>
+                  {pct >= 1 ? Math.round(pct) : pct.toFixed(1)}%
+                </Text>
+              </View>
 
               <Text style={[styles.rowValue, { color: palette.ink }]}>
                 {formatAmount(slice.value)}
-              </Text>
-              <Text style={[styles.rowPct, { color: palette.ink3 }]}>
-                {pct >= 1 ? Math.round(pct) : pct.toFixed(1)}%
               </Text>
             </TouchableOpacity>
           );
@@ -171,7 +200,7 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
 }
 
 const styles = StyleSheet.create({
-  wrap: { flexDirection: "row", alignItems: "flex-start", gap: space.lg },
+  wrap: { flexDirection: "row", alignItems: "center", gap: space.md },
   ring: {
     width: SIZE,
     height: SIZE,
@@ -181,29 +210,30 @@ const styles = StyleSheet.create({
   center: { position: "absolute", alignItems: "center" },
   centerValue: {
     ...type.bodyMedium,
-    fontSize: 13.5,
+    fontSize: 14,
     fontVariant: ["tabular-nums"],
   },
   centerLabel: { ...type.small, fontSize: 9.5, marginTop: 2 },
-  list: { flex: 1, gap: 10, paddingTop: 2 },
-  row: { flexDirection: "row", alignItems: "center", gap: 9 },
+  list: { flex: 1, gap: 8 },
+  row: { flexDirection: "row", alignItems: "center", gap: 7 },
   iconWrap: {
-    width: 26,
-    height: 26,
+    width: 20,
+    height: 20,
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
   },
-  rowLabel: { ...type.caption, flex: 1 },
+  rowLabelWrap: { flex: 1, minWidth: 0 },
+  rowLabel: { ...type.caption },
+  rowPct: {
+    ...type.small,
+    fontSize: 10,
+    marginTop: 1,
+    fontVariant: ["tabular-nums"],
+  },
   rowValue: {
     ...type.caption,
     fontWeight: "500",
-    fontVariant: ["tabular-nums"],
-  },
-  rowPct: {
-    ...type.small,
-    width: 34,
-    textAlign: "right",
     fontVariant: ["tabular-nums"],
   },
   empty: { ...type.caption, lineHeight: 19, paddingVertical: space.sm },
