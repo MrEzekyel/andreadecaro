@@ -1,43 +1,69 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import {
+  PanResponder,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TouchableOpacity,
   View,
 } from "react-native";
+import { CategoryDonut, DonutSlice } from "../components/CategoryDonut";
 import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
 import { LimitCard } from "../components/LimitCard";
 import { PaymentRow } from "../components/PaymentRow";
+import { TrendChart, TrendPoint } from "../components/TrendChart";
 import { useData } from "../lib/DataContext";
+import { useNav } from "../lib/NavContext";
 import { useTheme } from "../lib/ThemeContext";
-import { formatAmount, monthName, splitAmount } from "../lib/format";
+import {
+  formatAmount,
+  monthName,
+  monthTitle,
+  percentChange,
+  splitAmount,
+} from "../lib/format";
 import { categoryColor, radius, space, type } from "../lib/theme";
 import { useLimits } from "../lib/useLimits";
-import { usePayments } from "../lib/usePayments";
+import { comparisonCutoff, isCurrentMonth, usePayments } from "../lib/usePayments";
 
 export default function HomeScreen() {
   const { palette, dark } = useTheme();
   const { categoryById } = useData();
+  const { openSettings } = useNav();
 
   const [month, setMonth] = useState(() => new Date());
-  const { payments, reload } = usePayments(month);
+  const { payments, total, previousTotal, reload } = usePayments(month);
   const { monthlyOverall, alerts, reload: reloadLimits } = useLimits();
   const [refreshing, setRefreshing] = useState(false);
   const explorer = useExplorer(reload);
 
   // I limiti valgono sempre sul periodo corrente: mostrarli mentre si
   // sfoglia un mese passato darebbe un confronto senza senso.
-  const viewingCurrentMonth =
-    month.getFullYear() === new Date().getFullYear() &&
-    month.getMonth() === new Date().getMonth();
+  const viewingCurrentMonth = isCurrentMonth(month);
 
-  const total = useMemo(
-    () => payments.reduce((sum, p) => sum + Number(p.effective_amount), 0),
-    [payments]
-  );
+  function shiftMonth(delta: number) {
+    setMonth((current) => {
+      const next = new Date(current);
+      next.setDate(1);
+      next.setMonth(next.getMonth() + delta);
+      return next;
+    });
+  }
+
+  // Lo scorrimento orizzontale sull'intestazione cambia mese. Il responder si
+  // attiva solo quando il gesto e' nettamente orizzontale, altrimenti
+  // ruberebbe lo scorrimento verticale della pagina.
+  const pan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_event, gesture) =>
+        Math.abs(gesture.dx) > 14 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.6,
+      onPanResponderRelease: (_event, gesture) => {
+        if (gesture.dx <= -40) shiftMonth(1);
+        else if (gesture.dx >= 40) shiftMonth(-1);
+      },
+    })
+  ).current;
 
   const byCategory = useMemo(() => {
     const map = new Map<string | null, number>();
@@ -50,17 +76,57 @@ export default function HomeScreen() {
       .sort((a, b) => b.amount - a.amount);
   }, [payments]);
 
+  const slices = useMemo<DonutSlice[]>(
+    () =>
+      byCategory.map(({ id, amount }) => {
+        const category = categoryById(id);
+        return {
+          id,
+          label: category?.name ?? "Da categorizzare",
+          value: amount,
+          color: category
+            ? categoryColor(category.color, dark)
+            : palette.uncategorized,
+          icon: category?.icon ?? "circle-help",
+        };
+      }),
+    [byCategory, categoryById, dark, palette.uncategorized]
+  );
+
+  /** Spesa cumulata giorno per giorno, fino a oggi se il mese e' in corso. */
+  const trend = useMemo<TrendPoint[]>(() => {
+    const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+    const elapsed = viewingCurrentMonth ? new Date().getDate() : days;
+
+    const perDay = new Array(days).fill(0);
+    for (const payment of payments) {
+      const day = new Date(payment.occurred_at).getDate();
+      perDay[day - 1] += Number(payment.effective_amount);
+    }
+
+    const points: TrendPoint[] = [];
+    let running = 0;
+    for (let i = 0; i < elapsed; i++) {
+      running += perDay[i];
+      points.push({ label: String(i + 1), value: running });
+    }
+    return points;
+  }, [payments, month, viewingCurrentMonth]);
+
+  const limitAmount =
+    viewingCurrentMonth && monthlyOverall
+      ? Number(monthlyOverall.limit.amount)
+      : null;
+
+  const delta = percentChange(total, previousTotal);
+  const previousMonth = new Date(month.getFullYear(), month.getMonth() - 1, 1);
+  const cutoff = comparisonCutoff(month);
+  const deltaLabel = viewingCurrentMonth
+    ? `su ${monthName(previousMonth)} 1–${cutoff}`
+    : `su ${monthName(previousMonth)}`;
+
   const recent = payments.slice(0, 5);
   const amount = splitAmount(total);
-
-  function shiftMonth(delta: number) {
-    setMonth((current) => {
-      const next = new Date(current);
-      next.setDate(1);
-      next.setMonth(next.getMonth() + delta);
-      return next;
-    });
-  }
 
   async function onRefresh() {
     setRefreshing(true);
@@ -79,32 +145,32 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View style={styles.head}>
+        <View
+          style={styles.head}
+          {...pan.panHandlers}
+          accessibilityRole="adjustable"
+          accessibilityLabel={`${monthTitle(month)} ${month.getFullYear()}`}
+          accessibilityHint="Scorri a destra o a sinistra per cambiare mese"
+          accessibilityActions={[
+            { name: "increment", label: "Mese successivo" },
+            { name: "decrement", label: "Mese precedente" },
+          ]}
+          onAccessibilityAction={(event) => {
+            if (event.nativeEvent.actionName === "increment") shiftMonth(1);
+            if (event.nativeEvent.actionName === "decrement") shiftMonth(-1);
+          }}
+        >
           <Text style={[styles.title, { color: palette.ink }]}>
-            {monthName(month)}
+            {monthTitle(month)}
           </Text>
-          <View style={styles.monthNav}>
-            <TouchableOpacity
-              onPress={() => shiftMonth(-1)}
-              accessibilityLabel="Mese precedente"
-            >
-              <Icon name="chevron-left" size={16} color={palette.ink3} />
-            </TouchableOpacity>
-            <Text style={[styles.year, { color: palette.ink3 }]}>
-              {month.getFullYear()}
-            </Text>
-            <TouchableOpacity
-              onPress={() => shiftMonth(1)}
-              accessibilityLabel="Mese successivo"
-            >
-              <Icon name="chevron-right" size={16} color={palette.ink3} />
-            </TouchableOpacity>
-          </View>
+          <Text style={[styles.year, { color: palette.ink3 }]}>
+            {month.getFullYear()}
+          </Text>
         </View>
 
         <View>
           <Text style={[styles.label, { color: palette.ink3 }]}>
-            Speso questo mese
+            {viewingCurrentMonth ? "Speso questo mese" : "Speso nel mese"}
           </Text>
           <Text style={[styles.hero, { color: palette.ink }]}>
             {amount.whole}
@@ -112,9 +178,34 @@ export default function HomeScreen() {
               {amount.cents}
             </Text>
           </Text>
-          <Text style={[styles.heroMeta, { color: palette.ink2 }]}>
-            {payments.length} {payments.length === 1 ? "spesa" : "spese"}
-          </Text>
+
+          <View style={styles.heroFoot}>
+            <Text style={[styles.heroMeta, { color: palette.ink2 }]}>
+              {payments.length} {payments.length === 1 ? "spesa" : "spese"}
+            </Text>
+
+            {delta !== null && (
+              <View style={styles.delta}>
+                <Icon
+                  name={delta >= 0 ? "trending-up" : "trending-down"}
+                  size={13}
+                  color={delta >= 0 ? palette.over : palette.good}
+                />
+                <Text
+                  style={[
+                    styles.deltaValue,
+                    { color: delta >= 0 ? palette.over : palette.good },
+                  ]}
+                >
+                  {delta >= 0 ? "+" : "−"}
+                  {Math.abs(Math.round(delta))}%
+                </Text>
+                <Text style={[styles.deltaNote, { color: palette.ink3 }]}>
+                  {deltaLabel}
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {viewingCurrentMonth &&
@@ -149,61 +240,40 @@ export default function HomeScreen() {
           })}
 
         {viewingCurrentMonth && monthlyOverall && (
-          <LimitCard status={monthlyOverall} />
+          <LimitCard
+            status={monthlyOverall}
+            plain
+            onPress={() => openSettings("limits")}
+          />
         )}
 
-        {byCategory.length > 0 && (
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: palette.surface, borderColor: palette.hairline },
-            ]}
-          >
-            <Text style={[styles.cardTitle, { color: palette.ink }]}>
+        {trend.length > 1 && (
+          <View>
+            <Text style={[styles.label, { color: palette.ink3 }]}>Andamento</Text>
+            <TrendChart
+              points={trend}
+              limit={limitAmount}
+              color={palette.accent}
+            />
+          </View>
+        )}
+
+        {slices.length > 0 && (
+          <View>
+            <Text style={[styles.label, { color: palette.ink3 }]}>
               Ripartizione
             </Text>
-
-            {byCategory.map(({ id, amount: value }) => {
-              const category = categoryById(id);
-              const color = category
-                ? categoryColor(category.color, dark)
-                : palette.uncategorized;
-              const pct = total > 0 ? (value / total) * 100 : 0;
-
-              return (
-                <View key={id ?? "none"} style={styles.catRow}>
-                  <View style={styles.catHead}>
-                    <View style={styles.catName}>
-                      <View
-                        style={[styles.swatch, { backgroundColor: color }]}
-                      />
-                      <Text style={[styles.catLabel, { color: palette.ink2 }]}>
-                        {category?.name ?? "Da categorizzare"}
-                      </Text>
-                    </View>
-                    <Text style={[styles.catValue, { color: palette.ink }]}>
-                      {formatAmount(value)}
-                    </Text>
-                    <Text style={[styles.catPct, { color: palette.ink3 }]}>
-                      {Math.round(pct)}%
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.barTrack,
-                      { backgroundColor: palette.surface2 },
-                    ]}
-                  >
-                    <View
-                      style={[
-                        styles.barFill,
-                        { width: `${pct}%`, backgroundColor: color },
-                      ]}
-                    />
-                  </View>
-                </View>
-              );
-            })}
+            <CategoryDonut
+              slices={slices}
+              centerLabel={monthTitle(month).toLowerCase()}
+              onSelect={(slice) =>
+                explorer.openDetail({
+                  kind: "category",
+                  id: slice.id,
+                  title: slice.label,
+                })
+              }
+            />
           </View>
         )}
 
@@ -242,35 +312,28 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "baseline",
     justifyContent: "space-between",
+    paddingVertical: space.sm,
   },
-  title: { ...type.title },
-  monthNav: { flexDirection: "row", alignItems: "center", gap: space.sm },
-  year: { ...type.caption, fontWeight: "500" },
+  title: { ...type.title, fontSize: 27, letterSpacing: -0.3 },
+  year: { ...type.body, fontWeight: "500" },
   label: { ...type.label, marginBottom: space.sm },
   hero: { ...type.hero, fontVariant: ["tabular-nums"] },
   heroCents: { ...type.heroCents },
-  heroMeta: { ...type.caption, marginTop: space.sm },
-  card: {
-    borderRadius: radius.card,
-    borderWidth: 1,
-    padding: space.lg,
-    gap: space.md,
+  heroFoot: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: space.sm,
+    marginTop: space.sm,
   },
-  cardTitle: { ...type.bodyMedium, fontSize: 12.5 },
-  catRow: { gap: 6 },
-  catHead: { flexDirection: "row", alignItems: "center", gap: space.sm },
-  catName: { flexDirection: "row", alignItems: "center", gap: 8, flex: 1 },
-  swatch: { width: 9, height: 9, borderRadius: 2 },
-  catLabel: { ...type.caption, flexShrink: 1 },
-  catValue: { ...type.caption, fontWeight: "500", fontVariant: ["tabular-nums"] },
-  catPct: {
+  heroMeta: { ...type.caption },
+  delta: { flexDirection: "row", alignItems: "center", gap: 4 },
+  deltaValue: {
     ...type.caption,
-    width: 36,
-    textAlign: "right",
+    fontWeight: "600",
     fontVariant: ["tabular-nums"],
   },
-  barTrack: { height: 6, borderRadius: radius.pill, overflow: "hidden" },
-  barFill: { height: 6, borderRadius: radius.pill },
+  deltaNote: { ...type.small, fontSize: 10.5 },
   empty: { ...type.body, textAlign: "center", marginTop: space.xl, lineHeight: 21 },
   alert: {
     flexDirection: "row",

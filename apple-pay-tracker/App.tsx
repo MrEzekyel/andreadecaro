@@ -1,5 +1,5 @@
 import { StatusBar } from "expo-status-bar";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   SafeAreaView,
   StyleSheet,
@@ -11,6 +11,7 @@ import type { Session } from "@supabase/supabase-js";
 import { AddPaymentSheet } from "./components/AddPaymentSheet";
 import { Icon } from "./components/Icon";
 import { DataProvider, useData } from "./lib/DataContext";
+import { NavProvider, SettingsPage } from "./lib/NavContext";
 import { ThemeProvider, useTheme } from "./lib/ThemeContext";
 import { supabase } from "./lib/supabase";
 import { radius, space, type } from "./lib/theme";
@@ -36,48 +37,65 @@ function Shell() {
   const [tab, setTab] = useState<Tab>("home");
   const [adding, setAdding] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [settingsPage, setSettingsPage] = useState<SettingsPage>("root");
+  // Cambia a ogni richiesta di apertura, anche verso la stessa pagina: e' il
+  // segnale che dice a Impostazioni "riapri", invece di restare dove sei.
+  const [settingsNonce, setSettingsNonce] = useState(0);
+
+  const openSettings = useCallback((page: SettingsPage) => {
+    setSettingsPage(page);
+    setSettingsNonce((value) => value + 1);
+    setTab("settings");
+  }, []);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.ground }]}>
-      <View style={styles.content} key={reloadKey}>
-        {tab === "home" && <HomeScreen />}
-        {tab === "payments" && <PaymentsScreen />}
-        {tab === "stats" && <StatsScreen />}
-        {tab === "settings" && <SettingsScreen />}
-      </View>
+      <NavProvider value={{ openSettings }}>
+        <View style={styles.content} key={reloadKey}>
+          {tab === "home" && <HomeScreen />}
+          {tab === "payments" && <PaymentsScreen />}
+          {tab === "stats" && <StatsScreen />}
+          {tab === "settings" && (
+            <SettingsScreen initialPage={settingsPage} openNonce={settingsNonce} />
+          )}
+        </View>
 
-      <View
-        style={[
-          styles.tabbar,
-          { backgroundColor: palette.surface, borderTopColor: palette.hairline },
-        ]}
-      >
-        {TABS.slice(0, 2).map((item) => (
-          <TabButton
-            key={item.key}
-            item={item}
-            active={tab === item.key}
-            onPress={() => setTab(item.key)}
-          />
-        ))}
-
-        <TouchableOpacity
-          style={[styles.fab, { backgroundColor: palette.accent }]}
-          onPress={() => setAdding(true)}
-          accessibilityLabel="Aggiungi spesa"
+        <View
+          style={[
+            styles.tabbar,
+            { backgroundColor: palette.surface, borderTopColor: palette.hairline },
+          ]}
         >
-          <Icon name="plus" size={21} color={palette.onAccent} strokeWidth={1.9} />
-        </TouchableOpacity>
+          {TABS.slice(0, 2).map((item) => (
+            <TabButton
+              key={item.key}
+              item={item}
+              active={tab === item.key}
+              onPress={() => setTab(item.key)}
+            />
+          ))}
 
-        {TABS.slice(2).map((item) => (
-          <TabButton
-            key={item.key}
-            item={item}
-            active={tab === item.key}
-            onPress={() => setTab(item.key)}
-          />
-        ))}
-      </View>
+          <TouchableOpacity
+            style={[styles.fab, { backgroundColor: palette.accent }]}
+            onPress={() => setAdding(true)}
+            accessibilityLabel="Aggiungi spesa"
+          >
+            <Icon name="plus" size={21} color={palette.onAccent} strokeWidth={1.9} />
+          </TouchableOpacity>
+
+          {TABS.slice(2).map((item) => (
+            <TabButton
+              key={item.key}
+              item={item}
+              active={tab === item.key}
+              onPress={() => {
+                if (item.key === "settings") openSettings("root");
+                else setTab(item.key);
+              }}
+            />
+          ))}
+        </View>
+      </NavProvider>
 
       <AddPaymentSheet
         visible={adding}

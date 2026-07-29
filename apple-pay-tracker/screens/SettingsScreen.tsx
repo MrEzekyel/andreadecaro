@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Icon } from "../components/Icon";
 import { useData } from "../lib/DataContext";
+import { SettingsPage } from "../lib/NavContext";
 import { ThemePreference, useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
@@ -28,16 +29,29 @@ const THEME_OPTIONS: { value: ThemePreference; label: string; icon: string }[] =
   { value: "system", label: "Sistema", icon: "smartphone" },
 ];
 
-export default function SettingsScreen() {
+type Props = {
+  /** Sottopagina su cui aprirsi, quando ci si arriva da un'altra scheda. */
+  initialPage?: SettingsPage;
+  /** Cambia a ogni richiesta di apertura, anche verso la stessa pagina. */
+  openNonce?: number;
+};
+
+export default function SettingsScreen({ initialPage = "root", openNonce }: Props) {
   const { palette, preference, setPreference } = useTheme();
   const { categories, people } = useData();
   const { statuses } = useLimits();
 
-  const [page, setPage] = useState<
-    "root" | "categories" | "limits" | "recurring" | "people"
-  >("root");
+  const [page, setPage] = useState<SettingsPage>(initialPage);
   const [tokens, setTokens] = useState<IngestToken[]>([]);
   const [freshToken, setFreshToken] = useState<string | null>(null);
+
+  // Il nonce distingue "sono arrivato qui da un'altra scheda" da "sto
+  // navigando dentro Impostazioni": senza, tornare indietro dalla pagina dei
+  // limiti la riaprirebbe subito.
+  useEffect(() => {
+    if (openNonce === undefined) return;
+    setPage(initialPage);
+  }, [openNonce, initialPage]);
 
   const loadTokens = useCallback(async () => {
     const { data } = await supabase

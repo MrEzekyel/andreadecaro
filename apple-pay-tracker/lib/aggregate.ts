@@ -7,6 +7,8 @@ export type Bucket = {
   label: string;
   total: number;
   count: number;
+  /** Inizio dell'intervallo: serve per tornare al mese da una colonna. */
+  start: Date;
 };
 
 const MONTHS_SHORT = [
@@ -27,9 +29,19 @@ function startOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
 }
 
+/**
+ * Chiave dell'intervallo, composta dalle parti LOCALI della data.
+ *
+ * Con `toISOString()` un primo del mese a mezzanotte locale finisce nel mese
+ * precedente per ogni fuso a est di Greenwich: la chiave resterebbe coerente
+ * come identificatore, ma rileggerla per tornare al mese darebbe il mese
+ * sbagliato — ed e' esattamente quello che serve quando si tocca una colonna.
+ */
 function keyOf(date: Date, grain: Grain) {
   const anchor = grain === "week" ? startOfWeek(date) : startOfMonth(date);
-  return anchor.toISOString().slice(0, 10);
+  const month = String(anchor.getMonth() + 1).padStart(2, "0");
+  const day = String(anchor.getDate()).padStart(2, "0");
+  return `${anchor.getFullYear()}-${month}-${day}`;
 }
 
 function labelOf(date: Date, grain: Grain) {
@@ -77,6 +89,7 @@ export function bucketize(
       label: labelOf(cursor, grain),
       total: found?.total ?? 0,
       count: found?.count ?? 0,
+      start: grain === "week" ? startOfWeek(cursor) : startOfMonth(cursor),
     });
 
     if (grain === "week") {
@@ -87,6 +100,24 @@ export function bucketize(
   }
 
   return buckets;
+}
+
+/** Estremi dell'intervallo coperto da un bucket; la fine e' esclusiva. */
+export function bucketRange(bucket: Bucket, grain: Grain) {
+  const start = new Date(bucket.start);
+  const end = new Date(start);
+  if (grain === "week") end.setDate(end.getDate() + 7);
+  else end.setMonth(end.getMonth() + 1);
+  return { start, end };
+}
+
+/** Le spese che cadono dentro un bucket. */
+export function paymentsIn(payments: Payment[], bucket: Bucket, grain: Grain) {
+  const { start, end } = bucketRange(bucket, grain);
+  return payments.filter((payment) => {
+    const at = new Date(payment.occurred_at);
+    return at >= start && at < end;
+  });
 }
 
 /** Raggruppa per mese di calendario, dal piu' recente. Per gli elenchi. */

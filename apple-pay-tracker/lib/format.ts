@@ -40,8 +40,80 @@ const MONTHS = [
   "luglio", "agosto", "settembre", "ottobre", "novembre", "dicembre",
 ];
 
+const MONTHS_SHORT = [
+  "gen", "feb", "mar", "apr", "mag", "giu",
+  "lug", "ago", "set", "ott", "nov", "dic",
+];
+
 export function monthName(date: Date) {
   return MONTHS[date.getMonth()];
+}
+
+export function capitalize(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+/** "Luglio" — il nome del mese come titolo. */
+export function monthTitle(date: Date) {
+  return capitalize(MONTHS[date.getMonth()]);
+}
+
+/** "Lug 2026" — compatto, per le etichette che devono stare in una riga. */
+export function monthShort(date: Date) {
+  return `${capitalize(MONTHS_SHORT[date.getMonth()])} ${date.getFullYear()}`;
+}
+
+/**
+ * Data di una spesa come la si legge a colpo d'occhio: "Oggi 11:50",
+ * "Ieri 11:50", altrimenti "12 ago 11:50".
+ */
+export function shortDateTime(iso: string) {
+  const date = new Date(iso);
+  const time = date.toLocaleTimeString("it-IT", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(today.getDate() - 1);
+
+  const sameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate();
+
+  if (sameDay(date, today)) return `Oggi ${time}`;
+  if (sameDay(date, yesterday)) return `Ieri ${time}`;
+
+  return `${date.getDate()} ${MONTHS_SHORT[date.getMonth()]} ${time}`;
+}
+
+/**
+ * Importo ridotto all'osso per stare sopra una colonna di grafico: niente
+ * decimali, e migliaia abbreviate. Sotto la colonna c'e' spazio per 3-4
+ * caratteri, non per "1.234,56 €".
+ */
+export function compactAmount(value: number) {
+  if (value <= 0) return "";
+  if (value >= 1000) {
+    const thousands = value / 1000;
+    // Si arrotonda prima di decidere quante cifre servono, altrimenti 1999
+    // diventerebbe "2,0k" invece che "2k".
+    const rounded =
+      thousands >= 10 ? Math.round(thousands) : Math.round(thousands * 10) / 10;
+    return `${rounded.toFixed(Number.isInteger(rounded) ? 0 : 1).replace(".", ",")}k`;
+  }
+  return String(Math.round(value));
+}
+
+/**
+ * Variazione percentuale fra due totali. Restituisce null quando il termine
+ * di paragone e' zero: "+100%" rispetto a niente speso non informa.
+ */
+export function percentChange(current: number, previous: number) {
+  if (previous <= 0) return null;
+  return ((current - previous) / previous) * 100;
 }
 
 export function monthKey(date: Date) {

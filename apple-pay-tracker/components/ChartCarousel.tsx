@@ -15,7 +15,11 @@ export type ChartPage = {
   key: string;
   title: string;
   subtitle?: string;
+  /** Comandi allineati a destra nell'intestazione: il selettore W/M, la media. */
+  aside?: React.ReactNode;
   content: React.ReactNode;
+  /** Reso sotto la scheda, fuori dal riquadro. */
+  footer?: React.ReactNode;
 };
 
 type Props = {
@@ -65,19 +69,24 @@ export function ChartCarousel({ pages, horizontalPadding = 16 }: Props) {
                 },
               ]}
             >
-              <View>
-                <Text style={[styles.title, { color: palette.ink }]}>
-                  {page.title}
-                </Text>
-                {page.subtitle && (
-                  <Text style={[styles.subtitle, { color: palette.ink3 }]}>
-                    {page.subtitle}
+              <View style={styles.head}>
+                <View style={styles.heading}>
+                  <Text style={[styles.title, { color: palette.ink }]}>
+                    {page.title}
                   </Text>
-                )}
+                  {page.subtitle && (
+                    <Text style={[styles.subtitle, { color: palette.ink3 }]}>
+                      {page.subtitle}
+                    </Text>
+                  )}
+                </View>
+                {page.aside}
               </View>
 
               {page.content}
             </View>
+
+            {page.footer}
           </View>
         ))}
       </ScrollView>
@@ -109,6 +118,13 @@ const styles = StyleSheet.create({
     gap: space.md,
     marginRight: space.sm,
   },
+  head: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: space.md,
+  },
+  heading: { flex: 1 },
   title: { ...type.bodyMedium, fontSize: 12.5 },
   subtitle: { ...type.small, marginTop: 2 },
   dots: { flexDirection: "row", justifyContent: "center", gap: 5 },

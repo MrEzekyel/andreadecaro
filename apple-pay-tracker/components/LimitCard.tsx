@@ -11,9 +11,15 @@ const PERIOD_LABEL = { weekly: "Settimanale", monthly: "Mensile" } as const;
 type Props = {
   status: LimitStatus;
   onPress?: () => void;
+  /**
+   * Senza riquadro ne' fondo, per appoggiarlo direttamente sulla pagina.
+   * In Impostazioni il riquadro serve ancora: li' delimita una voce
+   * modificabile dentro un elenco.
+   */
+  plain?: boolean;
 };
 
-export function LimitCard({ status, onPress }: Props) {
+export function LimitCard({ status, onPress, plain }: Props) {
   const { palette, dark } = useTheme();
   const { categoryById } = useData();
 
@@ -33,7 +39,13 @@ export function LimitCard({ status, onPress }: Props) {
     <TouchableOpacity
       style={[
         styles.card,
-        { backgroundColor: palette.surface, borderColor: palette.hairline },
+        plain
+          ? styles.plain
+          : {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              borderWidth: 1,
+            },
       ]}
       onPress={onPress}
       disabled={!onPress}
@@ -100,10 +112,10 @@ export function LimitCard({ status, onPress }: Props) {
 const styles = StyleSheet.create({
   card: {
     borderRadius: radius.card,
-    borderWidth: 1,
     padding: space.lg,
     gap: 11,
   },
+  plain: { backgroundColor: "transparent", paddingHorizontal: 0 },
   head: {
     flexDirection: "row",
     alignItems: "center",

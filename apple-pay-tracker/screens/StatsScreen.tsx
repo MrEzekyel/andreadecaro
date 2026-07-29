@@ -7,19 +7,13 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import Svg, {
-  Circle,
-  Defs,
-  Line,
-  LinearGradient,
-  Path,
-  Stop,
-  Text as SvgText,
-} from "react-native-svg";
 import { BarChart } from "../components/BarChart";
+import { CategoryDonut, DonutSlice } from "../components/CategoryDonut";
 import { ChartCarousel, ChartPage } from "../components/ChartCarousel";
 import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
+import { LetterToggle } from "../components/LetterToggle";
+import { TrendChart, TrendPoint } from "../components/TrendChart";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, splitAmount } from "../lib/format";
@@ -30,15 +24,11 @@ import {
   buildPeriod,
   PeriodKind,
 } from "../lib/period";
-import { bucketize, Grain } from "../lib/aggregate";
+import { Bucket, bucketize, Grain, paymentsIn } from "../lib/aggregate";
 import { supabase } from "../lib/supabase";
 import { categoryColor, radius, space, tint, type } from "../lib/theme";
 import { Merchant, Payment } from "../lib/types";
 import { useLimits } from "../lib/useLimits";
-import { DetailTarget } from "./DetailScreen";
-
-const CHART_W = 300;
-const CHART_H = 120;
 
 const PERIOD_LABEL: Record<PeriodKind, string> = {
   week: "Settimana",
@@ -46,24 +36,15 @@ const PERIOD_LABEL: Record<PeriodKind, string> = {
   year: "Anno",
 };
 
-/**
- * Curva morbida che passa per tutti i punti. I punti di controllo stanno a un
- * terzo dell'intervallo orizzontale: e' il compromesso usuale fra morbidezza
- * e fedelta' al dato.
- */
-function smoothPath(points: { x: number; y: number }[]) {
-  if (points.length === 0) return "";
-  if (points.length === 1) return `M ${points[0].x},${points[0].y}`;
+const MONTHS_SHORT = [
+  "gen", "feb", "mar", "apr", "mag", "giu",
+  "lug", "ago", "set", "ott", "nov", "dic",
+];
 
-  let d = `M ${points[0].x},${points[0].y}`;
-  for (let i = 1; i < points.length; i++) {
-    const previous = points[i - 1];
-    const current = points[i];
-    const third = (current.x - previous.x) / 3;
-    d += ` C ${previous.x + third},${previous.y} ${current.x - third},${current.y} ${current.x},${current.y}`;
-  }
-  return d;
-}
+const GRAIN_OPTIONS = [
+  { value: "week" as Grain, letter: "W", label: "Per settimana" },
+  { value: "month" as Grain, letter: "M", label: "Per mese" },
+];
 
 export default function StatsScreen() {
   const { palette, dark } = useTheme();
@@ -74,35 +55,54 @@ export default function StatsScreen() {
   const [offset, setOffset] = useState(0);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [rankable, setRankable] = useState<Payment[]>([]);
+  /** Storico lungo, indipendente dal periodo: alimenta i grafici a colonne. */
+  const [history, setHistory] = useState<Payment[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [grain, setGrain] = useState<Grain>("month");
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
   /** null = tutte le categorie. */
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
 
   const period = useMemo(() => buildPeriod(kind, offset), [kind, offset]);
 
   const load = useCallback(async () => {
+    // I grafici a colonne confrontano periodi fra loro, quindi guardano
+    // indietro oltre il periodo selezionato: con i soli dati del periodo
+    // resterebbe una colonna piena e tutte le altre vuote, e toccarle per
+    // cambiare mese non porterebbe da nessuna parte.
+    const historyStart = new Date();
+    historyStart.setMonth(historyStart.getMonth() - 9);
+    historyStart.setDate(1);
+    historyStart.setHours(0, 0, 0, 0);
+
     // `rankable_payments` esclude gia' cio' che hai tolto dalle classifiche.
     // I totali restano su `payments`, perche' mutuo e rate sono spese vere.
-    const [paymentsResult, rankableResult, merchantsResult] = await Promise.all([
-      supabase
-        .from("payments")
-        .select("*")
-        .gte("occurred_at", period.start.toISOString())
-        .lt("occurred_at", period.end.toISOString())
-        .order("occurred_at"),
-      supabase
-        .from("rankable_payments")
-        .select("*")
-        .gte("occurred_at", period.start.toISOString())
-        .lt("occurred_at", period.end.toISOString())
-        .order("occurred_at"),
-      supabase.from("merchants").select("*"),
-    ]);
+    const [paymentsResult, rankableResult, historyResult, merchantsResult] =
+      await Promise.all([
+        supabase
+          .from("payments")
+          .select("*")
+          .gte("occurred_at", period.start.toISOString())
+          .lt("occurred_at", period.end.toISOString())
+          .order("occurred_at"),
+        supabase
+          .from("rankable_payments")
+          .select("*")
+          .gte("occurred_at", period.start.toISOString())
+          .lt("occurred_at", period.end.toISOString())
+          .order("occurred_at"),
+        supabase
+          .from("rankable_payments")
+          .select("*")
+          .gte("occurred_at", historyStart.toISOString())
+          .order("occurred_at"),
+        supabase.from("merchants").select("*"),
+      ]);
 
     if (paymentsResult.data) setPayments(paymentsResult.data as Payment[]);
     if (rankableResult.data) setRankable(rankableResult.data as Payment[]);
+    if (historyResult.data) setHistory(historyResult.data as Payment[]);
     if (merchantsResult.data) setMerchants(merchantsResult.data as Merchant[]);
   }, [period]);
 
@@ -120,28 +120,37 @@ export default function StatsScreen() {
       ? Number(monthlyOverall.limit.amount)
       : null;
 
-  const cumulative = useMemo(() => {
-    const buckets = new Array(bucketCount(period)).fill(0);
+  /** Spesa cumulata lungo il periodo, un punto per intervallo trascorso. */
+  const trend = useMemo<TrendPoint[]>(() => {
+    const slots = new Array(bucketCount(period)).fill(0);
     for (const payment of payments) {
-      buckets[bucketOf(period, payment.occurred_at)] += Number(
+      slots[bucketOf(period, payment.occurred_at)] += Number(
         payment.effective_amount
       );
     }
 
     const elapsed = Math.max(bucketsElapsed(period), 1);
-    const max = Math.max(total, limitAmount ?? 0) || 1;
-
-    const points: { x: number; y: number }[] = [];
+    const points: TrendPoint[] = [];
     let running = 0;
+
     for (let i = 0; i < elapsed; i++) {
-      running += buckets[i];
-      points.push({
-        x: (i / Math.max(elapsed - 1, 1)) * CHART_W,
-        y: CHART_H - (running / max) * (CHART_H - 12),
-      });
+      running += slots[i];
+      const label =
+        period.kind === "year"
+          ? MONTHS_SHORT[i]
+          : period.kind === "week"
+            ? String(
+                new Date(
+                  period.start.getFullYear(),
+                  period.start.getMonth(),
+                  period.start.getDate() + i
+                ).getDate()
+              )
+            : String(i + 1);
+      points.push({ label, value: running });
     }
     return points;
-  }, [payments, period, total, limitAmount]);
+  }, [payments, period]);
 
   const byCategory = useMemo(() => {
     const map = new Map<string | null, number>();
@@ -155,6 +164,23 @@ export default function StatsScreen() {
       .map(([id, amount]) => ({ id, amount }))
       .sort((a, b) => b.amount - a.amount);
   }, [payments]);
+
+  const slices = useMemo<DonutSlice[]>(
+    () =>
+      byCategory.map(({ id, amount }) => {
+        const category = categoryById(id);
+        return {
+          id,
+          label: category?.name ?? "Da categorizzare",
+          value: amount,
+          color: category
+            ? categoryColor(category.color, dark)
+            : palette.uncategorized,
+          icon: category?.icon ?? "circle-help",
+        };
+      }),
+    [byCategory, categoryById, dark, palette.uncategorized]
+  );
 
   const byMerchant = useMemo(() => {
     const map = new Map<string, { amount: number; count: number }>();
@@ -220,10 +246,47 @@ export default function StatsScreen() {
       .slice(0, 5);
   }, [rankedPool, merchants]);
 
-  const buckets = useMemo(
-    () => bucketize(rankedPool, grain, grain === "week" ? 10 : 8),
-    [rankedPool, grain]
+  /** Storico filtrato come le classifiche, per i grafici a colonne. */
+  const historyPool = useMemo(
+    () =>
+      filterCategory === null
+        ? history
+        : history.filter((p) => p.category_id === filterCategory),
+    [history, filterCategory]
   );
+
+  const buckets = useMemo(
+    () => bucketize(historyPool, grain, grain === "week" ? 10 : 8),
+    [historyPool, grain]
+  );
+
+  const selected: Bucket | undefined =
+    buckets.find((bucket) => bucket.key === selectedKey) ??
+    buckets[buckets.length - 1];
+
+  const selectedPayments = useMemo(
+    () => (selected ? paymentsIn(historyPool, selected, grain) : []),
+    [historyPool, selected, grain]
+  );
+
+  const selectedTotal = selectedPayments.reduce(
+    (sum, p) => sum + Number(p.effective_amount),
+    0
+  );
+  const biggest = selectedPayments.reduce(
+    (max, p) => Math.max(max, Number(p.effective_amount)),
+    0
+  );
+  const averagePerPayment = selectedPayments.length
+    ? selectedTotal / selectedPayments.length
+    : 0;
+
+  const averageTotal = buckets.length
+    ? buckets.reduce((sum, b) => sum + b.total, 0) / buckets.length
+    : 0;
+  const averageCount = buckets.length
+    ? buckets.reduce((sum, b) => sum + b.count, 0) / buckets.length
+    : 0;
 
   async function onRefresh() {
     setRefreshing(true);
@@ -233,43 +296,211 @@ export default function StatsScreen() {
 
   if (explorer.isOpen) return <>{explorer.overlay}</>;
 
-  const grainToggle = (
-    <View style={[styles.grainSegment, { backgroundColor: palette.surface2 }]}>
-      {(["week", "month"] as Grain[]).map((option) => (
-        <TouchableOpacity
-          key={option}
-          onPress={() => setGrain(option)}
-          style={[
-            styles.grainOption,
-            grain === option && { backgroundColor: palette.surface },
-          ]}
-        >
-          <Text
-            style={[
-              styles.grainLabel,
-              { color: grain === option ? palette.ink : palette.ink3 },
-            ]}
-          >
-            {option === "week" ? "Settimana" : "Mese"}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </View>
+  const amount = splitAmount(total);
+
+  const grainAside = (
+    <LetterToggle options={GRAIN_OPTIONS} value={grain} onChange={setGrain} />
   );
 
-  const chartMax = Math.max(total, limitAmount ?? 0) || 1;
-  const limitY =
-    limitAmount !== null
-      ? CHART_H - (limitAmount / chartMax) * (CHART_H - 12)
-      : null;
+  function statPair(
+    first: { label: string; value: string },
+    second: { label: string; value: string }
+  ) {
+    return (
+      <View style={styles.statsRow}>
+        {[first, second].map((stat) => (
+          <View key={stat.label} style={styles.stat}>
+            <Text style={[styles.statValue, { color: palette.accent }]}>
+              {stat.value}
+            </Text>
+            <Text style={[styles.statLabel, { color: palette.ink3 }]}>
+              {stat.label}
+            </Text>
+          </View>
+        ))}
+      </View>
+    );
+  }
 
-  const line = smoothPath(cumulative);
-  const area =
-    cumulative.length > 1
-      ? `${line} L ${CHART_W},${CHART_H} L 0,${CHART_H} Z`
-      : "";
-  const last = cumulative[cumulative.length - 1];
-  const amount = splitAmount(total);
+  const pages: ChartPage[] = [
+    {
+      key: "spend",
+      title: "Quanto spendi",
+      subtitle:
+        filterCategory === null
+          ? "tutte le categorie"
+          : categoryById(filterCategory)?.name,
+      aside: (
+        <View style={styles.asideStack}>
+          {grainAside}
+          <Text style={[styles.asideNote, { color: palette.ink3 }]}>
+            media {formatAmount(averageTotal)}
+          </Text>
+        </View>
+      ),
+      content: (
+        <>
+          <BarChart
+            buckets={buckets}
+            metric="amount"
+            color={palette.accent}
+            selectedKey={selected?.key ?? null}
+            onSelect={(bucket) => setSelectedKey(bucket.key)}
+            average={averageTotal}
+          />
+          {statPair(
+            {
+              label: selectedPayments.length === 1 ? "spesa" : "spese",
+              value: String(selectedPayments.length),
+            },
+            {
+              label: "Media per transazione",
+              value: formatAmount(averagePerPayment),
+            }
+          )}
+        </>
+      ),
+    },
+    {
+      key: "count",
+      title: "Quante volte",
+      subtitle: "numero di transazioni",
+      aside: (
+        <View style={styles.asideStack}>
+          {grainAside}
+          <Text style={[styles.asideNote, { color: palette.ink3 }]}>
+            media {averageCount.toFixed(1).replace(".", ",")}
+          </Text>
+        </View>
+      ),
+      content: (
+        <>
+          <BarChart
+            buckets={buckets}
+            metric="count"
+            color={palette.accent}
+            selectedKey={selected?.key ?? null}
+            onSelect={(bucket) => setSelectedKey(bucket.key)}
+            average={averageCount}
+          />
+          {statPair(
+            { label: "Spesa media", value: formatAmount(averagePerPayment) },
+            { label: "Spesa più alta", value: formatAmount(biggest) }
+          )}
+        </>
+      ),
+    },
+    {
+      key: "top-categories",
+      title: "Dove spendi di più",
+      subtitle: "categorie",
+      content: (
+        <View style={{ gap: 10 }}>
+          {topCategories.map(({ id, amount: value }) => {
+            const category = categoryById(id);
+            const color = category
+              ? categoryColor(category.color, dark)
+              : palette.uncategorized;
+            const max = topCategories[0]?.amount || 1;
+
+            return (
+              <TouchableOpacity
+                key={id ?? "none"}
+                style={{ gap: 5 }}
+                onPress={() =>
+                  explorer.openDetail({
+                    kind: "category",
+                    id,
+                    title: category?.name ?? "Da categorizzare",
+                  })
+                }
+              >
+                <View style={styles.catHead}>
+                  <Text style={[styles.catName, { color: palette.ink2 }]}>
+                    {category?.name ?? "Da categorizzare"}
+                  </Text>
+                  <Text style={[styles.catValue, { color: palette.ink }]}>
+                    {formatAmount(value)}
+                  </Text>
+                </View>
+                <View
+                  style={[styles.barTrack, { backgroundColor: palette.surface2 }]}
+                >
+                  <View
+                    style={[
+                      styles.barFill,
+                      {
+                        width: `${(value / max) * 100}%`,
+                        backgroundColor: color,
+                      },
+                    ]}
+                  />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ),
+    },
+    {
+      key: "top-merchants",
+      title: "Dove spendi di più",
+      subtitle:
+        filterCategory === null
+          ? "esercenti"
+          : `esercenti · ${categoryById(filterCategory)?.name}`,
+      content: (
+        <View style={{ gap: 10 }}>
+          {topMerchants.length === 0 && (
+            <Text style={[styles.empty, { color: palette.ink3 }]}>
+              Nessun esercente in classifica per questo filtro.
+            </Text>
+          )}
+          {topMerchants.map((merchant) => {
+            const max = topMerchants[0]?.amount || 1;
+            return (
+              <TouchableOpacity
+                key={merchant.id}
+                style={{ gap: 5 }}
+                onPress={() =>
+                  explorer.openDetail({
+                    kind: "merchant",
+                    id: merchant.id,
+                    title: merchant.name,
+                  })
+                }
+              >
+                <View style={styles.catHead}>
+                  <Text
+                    style={[styles.catName, { color: palette.ink2 }]}
+                    numberOfLines={1}
+                  >
+                    {merchant.name}
+                  </Text>
+                  <Text style={[styles.catValue, { color: palette.ink }]}>
+                    {formatAmount(merchant.amount)}
+                  </Text>
+                </View>
+                <View
+                  style={[styles.barTrack, { backgroundColor: palette.surface2 }]}
+                >
+                  <View
+                    style={[
+                      styles.barFill,
+                      {
+                        width: `${(merchant.amount / max) * 100}%`,
+                        backgroundColor: palette.accent,
+                      },
+                    ]}
+                  />
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      ),
+    },
+  ];
 
   return (
     <ScrollView
@@ -344,74 +575,16 @@ export default function StatsScreen() {
         </Text>
       </View>
 
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: palette.surface, borderColor: palette.hairline },
-        ]}
-      >
-        <Text style={[styles.cardTitle, { color: palette.ink }]}>
+      <View>
+        <Text style={[styles.label, { color: palette.ink3 }]}>
           Andamento cumulato
         </Text>
-
-        {cumulative.length > 1 ? (
-          <Svg
-            width="100%"
-            height={CHART_H + 8}
-            viewBox={`0 0 ${CHART_W} ${CHART_H + 8}`}
-          >
-            <Defs>
-              <LinearGradient id="fill" x1="0" y1="0" x2="0" y2="1">
-                <Stop offset="0%" stopColor={palette.accent} stopOpacity="0.24" />
-                <Stop offset="100%" stopColor={palette.accent} stopOpacity="0" />
-              </LinearGradient>
-            </Defs>
-
-            {limitY !== null && (
-              <>
-                <Line
-                  x1={0}
-                  y1={limitY}
-                  x2={CHART_W}
-                  y2={limitY}
-                  stroke={palette.limit}
-                  strokeWidth={1.5}
-                  strokeDasharray="4 4"
-                  opacity={0.55}
-                />
-                <SvgText
-                  x={CHART_W}
-                  y={Math.max(limitY - 4, 8)}
-                  textAnchor="end"
-                  fontSize={8.5}
-                  fill={palette.limit}
-                >
-                  {`LIMITE ${formatAmount(limitAmount as number)}`}
-                </SvgText>
-              </>
-            )}
-
-            <Path d={area} fill="url(#fill)" />
-            <Path
-              d={line}
-              fill="none"
-              stroke={palette.accent}
-              strokeWidth={2}
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            {last && (
-              <>
-                <Circle cx={last.x} cy={last.y} r={5} fill={palette.surface} />
-                <Circle cx={last.x} cy={last.y} r={3.2} fill={palette.accent} />
-              </>
-            )}
-          </Svg>
-        ) : (
-          <Text style={[styles.empty, { color: palette.ink3 }]}>
-            Servono almeno due giorni di spese per disegnare l'andamento.
-          </Text>
-        )}
+        <TrendChart
+          points={trend}
+          limit={limitAmount}
+          color={palette.accent}
+          empty="Servono almeno due giorni di spese per disegnare l'andamento."
+        />
       </View>
 
       <View>
@@ -457,25 +630,27 @@ export default function StatsScreen() {
           {topCategories.map(({ id }) => {
             const category = categoryById(id);
             if (!category) return null;
-            const selected = filterCategory === id;
+            const selectedChip = filterCategory === id;
             const color = categoryColor(category.color, dark);
 
             return (
               <TouchableOpacity
                 key={id ?? "none"}
-                onPress={() => setFilterCategory(selected ? null : id)}
+                onPress={() => setFilterCategory(selectedChip ? null : id)}
                 style={[
                   styles.filterChip,
                   {
-                    backgroundColor: selected ? tint(color, dark) : palette.surface,
-                    borderColor: selected ? color : palette.hairline,
+                    backgroundColor: selectedChip
+                      ? tint(color, dark)
+                      : palette.surface,
+                    borderColor: selectedChip ? color : palette.hairline,
                   },
                 ]}
               >
                 <Text
                   style={[
                     styles.filterChipText,
-                    { color: selected ? color : palette.ink2 },
+                    { color: selectedChip ? color : palette.ink2 },
                   ]}
                 >
                   {category.name}
@@ -486,224 +661,28 @@ export default function StatsScreen() {
         </ScrollView>
       </View>
 
-      {rankedPool.length > 0 && (
-        <ChartCarousel
-          pages={[
-            {
-              key: "spend",
-              title: "Quanto spendi",
-              subtitle:
-                filterCategory === null
-                  ? "tutte le categorie"
-                  : categoryById(filterCategory)?.name,
-              content: (
-                <>
-                  {grainToggle}
-                  <BarChart buckets={buckets} metric="amount" color={palette.accent} />
-                </>
-              ),
-            },
-            {
-              key: "count",
-              title: "Quante volte",
-              subtitle: "numero di transazioni",
-              content: (
-                <>
-                  {grainToggle}
-                  <BarChart buckets={buckets} metric="count" color={palette.accent} />
-                </>
-              ),
-            },
-            {
-              key: "top-categories",
-              title: "Dove spendi di più",
-              subtitle: "categorie",
-              content: (
-                <View style={{ gap: 10 }}>
-                  {topCategories.map(({ id, amount: value }) => {
-                    const category = categoryById(id);
-                    const color = category
-                      ? categoryColor(category.color, dark)
-                      : palette.uncategorized;
-                    const max = topCategories[0]?.amount || 1;
-
-                    return (
-                      <TouchableOpacity
-                        key={id ?? "none"}
-                        style={{ gap: 5 }}
-                        onPress={() =>
-                          explorer.openDetail({
-                            kind: "category",
-                            id,
-                            title: category?.name ?? "Da categorizzare",
-                          })
-                        }
-                      >
-                        <View style={styles.catHead}>
-                          <Text style={[styles.catName, { color: palette.ink2 }]}>
-                            {category?.name ?? "Da categorizzare"}
-                          </Text>
-                          <Text style={[styles.catValue, { color: palette.ink }]}>
-                            {formatAmount(value)}
-                          </Text>
-                        </View>
-                        <View
-                          style={[
-                            styles.barTrack,
-                            { backgroundColor: palette.surface2 },
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.barFill,
-                              {
-                                width: `${(value / max) * 100}%`,
-                                backgroundColor: color,
-                              },
-                            ]}
-                          />
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ),
-            },
-            {
-              key: "top-merchants",
-              title: "Dove spendi di più",
-              subtitle:
-                filterCategory === null
-                  ? "esercenti"
-                  : `esercenti · ${categoryById(filterCategory)?.name}`,
-              content: (
-                <View style={{ gap: 10 }}>
-                  {topMerchants.length === 0 && (
-                    <Text style={[styles.empty, { color: palette.ink3 }]}>
-                      Nessun esercente in classifica per questo filtro.
-                    </Text>
-                  )}
-                  {topMerchants.map((merchant) => {
-                    const max = topMerchants[0]?.amount || 1;
-                    return (
-                      <TouchableOpacity
-                        key={merchant.id}
-                        style={{ gap: 5 }}
-                        onPress={() =>
-                          explorer.openDetail({
-                            kind: "merchant",
-                            id: merchant.id,
-                            title: merchant.name,
-                          })
-                        }
-                      >
-                        <View style={styles.catHead}>
-                          <Text
-                            style={[styles.catName, { color: palette.ink2 }]}
-                            numberOfLines={1}
-                          >
-                            {merchant.name}
-                          </Text>
-                          <Text style={[styles.catValue, { color: palette.ink }]}>
-                            {formatAmount(merchant.amount)}
-                          </Text>
-                        </View>
-                        <View
-                          style={[
-                            styles.barTrack,
-                            { backgroundColor: palette.surface2 },
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.barFill,
-                              {
-                                width: `${(merchant.amount / max) * 100}%`,
-                                backgroundColor: palette.accent,
-                              },
-                            ]}
-                          />
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </View>
-              ),
-            },
-          ]}
-        />
+      {(historyPool.length > 0 || rankedPool.length > 0) && (
+        <ChartCarousel pages={pages} />
       )}
 
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: palette.surface, borderColor: palette.hairline },
-        ]}
-      >
-        <Text style={[styles.cardTitle, { color: palette.ink }]}>
-          Per categoria
-        </Text>
-
-        {byCategory.length === 0 && (
-          <Text style={[styles.empty, { color: palette.ink3 }]}>
-            Nessuna spesa in questo periodo.
-          </Text>
-        )}
-
-        {byCategory.map(({ id, amount: value }) => {
-          const category = categoryById(id);
-          const color = category
-            ? categoryColor(category.color, dark)
-            : palette.uncategorized;
-          const pct = total > 0 ? (value / total) * 100 : 0;
-
-          return (
-            <TouchableOpacity
-              key={id ?? "none"}
-              style={styles.catRow}
-              onPress={() =>
-                explorer.openDetail({
-                  kind: "category",
-                  id,
-                  title: category?.name ?? "Da categorizzare",
-                })
-              }
-            >
-              <View style={styles.catHead}>
-                <View style={[styles.swatch, { backgroundColor: color }]} />
-                <Text style={[styles.catName, { color: palette.ink2 }]}>
-                  {category?.name ?? "Da categorizzare"}
-                </Text>
-                <Text style={[styles.catValue, { color: palette.ink }]}>
-                  {formatAmount(value)}
-                </Text>
-                <Text style={[styles.catPct, { color: palette.ink3 }]}>
-                  {Math.round(pct)}%
-                </Text>
-              </View>
-              <View
-                style={[styles.barTrack, { backgroundColor: palette.surface2 }]}
-              >
-                <View
-                  style={[
-                    styles.barFill,
-                    { width: `${pct}%`, backgroundColor: color },
-                  ]}
-                />
-              </View>
-            </TouchableOpacity>
-          );
-        })}
+      <View>
+        <Text style={[styles.label, { color: palette.ink3 }]}>Per categoria</Text>
+        <CategoryDonut
+          slices={slices}
+          centerLabel={period.label.toLowerCase()}
+          onSelect={(slice) =>
+            explorer.openDetail({
+              kind: "category",
+              id: slice.id,
+              title: slice.label,
+            })
+          }
+        />
       </View>
 
       {byMerchant.length > 0 && (
-        <View
-          style={[
-            styles.card,
-            { backgroundColor: palette.surface, borderColor: palette.hairline },
-          ]}
-        >
-          <Text style={[styles.cardTitle, { color: palette.ink }]}>
+        <View>
+          <Text style={[styles.label, { color: palette.ink3 }]}>
             Dove spendi di più
           </Text>
 
@@ -775,24 +754,15 @@ const styles = StyleSheet.create({
   hero: { ...type.hero, fontVariant: ["tabular-nums"] },
   heroCents: { ...type.heroCents },
   heroMeta: { ...type.caption, marginTop: space.sm },
-  card: {
-    borderRadius: radius.card,
-    borderWidth: 1,
-    padding: space.lg,
-    gap: space.md,
-  },
-  cardTitle: { ...type.bodyMedium, fontSize: 12.5 },
-  catRow: { gap: 6 },
+  asideStack: { alignItems: "flex-end", gap: 4 },
+  asideNote: { ...type.small, fontSize: 10, fontVariant: ["tabular-nums"] },
+  statsRow: { flexDirection: "row", gap: space.xxl, marginTop: space.sm },
+  stat: { gap: 2 },
+  statValue: { ...type.bodyMedium, fontSize: 15, fontVariant: ["tabular-nums"] },
+  statLabel: { ...type.small, fontSize: 10.5 },
   catHead: { flexDirection: "row", alignItems: "center", gap: 8 },
-  swatch: { width: 9, height: 9, borderRadius: 2 },
   catName: { ...type.caption, flex: 1 },
   catValue: { ...type.caption, fontWeight: "500", fontVariant: ["tabular-nums"] },
-  catPct: {
-    ...type.caption,
-    width: 36,
-    textAlign: "right",
-    fontVariant: ["tabular-nums"],
-  },
   barTrack: { height: 6, borderRadius: radius.pill, overflow: "hidden" },
   barFill: { height: 6, borderRadius: radius.pill },
   merchantRow: { flexDirection: "row", alignItems: "center", gap: 11 },
@@ -822,12 +792,4 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   filterChipText: { ...type.caption, fontWeight: "500" },
-  grainSegment: { flexDirection: "row", gap: 4, borderRadius: 10, padding: 3 },
-  grainOption: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 7,
-    borderRadius: 7,
-  },
-  grainLabel: { ...type.small, fontSize: 11, fontWeight: "500" },
 });

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "./supabase";
 import { Payment } from "./types";
 
@@ -9,21 +9,56 @@ export function monthRange(date: Date) {
   return { start, end };
 }
 
+export function isCurrentMonth(date: Date) {
+  const now = new Date();
+  return (
+    date.getFullYear() === now.getFullYear() && date.getMonth() === now.getMonth()
+  );
+}
+
+/**
+ * Ultimo giorno da includere nel confronto col mese precedente: oggi se il
+ * mese e' in corso, altrimenti tutto il mese.
+ */
+export function comparisonCutoff(month: Date) {
+  return isCurrentMonth(month)
+    ? new Date().getDate()
+    : new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
+}
+
 export function usePayments(month: Date) {
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [previous, setPrevious] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     const { start, end } = monthRange(month);
+    const previousStart = new Date(
+      start.getFullYear(),
+      start.getMonth() - 1,
+      1,
+      0,
+      0,
+      0,
+      0
+    );
 
-    const { data, error } = await supabase
-      .from("payments")
-      .select("*")
-      .gte("occurred_at", start.toISOString())
-      .lt("occurred_at", end.toISOString())
-      .order("occurred_at", { ascending: false });
+    const [current, earlier] = await Promise.all([
+      supabase
+        .from("payments")
+        .select("*")
+        .gte("occurred_at", start.toISOString())
+        .lt("occurred_at", end.toISOString())
+        .order("occurred_at", { ascending: false }),
+      supabase
+        .from("payments")
+        .select("*")
+        .gte("occurred_at", previousStart.toISOString())
+        .lt("occurred_at", start.toISOString()),
+    ]);
 
-    if (!error && data) setPayments(data as Payment[]);
+    if (!current.error && current.data) setPayments(current.data as Payment[]);
+    if (!earlier.error && earlier.data) setPrevious(earlier.data as Payment[]);
     setLoading(false);
   }, [month]);
 
@@ -47,5 +82,25 @@ export function usePayments(month: Date) {
     };
   }, [load]);
 
-  return { payments, loading, reload: load };
+  const total = useMemo(
+    () => payments.reduce((sum, p) => sum + Number(p.effective_amount), 0),
+    [payments]
+  );
+
+  /**
+   * Totale del mese precedente ristretto agli stessi giorni gia' trascorsi.
+   *
+   * Confrontare un mese in corso con un mese intero direbbe sempre "stai
+   * spendendo meno" fino all'ultimo giorno: il paragone ha senso solo a
+   * parita' di giorni, quindi il 12 del mese si guarda al 1-12 precedente.
+   */
+  const previousTotal = useMemo(() => {
+    const cutoff = comparisonCutoff(month);
+
+    return previous
+      .filter((payment) => new Date(payment.occurred_at).getDate() <= cutoff)
+      .reduce((sum, payment) => sum + Number(payment.effective_amount), 0);
+  }, [previous, month]);
+
+  return { payments, total, previousTotal, loading, reload: load };
 }
