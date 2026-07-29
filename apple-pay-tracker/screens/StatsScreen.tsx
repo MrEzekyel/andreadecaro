@@ -82,6 +82,11 @@ export default function StatsScreen() {
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
   const [donutScope, setDonutScope] = useState<"month" | "all">("month");
   const [donutMonthIndex, setDonutMonthIndex] = useState(0);
+  // Diventa vero solo DOPO che l'indice e' stato corretto sull'ultimo mese:
+  // senza questo cancello, la ghiera monterebbe nello stesso render in cui
+  // i mesi diventano disponibili, con l'indice ancora a 0 (il primo mese),
+  // e solo un istante dopo verrebbe corretta — visibile come uno scatto.
+  const [donutMonthReady, setDonutMonthReady] = useState(false);
 
   const period = useMemo(() => buildPeriod(kind, offset), [kind, offset]);
 
@@ -192,9 +197,13 @@ export default function StatsScreen() {
     return monthsBetween(earliest, new Date());
   }, [categoryHistory]);
 
-  // Di default la ghiera sta sul mese corrente, l'ultimo della lista.
+  // Di default la ghiera sta sul mese corrente, l'ultimo della lista. Il
+  // flag "pronta" scatta nello stesso aggiornamento che fissa l'indice,
+  // cosi' la ghiera non monta mai con quello sbagliato.
   useEffect(() => {
-    if (donutMonths.length > 0) setDonutMonthIndex(donutMonths.length - 1);
+    if (donutMonths.length === 0) return;
+    setDonutMonthIndex(donutMonths.length - 1);
+    setDonutMonthReady(true);
   }, [donutMonths.length]);
 
   // Cambiare il mese principale in cima alla pagina sposta anche la
@@ -764,7 +773,7 @@ export default function StatsScreen() {
           }
         />
 
-        {donutScope === "month" && donutMonths.length > 0 && (
+        {donutScope === "month" && donutMonthReady && (
           <MonthWheel
             months={donutMonths}
             value={donutMonthIndex}

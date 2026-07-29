@@ -74,6 +74,10 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [shareScope, setShareScope] = useState<ShareScope>("month");
   const [shareMonthIndex, setShareMonthIndex] = useState(0);
+  // Diventa vero solo DOPO che l'indice e' stato corretto sull'ultimo mese:
+  // senza questo cancello, la ghiera monterebbe nello stesso render in cui
+  // i mesi diventano disponibili, con l'indice ancora a 0 (il primo mese).
+  const [shareMonthReady, setShareMonthReady] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -188,9 +192,13 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
     return monthsBetween(earliest, new Date());
   }, [siblingRows]);
 
-  // Di default la ghiera sta sul mese corrente, l'ultimo della lista.
+  // Di default la ghiera sta sul mese corrente, l'ultimo della lista. Il
+  // flag "pronta" scatta nello stesso aggiornamento che fissa l'indice,
+  // cosi' la ghiera non monta mai con quello sbagliato.
   useEffect(() => {
-    if (shareMonths.length > 0) setShareMonthIndex(shareMonths.length - 1);
+    if (shareMonths.length === 0) return;
+    setShareMonthIndex(shareMonths.length - 1);
+    setShareMonthReady(true);
   }, [shareMonths.length]);
 
   const shareMonth = shareMonths[shareMonthIndex];
@@ -376,7 +384,7 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
         />
       ),
       footer:
-        shareScope === "month" && shareMonths.length > 0 ? (
+        shareScope === "month" && shareMonthReady ? (
           <View style={styles.wheel}>
             <MonthWheel
               months={shareMonths}
