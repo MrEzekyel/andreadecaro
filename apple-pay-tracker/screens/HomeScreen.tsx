@@ -14,6 +14,7 @@ import { Icon } from "../components/Icon";
 import { LimitCard } from "../components/LimitCard";
 import { PaymentRow } from "../components/PaymentRow";
 import { RecurringSummary } from "../components/RecurringSummary";
+import { SavingsSummary } from "../components/SavingsSummary";
 import { TrendChart, TrendPoint } from "../components/TrendChart";
 import { useData } from "../lib/DataContext";
 import { useNav } from "../lib/NavContext";
@@ -28,7 +29,12 @@ import {
 import { categoryColor, radius, space, type } from "../lib/theme";
 import { supabase } from "../lib/supabase";
 import { useLimits } from "../lib/useLimits";
-import { comparisonCutoff, isCurrentMonth, usePayments } from "../lib/usePayments";
+import {
+  comparisonCutoff,
+  isCurrentMonth,
+  monthRange,
+  usePayments,
+} from "../lib/usePayments";
 
 export default function HomeScreen() {
   const { palette, dark } = useTheme();
@@ -63,6 +69,42 @@ export default function HomeScreen() {
   useEffect(() => {
     loadRecurring();
   }, [loadRecurring]);
+
+  const [monthlyIncome, setMonthlyIncome] = useState(0);
+  const [monthlyInvested, setMonthlyInvested] = useState(0);
+
+  // A differenza delle rate ricorrenti, introiti e investimenti sono
+  // legati al mese guardato: cambiano sfogliando il calendario.
+  const loadBalance = useCallback(async () => {
+    const { start, end } = monthRange(month);
+    const [incomeResult, investResult] = await Promise.all([
+      supabase
+        .from("incomes")
+        .select("amount")
+        .gte("occurred_at", start.toISOString())
+        .lt("occurred_at", end.toISOString()),
+      supabase
+        .from("investments")
+        .select("amount")
+        .gte("occurred_at", start.toISOString())
+        .lt("occurred_at", end.toISOString()),
+    ]);
+
+    if (incomeResult.data) {
+      setMonthlyIncome(
+        incomeResult.data.reduce((sum, r) => sum + Number(r.amount), 0)
+      );
+    }
+    if (investResult.data) {
+      setMonthlyInvested(
+        investResult.data.reduce((sum, r) => sum + Number(r.amount), 0)
+      );
+    }
+  }, [month]);
+
+  useEffect(() => {
+    loadBalance();
+  }, [loadBalance]);
 
   // I limiti valgono sempre sul periodo corrente: mostrarli mentre si
   // sfoglia un mese passato darebbe un confronto senza senso.
@@ -211,7 +253,7 @@ export default function HomeScreen() {
 
   async function onRefresh() {
     setRefreshing(true);
-    await Promise.all([reload(), reloadLimits(), loadRecurring()]);
+    await Promise.all([reload(), reloadLimits(), loadRecurring(), loadBalance()]);
     setRefreshing(false);
   }
 
@@ -318,6 +360,19 @@ export default function HomeScreen() {
             )}
           </View>
         </View>
+
+        {(monthlyIncome > 0 || monthlyInvested > 0) && (
+          <View>
+            <Text style={[styles.label, { color: palette.ink3 }]}>
+              Bilancio del mese
+            </Text>
+            <SavingsSummary
+              income={monthlyIncome}
+              expenses={total}
+              invested={monthlyInvested}
+            />
+          </View>
+        )}
 
         {viewingCurrentMonth &&
           alerts.map((status) => {

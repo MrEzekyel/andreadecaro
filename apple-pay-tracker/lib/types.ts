@@ -103,6 +103,45 @@ export type SpendingLimit = {
   created_at: string;
 };
 
+export type Investment = {
+  id: string;
+  user_id: string;
+  amount: number;
+  label: string;
+  card_name: string | null;
+  note: string | null;
+  occurred_at: string;
+  source: "manual" | "recurring";
+  dedup_key: string | null;
+  created_at: string;
+};
+
+export type InvestmentRule = {
+  id: string;
+  user_id: string;
+  label: string;
+  amount: number;
+  card_name: string | null;
+  frequency: RecurringFrequency;
+  day_of_month: number | null;
+  weekday: number | null;
+  start_on: string;
+  end_on: string | null;
+  next_run_on: string;
+  active: boolean;
+  created_at: string;
+};
+
+export type Income = {
+  id: string;
+  user_id: string;
+  amount: number;
+  label: string;
+  note: string | null;
+  occurred_at: string;
+  created_at: string;
+};
+
 export type IngestToken = {
   id: string;
   user_id: string;

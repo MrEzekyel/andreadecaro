@@ -9,6 +9,8 @@ import { radius, space, type } from "../lib/theme";
 import { useLimits } from "../lib/useLimits";
 import AutomationsScreen from "./AutomationsScreen";
 import CategoriesScreen from "./CategoriesScreen";
+import IncomeScreen from "./IncomeScreen";
+import InvestmentsScreen from "./InvestmentsScreen";
 import LimitsScreen from "./LimitsScreen";
 import OwedScreen from "./OwedScreen";
 import RecurringScreen from "./RecurringScreen";
@@ -59,6 +61,14 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
 
   if (page === "automations") {
     return <AutomationsScreen onBack={() => setPage("root")} />;
+  }
+
+  if (page === "investments") {
+    return <InvestmentsScreen onBack={() => setPage("root")} />;
+  }
+
+  if (page === "income") {
+    return <IncomeScreen onBack={() => setPage("root")} />;
   }
 
   return (
@@ -150,6 +160,27 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
           label="Automazioni"
           value="Gestisci"
           onPress={() => setPage("automations")}
+        />
+      </View>
+
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: palette.surface, borderColor: palette.hairline },
+        ]}
+      >
+        <SettingRow
+          icon="trending-up"
+          label="Investimenti"
+          value="Gestisci"
+          onPress={() => setPage("investments")}
+        />
+        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+        <SettingRow
+          icon="wallet"
+          label="Introiti"
+          value="Gestisci"
+          onPress={() => setPage("income")}
         />
       </View>
 

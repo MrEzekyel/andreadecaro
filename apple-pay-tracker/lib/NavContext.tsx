@@ -6,7 +6,9 @@ export type SettingsPage =
   | "limits"
   | "recurring"
   | "people"
-  | "automations";
+  | "automations"
+  | "investments"
+  | "income";
 
 type Nav = {
   /** Porta alla scheda Impostazioni gia' aperta su una sua sottopagina. */
