@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { CardPicker } from "../components/CardPicker";
 import { CategoryPicker } from "../components/CategoryPicker";
 import { Icon } from "../components/Icon";
 import { Sheet } from "../components/Sheet";
@@ -68,6 +69,7 @@ export default function RecurringScreen({ onBack }: { onBack: () => void }) {
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  const [card, setCard] = useState("");
   const [frequency, setFrequency] = useState<RecurringFrequency>("monthly");
   const [day, setDay] = useState(1);
   const [weekday, setWeekday] = useState(1);
@@ -89,6 +91,7 @@ export default function RecurringScreen({ onBack }: { onBack: () => void }) {
     setLabel("");
     setAmount("");
     setCategoryId(null);
+    setCard("");
     setFrequency("monthly");
     setDay(1);
     setWeekday(1);
@@ -100,6 +103,7 @@ export default function RecurringScreen({ onBack }: { onBack: () => void }) {
     setLabel(rule.label);
     setAmount(String(rule.amount).replace(".", ","));
     setCategoryId(rule.category_id);
+    setCard(rule.card_name ?? "");
     setFrequency(rule.frequency);
     setDay(rule.day_of_month ?? 1);
     setWeekday(rule.weekday ?? 1);
@@ -121,6 +125,7 @@ export default function RecurringScreen({ onBack }: { onBack: () => void }) {
       label: label.trim(),
       amount: parsed,
       category_id: categoryId,
+      card_name: card.trim() || null,
       frequency,
       day_of_month: frequency === "weekly" ? null : day,
       weekday: frequency === "weekly" ? weekday : null,
@@ -249,6 +254,7 @@ export default function RecurringScreen({ onBack }: { onBack: () => void }) {
                   </Text>
                   <Text style={[styles.cardMeta, { color: palette.ink3 }]}>
                     {FREQUENCY_LABEL[rule.frequency]}
+                    {rule.card_name ? ` · ${rule.card_name}` : ""}
                     {rule.active
                       ? ` · prossima ${new Date(
                           rule.next_run_on
@@ -425,6 +431,11 @@ export default function RecurringScreen({ onBack }: { onBack: () => void }) {
 
         <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Categoria</Text>
         <CategoryPicker value={categoryId} onChange={setCategoryId} />
+
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Metodo di pagamento
+        </Text>
+        <CardPicker value={card} onChange={setCard} />
 
         <TouchableOpacity
           style={[styles.button, { backgroundColor: palette.accent }]}

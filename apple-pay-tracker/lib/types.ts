@@ -80,6 +80,7 @@ export type RecurringRule = {
   label: string;
   amount: number;
   category_id: string | null;
+  card_name: string | null;
   frequency: RecurringFrequency;
   day_of_month: number | null;
   weekday: number | null;
