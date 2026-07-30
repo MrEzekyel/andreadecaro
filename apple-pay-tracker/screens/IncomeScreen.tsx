@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Icon } from "../components/Icon";
+import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { Sheet } from "../components/Sheet";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, formatDate, monthName, shortDateTime } from "../lib/format";
@@ -155,9 +156,14 @@ export default function IncomeScreen({ onBack }: { onBack: () => void }) {
   }
 
   return (
+    <SwipeBack onBack={onBack}>
     <View style={[styles.container, { backgroundColor: palette.ground }]}>
       <View style={styles.head}>
-        <TouchableOpacity onPress={onBack} style={styles.back}>
+        <TouchableOpacity
+          onPress={onBack}
+          style={styles.back}
+          hitSlop={backHitSlop}
+        >
           <Icon name="chevron-left" size={20} color={palette.ink} />
           <Text style={[styles.title, { color: palette.ink }]}>Introiti</Text>
         </TouchableOpacity>
@@ -315,6 +321,7 @@ export default function IncomeScreen({ onBack }: { onBack: () => void }) {
         )}
       </Sheet>
     </View>
+    </SwipeBack>
   );
 }
 
@@ -328,7 +335,13 @@ const styles = StyleSheet.create({
     paddingTop: space.lg,
     paddingBottom: space.sm,
   },
-  back: { flexDirection: "row", alignItems: "center", gap: 4 },
+  back: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 10,
+    paddingRight: 18,
+  },
   title: { ...type.title },
   addBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
   addText: { ...type.caption, fontWeight: "500" },

@@ -3,6 +3,7 @@ import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from "rea
 import { CategoryFormSheet } from "../components/CategoryFormSheet";
 import { DraggableCategoryList } from "../components/DraggableCategoryList";
 import { Icon } from "../components/Icon";
+import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
@@ -42,11 +43,13 @@ export default function CategoriesScreen({ onBack }: { onBack: () => void }) {
   }
 
   return (
+    <SwipeBack onBack={onBack}>
     <View style={[styles.container, { backgroundColor: palette.ground }]}>
       <View style={styles.head}>
         <TouchableOpacity
           onPress={onBack}
           style={styles.back}
+          hitSlop={backHitSlop}
           accessibilityLabel="Indietro"
         >
           <Icon name="chevron-left" size={20} color={palette.ink} />
@@ -93,6 +96,7 @@ export default function CategoriesScreen({ onBack }: { onBack: () => void }) {
         }}
       />
     </View>
+    </SwipeBack>
   );
 }
 
@@ -106,7 +110,13 @@ const styles = StyleSheet.create({
     paddingTop: space.lg,
     paddingBottom: space.sm,
   },
-  back: { flexDirection: "row", alignItems: "center", gap: 4 },
+  back: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 10,
+    paddingRight: 18,
+  },
   title: { ...type.title },
   addBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
   addText: { ...type.caption, fontWeight: "500" },

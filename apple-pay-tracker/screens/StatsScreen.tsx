@@ -57,6 +57,34 @@ const GRAIN_OPTIONS = [
   { value: "month" as Grain, letter: "M", label: "Per mese" },
 ];
 
+/** Riga ridotta all'osso: importo e quando, quanto basta per i risparmi. */
+type Dated = { amount: number; occurred_at: string };
+
+/** Etichette leggibili per `payments.source`. */
+const SOURCE_LABEL: Record<string, string> = {
+  shortcut: "Apple Pay",
+  siri: "Siri",
+  manual: "Manuale",
+  recurring: "Ricorrente",
+};
+
+const SOURCE_ICON: Record<string, string> = {
+  shortcut: "smartphone",
+  siri: "mic",
+  manual: "pencil",
+  recurring: "repeat",
+};
+
+/**
+ * Colori per le ripartizioni che non hanno un colore proprio nel database
+ * (metodo di pagamento, provenienza). Sono gli stessi valori verificati per
+ * contrasto e distinguibilita' usati dalle categorie.
+ */
+const NEUTRAL_COLORS = [
+  "#2563eb", "#ea580c", "#16a34a", "#db2777",
+  "#7c3aed", "#0891b2", "#a16207", "#65a30d",
+];
+
 const DONUT_SCOPE_OPTIONS = [
   { value: "month" as const, letter: "M", label: "Un mese alla volta" },
   { value: "all" as const, letter: "A", label: "Tutto lo storico" },
@@ -74,6 +102,9 @@ export default function StatsScreen() {
   const [history, setHistory] = useState<Payment[]>([]);
   /** Storico completo, per la ripartizione per categoria in modalita' M/ALL. */
   const [categoryHistory, setCategoryHistory] = useState<Payment[]>([]);
+  /** Introiti e investimenti servono solo come importo+data, per i risparmi. */
+  const [incomes, setIncomes] = useState<Dated[]>([]);
+  const [investments, setInvestments] = useState<Dated[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [grain, setGrain] = useState<Grain>("month");
@@ -108,31 +139,47 @@ export default function StatsScreen() {
     // I totali restano sempre su tutte le spese, perche' mutuo e rate sono
     // spese vere; l'esclusione si applica solo a valle, sulle classifiche,
     // con il filtro client-side controllato dal toggle.
-    const [paymentsResult, historyResult, categoryHistoryResult, merchantsResult] =
-      await Promise.all([
-        supabase
-          .from("payments")
-          .select("*")
-          .gte("occurred_at", period.start.toISOString())
-          .lt("occurred_at", period.end.toISOString())
-          .order("occurred_at"),
-        supabase
-          .from("payments")
-          .select("*")
-          .gte("occurred_at", historyStart.toISOString())
-          .order("occurred_at"),
-        // Nessun limite di tempo: la ripartizione per categoria puo' guardare
-        // a un mese qualunque da quando esiste il primo movimento, o a tutto
-        // lo storico in blocco.
-        supabase.from("payments").select("*").order("occurred_at"),
-        supabase.from("merchants").select("*"),
-      ]);
+    const [
+      paymentsResult,
+      historyResult,
+      categoryHistoryResult,
+      merchantsResult,
+      incomesResult,
+      investmentsResult,
+    ] = await Promise.all([
+      supabase
+        .from("payments")
+        .select("*")
+        .gte("occurred_at", period.start.toISOString())
+        .lt("occurred_at", period.end.toISOString())
+        .order("occurred_at"),
+      supabase
+        .from("payments")
+        .select("*")
+        .gte("occurred_at", historyStart.toISOString())
+        .order("occurred_at"),
+      // Nessun limite di tempo: la ripartizione per categoria puo' guardare
+      // a un mese qualunque da quando esiste il primo movimento, o a tutto
+      // lo storico in blocco.
+      supabase.from("payments").select("*").order("occurred_at"),
+      supabase.from("merchants").select("*"),
+      supabase
+        .from("incomes")
+        .select("amount, occurred_at")
+        .gte("occurred_at", historyStart.toISOString()),
+      supabase
+        .from("investments")
+        .select("amount, occurred_at")
+        .gte("occurred_at", historyStart.toISOString()),
+    ]);
 
     if (paymentsResult.data) setPayments(paymentsResult.data as Payment[]);
     if (historyResult.data) setHistory(historyResult.data as Payment[]);
     if (categoryHistoryResult.data)
       setCategoryHistory(categoryHistoryResult.data as Payment[]);
     if (merchantsResult.data) setMerchants(merchantsResult.data as Merchant[]);
+    if (incomesResult.data) setIncomes(incomesResult.data as Dated[]);
+    if (investmentsResult.data) setInvestments(investmentsResult.data as Dated[]);
   }, [period]);
 
   const explorer = useExplorer(load);
@@ -348,6 +395,82 @@ export default function StatsScreen() {
       ? excluded
       : excluded.filter((p) => p.category_id === filterCategory);
   }, [history, filterCategory, applyExclusion]);
+
+  /**
+   * Risparmio mensile: introiti − spese − investimenti.
+   *
+   * Un mese conta solo se ha SIA introiti SIA investimenti registrati: senza
+   * introiti il risparmio sarebbe l'intero speso in negativo, un numero che
+   * dice solo "quel mese non l'ho ancora compilato" e che schiaccerebbe la
+   * scala di tutti gli altri.
+   */
+  const savingsBuckets = useMemo(() => {
+    const months = bucketize([], "month", 8);
+
+    const sumIn = (rows: Dated[], start: Date, end: Date) =>
+      rows
+        .filter((r) => {
+          const at = new Date(r.occurred_at);
+          return at >= start && at < end;
+        })
+        .reduce((sum, r) => sum + Number(r.amount), 0);
+
+    return months.map((bucket) => {
+      const { start, end } = bucketRange(bucket, "month");
+      const income = sumIn(incomes, start, end);
+      const invested = sumIn(investments, start, end);
+      if (income === 0 || invested === 0) return bucket;
+
+      const spent = history
+        .filter((p) => {
+          const at = new Date(p.occurred_at);
+          return at >= start && at < end;
+        })
+        .reduce((sum, p) => sum + Number(p.effective_amount), 0);
+
+      return { ...bucket, total: income - spent - invested, count: 1 };
+    });
+  }, [incomes, investments, history]);
+
+  const savingsMonths = savingsBuckets.filter((b) => b.count > 0).length;
+
+  /** Ripartizione per metodo di pagamento, sul periodo selezionato. */
+  const cardSlices = useMemo<DonutSlice[]>(() => {
+    const map = new Map<string, number>();
+    for (const payment of payments) {
+      const key = payment.card_name ?? "Non indicato";
+      map.set(key, (map.get(key) ?? 0) + Number(payment.effective_amount));
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([label, value], index) => ({
+        id: label,
+        label,
+        value,
+        color:
+          label === "Non indicato"
+            ? palette.uncategorized
+            : NEUTRAL_COLORS[index % NEUTRAL_COLORS.length],
+        icon: label === "Contanti" ? "banknote" : "credit-card",
+      }));
+  }, [payments, palette.uncategorized]);
+
+  /** Da dove sono entrate le spese: automazione, Siri, a mano, ricorrenti. */
+  const sourceSlices = useMemo<DonutSlice[]>(() => {
+    const map = new Map<string, number>();
+    for (const payment of payments) {
+      map.set(payment.source, (map.get(payment.source) ?? 0) + 1);
+    }
+    return Array.from(map.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([source, count], index) => ({
+        id: source,
+        label: SOURCE_LABEL[source] ?? source,
+        value: count,
+        color: NEUTRAL_COLORS[index % NEUTRAL_COLORS.length],
+        icon: SOURCE_ICON[source] ?? "circle-help",
+      }));
+  }, [payments]);
 
   const buckets = useMemo(
     () => bucketize(historyPool, grain, grain === "week" ? 10 : 8),
@@ -818,6 +941,59 @@ export default function StatsScreen() {
         )}
       </View>
 
+      {savingsMonths > 0 && (
+        <View>
+          <View style={styles.filterHead}>
+            <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
+              Risparmi mensili
+            </Text>
+            <Text style={[styles.filterNote, { color: palette.ink3 }]}>
+              introiti − spese − investimenti
+            </Text>
+          </View>
+          <BarChart
+            buckets={savingsBuckets}
+            metric="amount"
+            color={palette.good}
+            negativeColor={palette.over}
+          />
+          <Text style={[styles.chartNote, { color: palette.ink3 }]}>
+            Contano solo i mesi in cui hai registrato sia introiti sia
+            investimenti.
+          </Text>
+        </View>
+      )}
+
+      {cardSlices.length > 0 && (
+        <View>
+          <Text style={[styles.label, { color: palette.ink3 }]}>
+            Metodo di pagamento
+          </Text>
+          <CategoryDonut
+            slices={cardSlices}
+            centerLabel={period.label.toLowerCase()}
+          />
+        </View>
+      )}
+
+      {sourceSlices.length > 0 && (
+        <View>
+          <View style={styles.filterHead}>
+            <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
+              Provenienza
+            </Text>
+            <Text style={[styles.filterNote, { color: palette.ink3 }]}>
+              numero di spese
+            </Text>
+          </View>
+          <CategoryDonut
+            slices={sourceSlices}
+            centerLabel="spese"
+            formatValue={(value) => String(Math.round(value))}
+          />
+        </View>
+      )}
+
       {byMerchant.length > 0 && (
         <View>
           <Text style={[styles.label, { color: palette.ink3 }]}>
@@ -934,6 +1110,7 @@ const styles = StyleSheet.create({
   },
   filterNote: { ...type.small, fontSize: 10.5 },
   excludeToggle: { flexDirection: "row", alignItems: "center", gap: 7 },
+  chartNote: { ...type.small, fontSize: 10.5, lineHeight: 15, marginTop: space.sm },
   filterRow: { gap: 7, paddingRight: space.lg },
   filterChip: {
     paddingVertical: 7,

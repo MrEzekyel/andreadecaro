@@ -95,6 +95,11 @@ export function bucketize(
     if (grain === "week") {
       cursor.setDate(cursor.getDate() - 7);
     } else {
+      // Prima al giorno 1, poi indietro di un mese: sottrarre un mese da un
+      // giorno 29-31 trabocca nel mese successivo (il 31 luglio diventa "31
+      // giugno", che JavaScript normalizza a 1 luglio), duplicando un bucket
+      // e facendone sparire un altro dalla finestra.
+      cursor.setDate(1);
       cursor.setMonth(cursor.getMonth() - 1);
     }
   }

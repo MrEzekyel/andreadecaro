@@ -10,6 +10,7 @@ import {
 import { BarChart } from "../components/BarChart";
 import { ChartCarousel, ChartPage } from "../components/ChartCarousel";
 import { Icon } from "../components/Icon";
+import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { LetterToggle } from "../components/LetterToggle";
 import { MonthWheel } from "../components/MonthWheel";
 import { PaymentRow } from "../components/PaymentRow";
@@ -401,11 +402,13 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
   }
 
   return (
+    <SwipeBack onBack={onBack}>
     <View style={[styles.container, { backgroundColor: palette.ground }]}>
       <View style={styles.head}>
         <TouchableOpacity
           onPress={onBack}
           style={styles.back}
+          hitSlop={backHitSlop}
           accessibilityLabel="Indietro"
         >
           <Icon name="chevron-left" size={20} color={palette.ink} />
@@ -502,6 +505,7 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
         )}
       </ScrollView>
     </View>
+    </SwipeBack>
   );
 }
 
@@ -515,7 +519,7 @@ const styles = StyleSheet.create({
     paddingTop: space.lg,
     paddingBottom: space.sm,
   },
-  back: { padding: 2 },
+  back: { padding: 12, marginLeft: -8 },
   title: { ...type.title, flex: 1 },
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.xl },
   totalRow: {

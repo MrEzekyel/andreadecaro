@@ -12,9 +12,11 @@ import {
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { CardPicker } from "../components/CardPicker";
 import { Icon } from "../components/Icon";
+import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { Sheet } from "../components/Sheet";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, formatDate, monthName, shortDateTime } from "../lib/format";
+import { nextRunOn, scheduleChanged } from "../lib/recurrence";
 import { supabase } from "../lib/supabase";
 import { radius, space, tint, type } from "../lib/theme";
 import { Investment, InvestmentRule, RecurringFrequency } from "../lib/types";
@@ -31,31 +33,6 @@ const WEEKDAYS = ["lun", "mar", "mer", "gio", "ven", "sab", "dom"];
 function parseAmountInput(value: string): number | null {
   const parsed = Number(value.replace(",", ".").trim());
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
-/** Prima scadenza a partire da oggi, coerente con frequenza e giorno scelti. */
-function firstRun(frequency: RecurringFrequency, day: number, weekday: number) {
-  const today = new Date();
-
-  if (frequency === "weekly") {
-    const next = new Date(today);
-    const current = next.getDay() === 0 ? 7 : next.getDay();
-    const delta = (weekday - current + 7) % 7 || 7;
-    next.setDate(next.getDate() + delta);
-    return next.toISOString().slice(0, 10);
-  }
-
-  const candidate = new Date(today.getFullYear(), today.getMonth(), day);
-  if (candidate <= today) {
-    candidate.setMonth(candidate.getMonth() + (frequency === "yearly" ? 12 : 1));
-  }
-  const lastDay = new Date(
-    candidate.getFullYear(),
-    candidate.getMonth() + 1,
-    0
-  ).getDate();
-  candidate.setDate(Math.min(day, lastDay));
-  return candidate.toISOString().slice(0, 10);
 }
 
 export default function InvestmentsScreen({ onBack }: { onBack: () => void }) {
@@ -249,9 +226,16 @@ export default function InvestmentsScreen({ onBack }: { onBack: () => void }) {
     };
 
     if (editingRule) {
+      // Cambiando la cadenza va ricalcolata anche la prossima scadenza:
+      // aggiornare solo il giorno lascerebbe `next_run_on` a quello vecchio,
+      // e la regola continuerebbe a mostrare e generare la data precedente.
       const { error } = await supabase
         .from("investment_rules")
-        .update(payload)
+        .update(
+          scheduleChanged(editingRule, frequency, day, weekday)
+            ? { ...payload, next_run_on: nextRunOn(frequency, day, weekday) }
+            : payload
+        )
         .eq("id", editingRule.id);
       if (error) {
         Alert.alert("Errore", error.message);
@@ -267,7 +251,7 @@ export default function InvestmentsScreen({ onBack }: { onBack: () => void }) {
       const { error } = await supabase.from("investment_rules").insert({
         ...payload,
         user_id: userId,
-        next_run_on: firstRun(frequency, day, weekday),
+        next_run_on: nextRunOn(frequency, day, weekday),
       });
       if (error) {
         Alert.alert("Errore", error.message);
@@ -317,9 +301,14 @@ export default function InvestmentsScreen({ onBack }: { onBack: () => void }) {
   }
 
   return (
+    <SwipeBack onBack={onBack}>
     <View style={[styles.container, { backgroundColor: palette.ground }]}>
       <View style={styles.head}>
-        <TouchableOpacity onPress={onBack} style={styles.back}>
+        <TouchableOpacity
+          onPress={onBack}
+          style={styles.back}
+          hitSlop={backHitSlop}
+        >
           <Icon name="chevron-left" size={20} color={palette.ink} />
           <Text style={[styles.title, { color: palette.ink }]}>Investimenti</Text>
         </TouchableOpacity>
@@ -648,6 +637,7 @@ export default function InvestmentsScreen({ onBack }: { onBack: () => void }) {
         </TouchableOpacity>
       </Sheet>
     </View>
+    </SwipeBack>
   );
 }
 
@@ -661,7 +651,13 @@ const styles = StyleSheet.create({
     paddingTop: space.lg,
     paddingBottom: space.sm,
   },
-  back: { flexDirection: "row", alignItems: "center", gap: 4 },
+  back: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 10,
+    paddingRight: 18,
+  },
   title: { ...type.title },
   addBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
   addText: { ...type.caption, fontWeight: "500" },

@@ -29,6 +29,12 @@ type Props = {
   onSelect?: (slice: DonutSlice) => void;
   /** Testo sotto il totale al centro. */
   centerLabel?: string;
+  /**
+   * Come scrivere i valori. Serve alle ripartizioni che non contano euro —
+   * la provenienza conta spese, e formattarla in valuta direbbe una cosa
+   * falsa.
+   */
+  formatValue?: (value: number) => string;
 };
 
 /** Spicchio di corona circolare, con lo zero a ore 12 e verso orario. */
@@ -61,7 +67,12 @@ function arcPath(cx: number, cy: number, start: number, end: number): string {
  * fianco restano leggibili anche con dieci categorie configurate, invece di
  * diluirsi in spicchi e righe troppo sottili per portare informazione.
  */
-export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
+export function CategoryDonut({
+  slices,
+  onSelect,
+  centerLabel,
+  formatValue = formatAmount,
+}: Props) {
   const { palette, dark } = useTheme();
   const [expanded, setExpanded] = useState(false);
 
@@ -149,7 +160,7 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
 
         <View style={styles.center} pointerEvents="none">
           <Text style={[styles.centerValue, { color: palette.ink }]}>
-            {formatAmount(total)}
+            {formatValue(total)}
           </Text>
           {centerLabel && (
             <Text style={[styles.centerLabel, { color: palette.ink3 }]}>
@@ -172,7 +183,7 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
                   isOther ? setExpanded((v) => !v) : onSelect?.(slice)
                 }
                 accessibilityRole="button"
-                accessibilityLabel={`${slice.label}, ${formatAmount(
+                accessibilityLabel={`${slice.label}, ${formatValue(
                   slice.value
                 )}, ${Math.round(pct)} percento`}
               >
@@ -195,7 +206,7 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
                 </View>
 
                 <Text style={[styles.rowValue, { color: palette.ink }]}>
-                  {formatAmount(slice.value)}
+                  {formatValue(slice.value)}
                 </Text>
 
                 {isOther && (
@@ -223,7 +234,7 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
                         style={styles.row}
                         onPress={() => onSelect?.(h)}
                         accessibilityRole="button"
-                        accessibilityLabel={`${h.label}, ${formatAmount(
+                        accessibilityLabel={`${h.label}, ${formatValue(
                           h.value
                         )}, ${Math.round(hPct)} percento`}
                       >
@@ -247,7 +258,7 @@ export function CategoryDonut({ slices, onSelect, centerLabel }: Props) {
                           </Text>
                         </View>
                         <Text style={[styles.rowValue, { color: palette.ink }]}>
-                          {formatAmount(h.value)}
+                          {formatValue(h.value)}
                         </Text>
                       </TouchableOpacity>
                     );

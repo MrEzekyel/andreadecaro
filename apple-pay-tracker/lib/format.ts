@@ -94,8 +94,11 @@ export function shortDateTime(iso: string) {
  * decimali, e migliaia abbreviate. Sotto la colonna c'e' spazio per 3-4
  * caratteri, non per "1.234,56 €".
  */
-export function compactAmount(value: number) {
-  if (value <= 0) return "";
+export function compactAmount(value: number): string {
+  if (value === 0) return "";
+  // I risparmi mensili possono essere negativi: il segno va tenuto, ma la
+  // scelta di formato si fa sul valore assoluto.
+  if (value < 0) return `−${compactAmount(-value)}`;
   if (value >= 1000) {
     const thousands = value / 1000;
     // Si arrotonda prima di decidere quante cifre servono, altrimenti 1999

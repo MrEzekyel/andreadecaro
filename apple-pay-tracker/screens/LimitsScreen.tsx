@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Icon } from "../components/Icon";
+import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { LimitCard } from "../components/LimitCard";
 import { CategoryPicker } from "../components/CategoryPicker";
 import { Sheet } from "../components/Sheet";
@@ -138,9 +139,14 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
   }
 
   return (
+    <SwipeBack onBack={onBack}>
     <View style={[styles.container, { backgroundColor: palette.ground }]}>
       <View style={styles.head}>
-        <TouchableOpacity onPress={onBack} style={styles.back}>
+        <TouchableOpacity
+          onPress={onBack}
+          style={styles.back}
+          hitSlop={backHitSlop}
+        >
           <Icon name="chevron-left" size={20} color={palette.ink} />
           <Text style={[styles.title, { color: palette.ink }]}>Limiti</Text>
         </TouchableOpacity>
@@ -306,6 +312,7 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
         </TouchableOpacity>
       </Sheet>
     </View>
+    </SwipeBack>
   );
 }
 
@@ -319,7 +326,13 @@ const styles = StyleSheet.create({
     paddingTop: space.lg,
     paddingBottom: space.sm,
   },
-  back: { flexDirection: "row", alignItems: "center", gap: 4 },
+  back: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 10,
+    paddingRight: 18,
+  },
   title: { ...type.title },
   addBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
   addText: { ...type.caption, fontWeight: "500" },

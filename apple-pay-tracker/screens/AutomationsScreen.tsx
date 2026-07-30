@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Icon } from "../components/Icon";
+import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
@@ -79,9 +80,14 @@ export default function AutomationsScreen({ onBack }: { onBack: () => void }) {
   }
 
   return (
+    <SwipeBack onBack={onBack}>
     <View style={[styles.container, { backgroundColor: palette.ground }]}>
       <View style={styles.head}>
-        <TouchableOpacity onPress={onBack} style={styles.back}>
+        <TouchableOpacity
+          onPress={onBack}
+          style={styles.back}
+          hitSlop={backHitSlop}
+        >
           <Icon name="chevron-left" size={20} color={palette.ink} />
           <Text style={[styles.title, { color: palette.ink }]}>Automazioni</Text>
         </TouchableOpacity>
@@ -176,6 +182,7 @@ export default function AutomationsScreen({ onBack }: { onBack: () => void }) {
         </Text>
       </ScrollView>
     </View>
+    </SwipeBack>
   );
 }
 
@@ -189,7 +196,13 @@ const styles = StyleSheet.create({
     paddingTop: space.lg,
     paddingBottom: space.sm,
   },
-  back: { flexDirection: "row", alignItems: "center", gap: 4 },
+  back: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 10,
+    paddingRight: 18,
+  },
   title: { ...type.title },
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.md },
   label: { ...type.label },

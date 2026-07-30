@@ -27,6 +27,8 @@ type Props = {
   onSelect?: (bucket: Bucket) => void;
   /** Valore della linea tratteggiata di riferimento (media). */
   average?: number | null;
+  /** Colore delle colonne sotto lo zero; serve solo ai grafici con negativi. */
+  negativeColor?: string;
 };
 
 /** Passo "tondo" piu' vicino a `raw`: 1, 2, 2.5 o 5 per decade. */
@@ -45,22 +47,31 @@ export function BarChart({
   selectedKey,
   onSelect,
   average,
+  negativeColor,
 }: Props) {
   const { palette } = useTheme();
 
   const values = buckets.map((b) => (metric === "amount" ? b.total : b.count));
   const peak = Math.max(...values, 0);
+  const trough = Math.min(...values, 0);
 
-  // Con l'asse a valori tondi la cima del grafico e' l'ultima tacca, non il
-  // massimo osservato: altrimenti la colonna piu' alta tocca il bordo e le
+  // Con l'asse a valori tondi gli estremi del grafico sono le tacche, non i
+  // valori osservati: altrimenti la colonna piu' alta tocca il bordo e le
   // tacche cadono a quote arbitrarie.
-  const rawStep = metric === "count" ? Math.max(peak / 3, 1) : peak / 3;
-  const step = metric === "count" ? Math.max(1, Math.round(niceStep(rawStep))) : niceStep(rawStep);
-  const chartMax = peak > 0 ? Math.ceil(peak / step) * step : step;
+  const span = peak - trough;
+  const rawStep = metric === "count" ? Math.max(span / 3, 1) : span / 3;
+  const step =
+    metric === "count" ? Math.max(1, Math.round(niceStep(rawStep))) : niceStep(rawStep);
+
+  const chartMax = peak > 0 ? Math.ceil(peak / step) * step : 0;
+  const chartMin = trough < 0 ? Math.floor(trough / step) * step : 0;
+  // Con soli zeri servirebbe comunque un'altezza: una scala degenere
+  // dividerebbe per zero.
+  const range = chartMax - chartMin || step;
 
   const ticks: number[] = [];
-  for (let value = step; value <= chartMax + step / 100; value += step) {
-    ticks.push(value);
+  for (let value = chartMin; value <= chartMax + step / 100; value += step) {
+    if (Math.abs(value) > step / 100) ticks.push(value);
   }
 
   const plotWidth = WIDTH - GUTTER;
@@ -69,9 +80,17 @@ export function BarChart({
     2
   );
 
-  const yOf = (value: number) => BASE - (value / chartMax) * PLOT_H;
+  const yOf = (value: number) => BASE - ((value - chartMin) / range) * PLOT_H;
+  /** Quota dello zero: coincide con la base finche' non ci sono negativi. */
+  const zeroY = yOf(0);
+
   const averageY =
-    average != null && average > 0 && average <= chartMax ? yOf(average) : null;
+    average != null &&
+    average !== 0 &&
+    average >= chartMin &&
+    average <= chartMax
+      ? yOf(average)
+      : null;
 
   const tickLabel = (value: number) =>
     metric === "amount" ? compactAmount(value) : String(Math.round(value));
@@ -105,11 +124,13 @@ export function BarChart({
           );
         })}
 
+        {/* Lo zero e' sempre marcato: con i negativi non e' piu' il fondo del
+            grafico, ed e' la linea rispetto a cui si legge il segno. */}
         <Line
           x1={GUTTER}
-          y1={BASE}
+          y1={zeroY}
           x2={WIDTH}
-          y2={BASE}
+          y2={zeroY}
           stroke={palette.hairline}
           strokeWidth={1}
         />
@@ -117,31 +138,47 @@ export function BarChart({
         {buckets.map((bucket, index) => {
           const value = values[index];
           const x = GUTTER + index * (barWidth + GAP);
-          const height = (value / chartMax) * PLOT_H;
+          const valueY = yOf(value);
 
           // Un periodo a zero resta visibile come traccia: distinguere
           // "niente speso" da "periodo assente" e' il punto del grafico.
-          const drawn = Math.max(height, 2);
+          const drawn = Math.max(Math.abs(valueY - zeroY), 2);
+          const negative = value < 0;
+          const top = negative ? zeroY : zeroY - drawn;
+
           const selected = selectedKey == null || bucket.key === selectedKey;
           const label =
-            metric === "amount" ? compactAmount(value) : value > 0 ? String(value) : "";
+            metric === "amount"
+              ? compactAmount(value)
+              : value > 0
+                ? String(value)
+                : "";
+
+          const fill =
+            value === 0
+              ? palette.hairline
+              : negative
+                ? negativeColor ?? palette.over
+                : color;
 
           return (
             <React.Fragment key={bucket.key}>
               <Rect
                 x={x}
-                y={BASE - drawn}
+                y={top}
                 width={barWidth}
                 height={drawn}
                 rx={RADIUS}
-                fill={value > 0 ? color : palette.hairline}
-                fillOpacity={value > 0 && !selected ? 0.32 : 1}
+                fill={fill}
+                fillOpacity={value !== 0 && !selected ? 0.32 : 1}
               />
 
               {label !== "" && (
                 <SvgText
                   x={x + barWidth / 2}
-                  y={BASE - drawn - 4}
+                  // Sopra le colonne positive, sotto quelle negative: dentro
+                  // la colonna il testo sparirebbe sul proprio fondo.
+                  y={negative ? top + drawn + 8 : top - 4}
                   textAnchor="middle"
                   fontSize={7.5}
                   fontWeight={bucket.key === selectedKey ? "600" : "400"}

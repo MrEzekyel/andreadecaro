@@ -48,11 +48,19 @@ export function MonthWheel({ months, value, onChange }: Props) {
     if (width === 0) return;
     const animated = positioned.current;
     positioned.current = true;
+    const offset = value * ITEM_W;
+
+    // scrollX guida opacita' e scala, ma si aggiorna solo tramite onScroll —
+    // che uno scorrimento programmatico non emette in modo affidabile. Senza
+    // allinearlo a mano la ghiera finisce nella posizione giusta ma illumina
+    // la voce sbagliata (era il "mostra luglio ma si illumina maggio").
+    scrollX.setValue(offset);
+
     // Il ref di un componente animato non sempre espone i metodi della lista
     // sottostante: se manca, la ghiera resta dov'e' invece di far cadere la
     // schermata.
-    ref.current?.scrollToOffset?.({ offset: value * ITEM_W, animated });
-  }, [value, width]);
+    ref.current?.scrollToOffset?.({ offset, animated });
+  }, [value, width, scrollX]);
 
   function onMomentumEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
     const index = Math.round(event.nativeEvent.contentOffset.x / ITEM_W);

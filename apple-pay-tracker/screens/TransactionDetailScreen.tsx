@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { EditPaymentSheet } from "../components/EditPaymentSheet";
 import { Icon } from "../components/Icon";
+import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, shortDateTime, splitAmount } from "../lib/format";
@@ -132,11 +133,13 @@ export default function TransactionDetailScreen({
 
   return (
     <>
+      <SwipeBack onBack={onBack}>
       <View style={[styles.container, { backgroundColor: palette.ground }]}>
         <View style={styles.head}>
           <TouchableOpacity
             onPress={onBack}
             style={styles.back}
+            hitSlop={backHitSlop}
             accessibilityLabel="Indietro"
           >
             <Icon name="chevron-left" size={20} color={palette.ink} />
@@ -319,6 +322,7 @@ export default function TransactionDetailScreen({
           </View>
         </ScrollView>
       </View>
+      </SwipeBack>
 
       <EditPaymentSheet
         payment={editing ? payment : null}
@@ -348,7 +352,7 @@ const styles = StyleSheet.create({
     paddingTop: space.lg,
     paddingBottom: space.sm,
   },
-  back: { padding: 2 },
+  back: { padding: 12, marginLeft: -8 },
   headTitle: { ...type.bodyMedium, flex: 1 },
   edit: { ...type.body },
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.xl },
