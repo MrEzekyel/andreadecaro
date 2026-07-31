@@ -35,6 +35,7 @@ type Row = {
 
 const SOURCE_LABEL: Record<string, string> = {
   shortcut: "Apple Pay",
+  shortcut_manual: "Apple Pay, a mano",
   siri: "Dettata a Siri",
   manual: "Inserita a mano",
   recurring: "Ricorrente",

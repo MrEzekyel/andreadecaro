@@ -63,6 +63,7 @@ type Dated = { amount: number; occurred_at: string };
 /** Etichette leggibili per `payments.source`. */
 const SOURCE_LABEL: Record<string, string> = {
   shortcut: "Apple Pay",
+  shortcut_manual: "Apple Pay a mano",
   siri: "Siri",
   manual: "Manuale",
   recurring: "Ricorrente",
@@ -70,6 +71,7 @@ const SOURCE_LABEL: Record<string, string> = {
 
 const SOURCE_ICON: Record<string, string> = {
   shortcut: "smartphone",
+  shortcut_manual: "credit-card",
   siri: "mic",
   manual: "pencil",
   recurring: "repeat",

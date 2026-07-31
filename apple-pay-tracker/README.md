@@ -30,8 +30,9 @@ App Apple Pay Tracker → spese, statistiche, limiti
 ```
 
 La function accetta un pagamento da qualunque sorgente sappia fare una POST,
-quindi la stessa pipeline serve anche l'inserimento a voce con Siri
-(`"source": "siri"`) e quello manuale dall'app.
+quindi la stessa pipeline serve anche l'inserimento a voce con Siri e il
+Comando Rapido lanciato a mano per gli acquisti in-app e online, che il
+trigger Wallet non vede. Il campo `source` tiene distinte le provenienze.
 
 L'autenticazione usa un **token per utente**: la function ne calcola l'hash
 SHA-256 e lo cerca in `ingest_tokens` per risalire all'utente. In tabella non
@@ -86,7 +87,7 @@ usare, gia' pronto da copiare.
 | --- | --- | --- |
 | `merchant` | Testo | variabile **Esercente** |
 | `amount` | Testo | variabile **Importo** |
-| `source` | Testo | `shortcut` |
+| `source` | Testo | `Apple Pay` |
 
 I valori sono le **variabili** della transazione, scelte dal selettore
 variabili — non testo digitato.
@@ -96,11 +97,93 @@ la ripulisce e gestisce il formato italiano, virgola decimale inclusa. La data
 non serve inviarla: per un trigger in tempo reale l'istante della chiamata e'
 corretto.
 
+### Tutti i campi accettati
+
+Solo `merchant` e `amount` sono obbligatori. Gli altri si mandano quando
+servono: quelli lasciati vuoti finiscono a NULL, non a stringa vuota, quindi
+mandare una chiave con dentro niente equivale a non mandarla.
+
+| Chiave | Cosa ci va | Se manca |
+| --- | --- | --- |
+| `merchant` | nome esercente — guida categoria e raggruppamento | errore 400 |
+| `amount` | importo, anche "12,99 €" | errore 400 |
+| `card` | metodo di pagamento (`Revolut Visa`, `Contanti`, …) | resta vuoto |
+| `source` | provenienza, vedi tabella sotto | `shortcut` |
+| `city` | citta' del pagamento | resta vuoto |
+| `name` | descrizione diversa dal nome esercente | resta vuoto |
+| `country` | paese del pagamento | resta vuoto |
+| `occurred_at` | data/ora ISO, per registrare una spesa di ieri | adesso |
+
+`city` ha senso solo per i pagamenti fisici, dove il trigger Wallet la
+fornisce. Per gli acquisti in-app e online **va lasciata fuori**: scriverci
+dentro la citta' di residenza direbbe una cosa falsa, e la citta' e' un dato
+che serve a ricordare *dove* si e' speso.
+
+### Provenienza (`source`)
+
+Distingue com'e' entrata la spesa, ed e' quello che la ripartizione per
+provenienza mostra in Statistiche.
+
+| Valore da mandare | Come compare nell'app | Quando |
+| --- | --- | --- |
+| `Apple Pay` | Apple Pay | automazione Wallet, scatta da sola |
+| `Apple Pay manuale` | Apple Pay, a mano | Comando Rapido lanciato a mano: acquisti in-app e online che il trigger Wallet non vede |
+| `Inserito manualmente` | Inserita a mano | come se fosse stata scritta dentro l'app |
+| `Siri` | Dettata a Siri | inserimento a voce |
+
+La function accetta sia queste etichette sia i valori tecnici
+(`shortcut`, `shortcut_manual`, `manual`, `siri`), senza distinzione fra
+maiuscole e minuscole. Le etichette esistono per poter mettere direttamente
+il risultato di un **Scegli da elenco** dentro il JSON, senza tradurlo con un
+blocco "Se". Un valore non riconosciuto non fa fallire la chiamata: ricade su
+`shortcut`, perche' una provenienza sbagliata si corregge dall'app mentre una
+spesa persa no.
+
+### Comando Rapido per l'inserimento rapido
+
+Per i pagamenti che il trigger Wallet non intercetta — dentro le app, online,
+o su carte non aggiunte a Wallet. Comando Rapido normale (non automazione),
+da tenere in Home o nel Centro di Controllo:
+
+1. **Chiedi input** → *Numero*, "Quanto?" → variabile `Importo`
+2. **Chiedi input** → *Testo*, "Dove?" → variabile `Esercente`
+3. **Scegli da elenco** con le voci delle carte (`Revolut Visa`, `Contanti`,
+   …) → variabile `Carta`
+4. **Scegli da elenco** con `Apple Pay manuale` e `Inserito manualmente` →
+   variabile `Provenienza`
+5. **Ottieni contenuto URL**, POST, stesso URL e stesso header
+   `x-ingest-token` dell'automazione, corpo JSON:
+
+| Chiave | Valore |
+| --- | --- |
+| `merchant` | variabile del passo 2 |
+| `amount` | variabile del passo 1 |
+| `card` | variabile del passo 3 |
+| `source` | variabile del passo 4 |
+
+**Scegli da elenco** e' l'azione che sostituisce il campo di testo libero: le
+voci si scrivono una per riga dentro l'azione e non devono per forza esistere
+gia' nell'app — un metodo di pagamento nuovo compare da solo nei selettori
+dell'app dopo la prima spesa che lo usa. Con una sola voce in elenco l'azione
+non chiede niente e la passa e basta, quindi vale anche per fissare la
+provenienza senza domande.
+
+Per non farsi chiedere due volte la stessa cosa: se il Comando Rapido serve
+solo agli acquisti online, si puo' togliere il passo 4 e scrivere
+`Apple Pay manuale` come testo fisso.
+
 ### Inserimento a voce con Siri
 
 Un Comando Rapido con frase di attivazione ("Aggiungi spesa") che usa **Chiedi
 input** per importo ed esercente e chiama lo stesso URL con
-`"source": "siri"`. Utile per contanti e pagamenti non Apple Pay.
+`"source": "Siri"`. Utile per contanti e pagamenti non Apple Pay.
+
+### Doppio invio
+
+Due spese con **stesso importo e stesso esercente entro 5 minuti** sono
+considerate un doppio scatto e la seconda viene ignorata (risposta
+`{"skipped":"duplicate"}`). Per registrarne davvero due identiche a distanza
+di pochi minuti, basta mandare una `dedup_key` diversa per ciascuna.
 
 ### 3. Verifica
 

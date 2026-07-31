@@ -36,10 +36,66 @@ function optionalText(value: unknown): string | null {
 // della stessa notifica Wallet.
 const DEDUP_WINDOW_MINUTES = 5;
 
-const ALLOWED_SOURCES = new Set(["shortcut", "siri", "manual", "recurring"]);
+/**
+ * Valori ammessi per `payments.source`.
+ *
+ * `shortcut` e' l'automazione Wallet che scatta da sola; `shortcut_manual` e'
+ * il Comando Rapido lanciato a mano per i pagamenti che il trigger Wallet non
+ * vede — acquisti dentro le app e online con la carta. Tenerli separati e'
+ * l'unico modo perche' la ripartizione per provenienza dica davvero quanto
+ * passa da Apple Pay, invece di gonfiarlo con quello che si e' scritto a mano.
+ */
+const ALLOWED_SOURCES = new Set([
+  "shortcut",
+  "shortcut_manual",
+  "siri",
+  "manual",
+  "recurring",
+]);
+
+/**
+ * Etichette leggibili accettate al posto del valore tecnico.
+ *
+ * Servono al Comando Rapido: cosi' puo' mandare la voce scelta dall'elenco
+ * ("Apple Pay manuale") cosi' com'e', senza tradurla con un blocco "Se".
+ * Dentro la Shortcut resta leggibile cosa si sta scegliendo, che con un
+ * `shortcut_manual` grezzo non succederebbe.
+ */
+const SOURCE_ALIASES: Record<string, string> = {
+  "apple pay": "shortcut",
+  "apple pay automatico": "shortcut",
+  wallet: "shortcut",
+  "apple pay manuale": "shortcut_manual",
+  "apple pay manual": "shortcut_manual",
+  "apple pay a mano": "shortcut_manual",
+  online: "shortcut_manual",
+  "in app": "shortcut_manual",
+  "inserito manualmente": "manual",
+  "inserita a mano": "manual",
+  "a mano": "manual",
+  manuale: "manual",
+  "dettata a siri": "siri",
+};
 
 function normalize(value: string) {
   return value.trim().toLowerCase().replace(/\s+/g, " ");
+}
+
+/**
+ * Sorgente della spesa, dal valore tecnico o dall'etichetta leggibile.
+ *
+ * Un valore non riconosciuto ricade su `shortcut` invece di far fallire la
+ * chiamata: una spesa registrata con la provenienza sbagliata si corregge
+ * dall'app, una spesa persa perche' la Shortcut ha risposto 400 no.
+ */
+function resolveSource(value: unknown): string {
+  if (typeof value !== "string") return "shortcut";
+
+  const cleaned = normalize(value);
+  if (!cleaned) return "shortcut";
+  if (ALLOWED_SOURCES.has(cleaned)) return cleaned;
+
+  return SOURCE_ALIASES[cleaned] ?? "shortcut";
 }
 
 const ALPHANUM = /[\p{L}\p{N}]/u;
@@ -211,8 +267,7 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: "occurred_at is not a valid date" }, 400);
   }
 
-  const source =
-    body.source && ALLOWED_SOURCES.has(body.source) ? body.source : "shortcut";
+  const source = resolveSource(body.source);
 
   // Il token e' valido: segna l'uso senza bloccare l'ingestione se fallisce.
   await supabase

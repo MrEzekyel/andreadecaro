@@ -57,6 +57,14 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   token per-utente (Impostazioni → Automazioni). Scatta sia per pagamenti
   fisici NFC sia per acquisti online con Apple Pay, non per bonifici/addebiti
   diretti su carte non aggiunte a Wallet.
+- `payments.source` = come è entrata la spesa: `shortcut` (automazione
+  Wallet), `shortcut_manual` (Comando Rapido lanciato a mano per acquisti
+  in-app/online che il trigger Wallet non vede), `siri`, `manual`,
+  `recurring`. La Edge Function accetta anche le etichette leggibili
+  ("Apple Pay manuale", "Inserito manualmente") così il Comando Rapido può
+  passare direttamente la voce di uno *Scegli da elenco*. Ogni valore nuovo
+  va aggiunto in tre punti: `ALLOWED_SOURCES` nella function, e i
+  `SOURCE_LABEL`/`SOURCE_ICON` di StatsScreen e TransactionDetailScreen.
 
 ## Git e pubblicazione
 
