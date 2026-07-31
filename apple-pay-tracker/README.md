@@ -145,32 +145,46 @@ Per i pagamenti che il trigger Wallet non intercetta — dentro le app, online,
 o su carte non aggiunte a Wallet. Comando Rapido normale (non automazione),
 da tenere in Home o nel Centro di Controllo:
 
-1. **Chiedi input** → *Numero*, "Quanto?" → variabile `Importo`
-2. **Chiedi input** → *Testo*, "Dove?" → variabile `Esercente`
-3. **Scegli da elenco** con le voci delle carte (`Revolut Visa`, `Contanti`,
-   …) → variabile `Carta`
-4. **Scegli da elenco** con `Apple Pay manuale` e `Inserito manualmente` →
-   variabile `Provenienza`
-5. **Ottieni contenuto URL**, POST, stesso URL e stesso header
+1. **Chiedi input** → *Numero*, "Quanto?"
+2. **Chiedi input** → *Testo*, "Dove?"
+3. **Elenco** con le voci delle carte: `Revolut Visa`, `Contanti`, …
+4. **Scegli dall'elenco** → *Richiesta*: "Quale carta?"
+5. **Imposta variabile** → nome `Carta`, valore l'esito del passo 4
+6. **Elenco** con `Apple Pay manuale` e `Inserito manualmente`
+7. **Scegli dall'elenco** → *Richiesta*: "Come l'hai pagata?"
+8. **Imposta variabile** → nome `Provenienza`, valore l'esito del passo 7
+9. **Ottieni contenuto URL**, POST, stesso URL e stesso header
    `x-ingest-token` dell'automazione, corpo JSON:
 
 | Chiave | Valore |
 | --- | --- |
-| `merchant` | variabile del passo 2 |
-| `amount` | variabile del passo 1 |
-| `card` | variabile del passo 3 |
-| `source` | variabile del passo 4 |
+| `merchant` | esito del passo 2 |
+| `amount` | esito del passo 1 |
+| `card` | variabile `Carta` |
+| `source` | variabile `Provenienza` |
 
-**Scegli da elenco** e' l'azione che sostituisce il campo di testo libero: le
-voci si scrivono una per riga dentro l'azione e non devono per forza esistere
-gia' nell'app — un metodo di pagamento nuovo compare da solo nei selettori
-dell'app dopo la prima spesa che lo usa. Con una sola voce in elenco l'azione
-non chiede niente e la passa e basta, quindi vale anche per fissare la
-provenienza senza domande.
+Le azioni si aggiungono dalla barra di ricerca in fondo (*Cerca app e
+azioni*), cercando `elenco`. Il menu che compare toccando un **campo**
+("Chiedi ogni volta", "Seleziona variabile", …) e' un'altra cosa: serve al
+passo 9 per infilare le variabili dentro il JSON, non ad aggiungere azioni.
+
+**Scegli dall'elenco** non contiene le voci, le riceve: da qui l'azione
+**Elenco** che la precede. Le voci non devono per forza esistere gia'
+nell'app — un metodo di pagamento nuovo compare da solo nei selettori dopo
+la prima spesa che lo usa.
+
+I passi 5 e 8 servono a non ritrovarsi due variabili chiamate entrambe
+*Elemento scelto*, indistinguibili nel campo JSON. Con un nome proprio il
+corpo della richiesta resta leggibile a distanza di mesi.
+
+Esiste anche **Scegli dal menu**, che le voci le contiene davvero e fa a
+meno dell'Elenco. Costa piu' di quanto rende: apre un ramo per ogni voce, e
+la chiamata POST va ripetuta identica dentro ciascuno — con due menu
+diventano quattro copie da tenere allineate a mano.
 
 Per non farsi chiedere due volte la stessa cosa: se il Comando Rapido serve
-solo agli acquisti online, si puo' togliere il passo 4 e scrivere
-`Apple Pay manuale` come testo fisso.
+solo agli acquisti online, si tolgono i passi 6-8 e si scrive
+`Apple Pay manuale` come testo fisso nel campo `source`.
 
 ### Inserimento a voce con Siri
 
