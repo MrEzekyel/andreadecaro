@@ -37,7 +37,9 @@ function startOfMonth(date: Date) {
  * come identificatore, ma rileggerla per tornare al mese darebbe il mese
  * sbagliato — ed e' esattamente quello che serve quando si tocca una colonna.
  */
-function keyOf(date: Date, grain: Grain) {
+/** Esportata per costruire la chiave di un bucket da fuori, es. per aprire
+ *  il dettaglio gia' posizionato su un mese preciso invece che sull'ultimo. */
+export function keyOf(date: Date, grain: Grain) {
   const anchor = grain === "week" ? startOfWeek(date) : startOfMonth(date);
   const month = String(anchor.getMonth() + 1).padStart(2, "0");
   const day = String(anchor.getDate()).padStart(2, "0");

@@ -23,19 +23,27 @@ import {
   bucketize,
   Grain,
   groupByMonth,
+  keyOf,
   monthsBetween,
   paymentsIn,
   sameMonth,
 } from "../lib/aggregate";
-import { formatAmount, monthName, splitAmount } from "../lib/format";
+import { formatAmount, monthName, monthShort, splitAmount } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { categoryColor, space, type } from "../lib/theme";
 import { Merchant, Payment } from "../lib/types";
 
-/** Dettaglio di un singolo esercente oppure di una singola categoria. */
+/**
+ * Dettaglio di un singolo esercente oppure di una singola categoria.
+ *
+ * `month` e' il mese da cui si arriva (Home o Statistiche): se presente, il
+ * grafico si apre gia' posizionato li' invece che sull'ultimo mese, per non
+ * dare l'impressione di essere saltati altrove rispetto a cosa si stava
+ * guardando.
+ */
 export type DetailTarget =
-  | { kind: "merchant"; id: string; title: string }
-  | { kind: "category"; id: string | null; title: string };
+  | { kind: "merchant"; id: string; title: string; month?: Date }
+  | { kind: "category"; id: string | null; title: string; month?: Date };
 
 type Props = {
   target: DetailTarget;
@@ -72,7 +80,9 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
     new Map()
   );
   const [grain, setGrain] = useState<Grain>("month");
-  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [selectedKey, setSelectedKey] = useState<string | null>(
+    target.month ? keyOf(target.month, "month") : null
+  );
   const [shareScope, setShareScope] = useState<ShareScope>("month");
   const [shareMonthIndex, setShareMonthIndex] = useState(0);
   // Diventa vero solo DOPO che l'indice e' stato corretto sull'ultimo mese:
@@ -238,7 +248,17 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
       : palette.accent;
 
   const amount = splitAmount(selectedTotal);
-  const visibleMonths = showAll ? months : months.slice(0, 1);
+
+  // L'elenco sotto deve seguire il mese scelto sul grafico sopra, non
+  // restare sempre sull'ultimo: prima mostrava months[0] a prescindere da
+  // quale colonna fosse selezionata, quindi cambiare mese sul grafico non
+  // spostava mai le transazioni elencate.
+  const selectedMonthKey = selected
+    ? `${selected.start.getFullYear()}-${selected.start.getMonth()}`
+    : null;
+  const visibleMonths = showAll
+    ? months
+    : months.filter((group) => group.key === selectedMonthKey);
 
   /** "Nel mese corrente", oppure il periodo davvero selezionato. */
   const periodLabel = (() => {
@@ -445,7 +465,11 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
         <View>
           <View style={styles.listHead}>
             <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
-              {showAll ? "Tutte le spese" : "Ultimo mese"}
+              {showAll
+                ? "Tutte le spese"
+                : selected
+                  ? monthShort(selected.start)
+                  : "Le tue spese"}
             </Text>
             {months.length > 1 && (
               <TouchableOpacity onPress={() => setShowAll((v) => !v)}>
@@ -481,6 +505,11 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
           {!loading && payments.length === 0 && (
             <Text style={[styles.empty, { color: palette.ink3 }]}>
               Nessuna spesa registrata.
+            </Text>
+          )}
+          {!loading && payments.length > 0 && !showAll && visibleMonths.length === 0 && (
+            <Text style={[styles.empty, { color: palette.ink3 }]}>
+              Nessuna spesa in questo periodo.
             </Text>
           )}
         </View>

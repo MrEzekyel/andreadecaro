@@ -1,17 +1,17 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Animated,
-  PanResponder,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { CategoryDonut, DonutSlice } from "../components/CategoryDonut";
 import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
 import { LimitCard } from "../components/LimitCard";
+import { MonthYearPicker } from "../components/MonthYearPicker";
 import { PaymentRow } from "../components/PaymentRow";
 import { RecurringSummary } from "../components/RecurringSummary";
 import { SavingsSummary } from "../components/SavingsSummary";
@@ -42,6 +42,7 @@ export default function HomeScreen() {
   const { openSettings } = useNav();
 
   const [month, setMonth] = useState(() => new Date());
+  const [pickerOpen, setPickerOpen] = useState(false);
   const { payments, total, previousTotal, reload } = usePayments(month);
   const { monthlyOverall, alerts, reload: reloadLimits } = useLimits();
   const [refreshing, setRefreshing] = useState(false);
@@ -109,84 +110,6 @@ export default function HomeScreen() {
   // I limiti valgono sempre sul periodo corrente: mostrarli mentre si
   // sfoglia un mese passato darebbe un confronto senza senso.
   const viewingCurrentMonth = isCurrentMonth(month);
-
-  function shiftMonth(delta: number) {
-    setMonth((current) => {
-      const next = new Date(current);
-      next.setDate(1);
-      next.setMonth(next.getMonth() + delta);
-      return next;
-    });
-  }
-
-  // Lo scorrimento orizzontale sull'intestazione cambia mese, con
-  // un'anteprima che compare gradualmente man mano che si trascina invece
-  // di scattare solo al rilascio: non c'e' bisogno di vedere il mese
-  // opposto, solo quello verso cui si sta scorrendo.
-  const HEAD_TRAVEL = 60;
-  const dragX = useRef(new Animated.Value(0)).current;
-  /** 1 = verso il mese successivo (trascinamento a sinistra), -1 = precedente. */
-  const [dragDir, setDragDir] = useState<0 | 1 | -1>(0);
-
-  const pan = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_event, gesture) =>
-        Math.abs(gesture.dx) > 10 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.6,
-      onPanResponderGrant: () => dragX.setValue(0),
-      onPanResponderMove: (_event, gesture) => {
-        dragX.setValue(gesture.dx);
-        setDragDir(gesture.dx < 0 ? 1 : gesture.dx > 0 ? -1 : 0);
-      },
-      onPanResponderRelease: (_event, gesture) => {
-        if (Math.abs(gesture.dx) >= HEAD_TRAVEL) {
-          const dir = gesture.dx < 0 ? 1 : -1;
-          Animated.timing(dragX, {
-            toValue: -dir * HEAD_TRAVEL,
-            duration: 90,
-            useNativeDriver: true,
-          }).start(() => {
-            shiftMonth(dir);
-            dragX.setValue(0);
-            setDragDir(0);
-          });
-        } else {
-          Animated.spring(dragX, {
-            toValue: 0,
-            useNativeDriver: true,
-            bounciness: 4,
-          }).start(() => setDragDir(0));
-        }
-      },
-    })
-  ).current;
-
-  const outgoingOpacity = dragX.interpolate({
-    inputRange: [-HEAD_TRAVEL, 0, HEAD_TRAVEL],
-    outputRange: [0, 1, 0],
-    extrapolate: "clamp",
-  });
-  const outgoingTranslate = dragX.interpolate({
-    inputRange: [-HEAD_TRAVEL, 0, HEAD_TRAVEL],
-    outputRange: [-HEAD_TRAVEL * 0.4, 0, HEAD_TRAVEL * 0.4],
-    extrapolate: "clamp",
-  });
-  const incomingOpacity = dragX.interpolate({
-    inputRange: [-HEAD_TRAVEL, 0, HEAD_TRAVEL],
-    outputRange: dragDir === 1 ? [1, 0, 0] : [0, 0, 1],
-    extrapolate: "clamp",
-  });
-  const incomingTranslate = dragX.interpolate({
-    inputRange: [-HEAD_TRAVEL, 0, HEAD_TRAVEL],
-    outputRange:
-      dragDir === 1 ? [0, HEAD_TRAVEL, HEAD_TRAVEL] : [-HEAD_TRAVEL, -HEAD_TRAVEL, 0],
-    extrapolate: "clamp",
-  });
-
-  const incomingMonth = new Date(
-    month.getFullYear(),
-    month.getMonth() + dragDir,
-    1
-  );
 
   const byCategory = useMemo(() => {
     const map = new Map<string | null, number>();
@@ -268,58 +191,23 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View
+        <TouchableOpacity
           style={styles.head}
-          {...pan.panHandlers}
-          accessibilityRole="adjustable"
+          activeOpacity={0.6}
+          onPress={() => setPickerOpen(true)}
+          accessibilityRole="button"
           accessibilityLabel={`${monthTitle(month)} ${month.getFullYear()}`}
-          accessibilityHint="Scorri a destra o a sinistra per cambiare mese"
-          accessibilityActions={[
-            { name: "increment", label: "Mese successivo" },
-            { name: "decrement", label: "Mese precedente" },
-          ]}
-          onAccessibilityAction={(event) => {
-            if (event.nativeEvent.actionName === "increment") shiftMonth(1);
-            if (event.nativeEvent.actionName === "decrement") shiftMonth(-1);
-          }}
+          accessibilityHint="Apre il selettore di mese e anno"
         >
-          <Animated.View
-            style={[
-              styles.headPair,
-              {
-                opacity: outgoingOpacity,
-                transform: [{ translateX: outgoingTranslate }],
-              },
-            ]}
-          >
+          <View style={styles.headPair}>
             <Text style={[styles.title, { color: palette.ink }]}>
               {monthTitle(month)}
             </Text>
             <Text style={[styles.year, { color: palette.ink3 }]}>
               {month.getFullYear()}
             </Text>
-          </Animated.View>
-
-          {dragDir !== 0 && (
-            <Animated.View
-              style={[
-                styles.headPair,
-                styles.headIncoming,
-                {
-                  opacity: incomingOpacity,
-                  transform: [{ translateX: incomingTranslate }],
-                },
-              ]}
-            >
-              <Text style={[styles.title, { color: palette.ink }]}>
-                {monthTitle(incomingMonth)}
-              </Text>
-              <Text style={[styles.year, { color: palette.ink3 }]}>
-                {incomingMonth.getFullYear()}
-              </Text>
-            </Animated.View>
-          )}
-        </View>
+          </View>
+        </TouchableOpacity>
 
         <View>
           <Text style={[styles.label, { color: palette.ink3 }]}>
@@ -437,6 +325,7 @@ export default function HomeScreen() {
                   kind: "category",
                   id: slice.id,
                   title: slice.label,
+                  month,
                 })
               }
             />
@@ -476,6 +365,13 @@ export default function HomeScreen() {
         )}
       </ScrollView>
 
+      <MonthYearPicker
+        visible={pickerOpen}
+        value={month}
+        onSelect={setMonth}
+        onClose={() => setPickerOpen(false)}
+      />
+
       {explorer.overlay}
     </>
   );
@@ -491,7 +387,6 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingVertical: space.sm,
   },
-  headIncoming: { position: "absolute", left: 0, top: 0, right: 0 },
   title: { ...type.title, fontSize: 27, letterSpacing: -0.3 },
   year: { ...type.body, fontWeight: "500" },
   label: { ...type.label, marginBottom: space.sm },

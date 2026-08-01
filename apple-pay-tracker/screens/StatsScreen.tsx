@@ -1,5 +1,6 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  PanResponder,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -127,6 +128,22 @@ export default function StatsScreen() {
   const [donutMonthReady, setDonutMonthReady] = useState(false);
 
   const period = useMemo(() => buildPeriod(kind, offset), [kind, offset]);
+
+  // Le frecce restano il modo esplicito di cambiare periodo; lo swipe sulla
+  // stessa riga e' un modo piu' rapido di fare la stessa cosa, non lo
+  // sostituisce. Stesso limite delle frecce: non si va oltre il periodo
+  // corrente.
+  const periodSwipe = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_event, gesture) =>
+        Math.abs(gesture.dx) > 10 && Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.6,
+      onPanResponderRelease: (_event, gesture) => {
+        if (Math.abs(gesture.dx) < 40) return;
+        if (gesture.dx < 0) setOffset((o) => Math.min(o + 1, 0));
+        else setOffset((o) => o - 1);
+      },
+    })
+  ).current;
 
   const load = useCallback(async () => {
     // I grafici a colonne confrontano periodi fra loro, quindi guardano
@@ -639,6 +656,7 @@ export default function StatsScreen() {
                     kind: "category",
                     id,
                     title: category?.name ?? "Da categorizzare",
+                    month: kind === "month" ? period.start : undefined,
                   })
                 }
               >
@@ -694,6 +712,7 @@ export default function StatsScreen() {
                     kind: "merchant",
                     id: merchant.id,
                     title: merchant.name,
+                    month: kind === "month" ? period.start : undefined,
                   })
                 }
               >
@@ -766,7 +785,7 @@ export default function StatsScreen() {
         ))}
       </View>
 
-      <View style={styles.periodNav}>
+      <View style={styles.periodNav} {...periodSwipe.panHandlers}>
         <TouchableOpacity
           onPress={() => setOffset((o) => o - 1)}
           accessibilityLabel="Periodo precedente"
@@ -930,6 +949,8 @@ export default function StatsScreen() {
               kind: "category",
               id: slice.id,
               title: slice.label,
+              month:
+                donutScope === "month" ? donutMonths[donutMonthIndex] : undefined,
             })
           }
         />
@@ -1011,6 +1032,7 @@ export default function StatsScreen() {
                   kind: "merchant",
                   id: merchant.id,
                   title: merchant.name,
+                  month: kind === "month" ? period.start : undefined,
                 })
               }
             >

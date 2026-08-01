@@ -14,9 +14,12 @@ Update dentro Expo Go (vedi sotto), niente Apple Developer Program.
   nessuna libreria di charting esterna
 - `lucide-react-native` per le icone
 - Niente `react-native-gesture-handler`/`reanimated`: drag & drop e gesti
-  (riordino categorie, swipe mese in Home, ghiera mesi) sono fatti a mano con
-  `PanResponder` + `Animated` di React Native core, per restare dentro ai
-  moduli già inclusi in Expo Go
+  (riordino categorie, swipe periodo in Statistiche, ghiera mesi) sono fatti
+  a mano con `PanResponder` + `Animated` di React Native core, per restare
+  dentro ai moduli già inclusi in Expo Go. Il mese in Home si cambia con un
+  selettore a foglio (`MonthYearPicker`, apertura al tocco), non più a
+  swipe; in Statistiche il periodo si cambia sia con le frecce sia con lo
+  swipe
 
 ## Design system
 
@@ -52,6 +55,10 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   una regola ricorrente darebbe quasi sempre il numero sbagliato.
 - "Risparmiato" (Home → Bilancio del mese) = Introiti − Spese − Investimenti:
   quello che resta sul conto senza essere né speso né investito.
+- `DetailTarget.month` (screens/DetailScreen.tsx) porta il mese da cui si
+  apre il dettaglio di categoria/esercente, cosi' il grafico si posiziona li'
+  invece che sull'ultimo mese: ogni nuovo punto d'ingresso a `openDetail`
+  dovrebbe passarlo, quando un mese di riferimento esiste davvero.
 - L'ingestione da Apple Pay passa da una **Shortcut iOS** (trigger
   "Wallet"/"Transazione") che chiama l'Edge Function `ingest-payment` con un
   token per-utente (Impostazioni → Automazioni). Scatta sia per pagamenti
