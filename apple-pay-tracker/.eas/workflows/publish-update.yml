@@ -1,0 +1,12 @@
+name: Pubblica update
+
+on:
+  push:
+    branches: ['claude/apple-pay-payment-tracker-6o1dxc']
+
+jobs:
+  publish_update:
+    name: Pubblica update
+    type: update
+    params:
+      branch: production
