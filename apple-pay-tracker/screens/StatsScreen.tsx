@@ -233,6 +233,15 @@ export default function StatsScreen() {
   );
 
   const total = payments.reduce((sum, p) => sum + Number(p.effective_amount), 0);
+  const rankableTotal = rankable.reduce(
+    (sum, p) => sum + Number(p.effective_amount),
+    0
+  );
+  // Con "escludi costi fissi" acceso, il totale in cima deve raccontare la
+  // stessa cosa dei grafici sotto invece di restare sempre sul totale pieno:
+  // due numeri diversi con lo stesso significato apparente confondono.
+  const heroTotal = excludeMarked ? rankableTotal : total;
+  const fixedCostsTotal = total - rankableTotal;
 
   // Il limite mensile ha senso come riferimento solo sul mese corrente.
   const limitAmount =
@@ -540,7 +549,7 @@ export default function StatsScreen() {
 
   if (explorer.isOpen) return <>{explorer.overlay}</>;
 
-  const amount = splitAmount(total);
+  const amount = splitAmount(heroTotal);
 
   const grainAside = (
     <LetterToggle options={GRAIN_OPTIONS} value={grain} onChange={setGrain} />
@@ -819,6 +828,11 @@ export default function StatsScreen() {
         <Text style={[styles.heroMeta, { color: palette.ink2 }]}>
           {payments.length} {payments.length === 1 ? "spesa" : "spese"}
         </Text>
+        {!excludeMarked && fixedCostsTotal > 0 && (
+          <Text style={[styles.heroMeta, { color: palette.ink3 }]}>
+            di cui costi fissi {formatAmount(fixedCostsTotal)}
+          </Text>
+        )}
       </View>
 
       <View>
