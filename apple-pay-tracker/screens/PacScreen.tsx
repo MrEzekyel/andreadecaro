@@ -249,12 +249,12 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
         </TouchableOpacity>
 
         <Text style={[styles.note, { color: palette.ink3 }]}>
-          Ogni piano attivo inserisce la sua rata da solo il giorno stabilito,
-          segnandola come prevista: conta nel saldo, ma resta fuori dal prezzo
-          medio e dal rendimento finche' non si sa a che prezzo ha comprato.
-          Quando arriva l'estratto conto di Trade Republic, l'operazione vera
-          prende il posto della stima di quel mese — cosi' la rata non finisce
-          contata due volte.
+          Ogni piano attivo inserisce la sua rata da solo il giorno stabilito e
+          la completa la sera stessa con il prezzo di chiusura: non c'e' niente
+          da caricare. I fondi private market restano al loro costo finche' non
+          pubblicano un valore, perche' un prezzo pubblico non ce l'hanno. Se un
+          giorno carichi l'estratto conto, le operazioni vere prendono il posto
+          di quelle calcolate.
         </Text>
       </ScrollView>
 

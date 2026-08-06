@@ -53,14 +53,23 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   rende questa esclusione una scelta invece che un comportamento fisso.
 - `recurring_rules` → `materialize_recurring()` genera le spese ricorrenti
   ogni notte via pg_cron (mutuo, abbonamenti).
-- `investment_rules` = i **piani di accumulo** (schermata PAC).
-  `materialize_investments()` inserisce la rata da sola il giorno stabilito,
-  via pg_cron, **come `status='estimated'`**: è una previsione, non un
-  acquisto: non ha quote né prezzo, quindi vale il suo importo e resta fuori
-  da prezzo medio e rendimento. Il trigger `drop_superseded_estimates` la
-  cancella appena arriva l'operazione vera dello stesso mese per quello
-  stesso asset (`source='import'`) — è l'unica cosa che impedisce a ogni
-  import di raddoppiare le rate del periodo che copre.
+- `investment_rules` = i **piani di accumulo** (schermata PAC). Il ciclo è
+  interamente automatico e **non richiede mai un import**:
+  1. `materialize_investments()` (cron 03:00) inserisce la rata il giorno
+     stabilito come `status='estimated'` — senza quote né prezzo, perché a
+     quell'ora non si sanno ancora.
+  2. `sync-prices` (21:30) scarica la chiusura del giorno.
+  3. `settle_plan_instalments()` (22:00) calcola `quote = importo / prezzo` e
+     la porta a `settled`. Usa la **prima seduta dal giorno della rata in poi**,
+     non l'ultima precedente: se il 3 cade di sabato il broker esegue lunedì, e
+     la chiusura di venerdì sarebbe di due giorni prima dell'acquisto.
+  Lo scarto rispetto all'eseguito vero è 0,3-0,4% sugli ETF, ~2% su Solana.
+  I fondi private market non hanno prezzo pubblico: restano `estimated` (cioè
+  valorizzati al costo) finché non arriva un NAV.
+- L'import dell'estratto conto resta possibile ma **facoltativo**: il trigger
+  `drop_superseded_estimates` cancella la rata calcolata di quel mese per quel
+  asset appena ne arriva una con `source='import'`. Guarda `source='recurring'`
+  e non lo stato, altrimenti lascerebbe doppioni sulle rate già completate.
 - `incomes` è **sempre manuale**: stipendio e ricavi variano ogni volta,
   una regola ricorrente darebbe quasi sempre il numero sbagliato.
 - "Risparmiato" (Home → Bilancio del mese) = Introiti − Spese − Investimenti:
