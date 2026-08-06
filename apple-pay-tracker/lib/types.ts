@@ -154,6 +154,8 @@ export type Investment = {
 export type InvestmentRule = {
   id: string;
   user_id: string;
+  /** Il piano punta a un asset: senza, non si saprebbe in quale sezione va. */
+  asset_id: string | null;
   label: string;
   amount: number;
   card_name: string | null;

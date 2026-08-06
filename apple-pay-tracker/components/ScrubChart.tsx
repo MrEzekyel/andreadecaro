@@ -16,7 +16,7 @@ import Svg, {
 } from "react-native-svg";
 import { useTheme } from "../lib/ThemeContext";
 import { compactAmount } from "../lib/format";
-import { type } from "../lib/theme";
+import { space, type } from "../lib/theme";
 
 export type ScrubPoint = {
   date: string;
@@ -31,7 +31,8 @@ type Props = {
   /** Indice sotto il dito, o null quando non si sta trascinando. */
   onScrub?: (index: number | null) => void;
   height?: number;
-  baselineLabel?: string;
+  /** Nome della seconda linea in legenda. */
+  baselineName?: string;
   empty?: string;
 };
 
@@ -59,7 +60,7 @@ export function ScrubChart({
   color,
   onScrub,
   height = 180,
-  baselineLabel,
+  baselineName = "capitale versato",
   empty = "Ancora troppo pochi dati per disegnare l'andamento.",
 }: Props) {
   const { palette } = useTheme();
@@ -219,17 +220,37 @@ export function ScrubChart({
         )}
       </View>
 
-      <View style={styles.axis}>
-        <Text style={[styles.axisText, { color: palette.ink3 }]}>
-          {compactAmount(shape?.min ?? 0)}
-        </Text>
-        {baselineLabel && (
-          <Text style={[styles.axisText, { color: palette.ink3 }]}>
-            {baselineLabel}
-          </Text>
-        )}
-        <Text style={[styles.axisText, { color: palette.ink3 }]}>
-          {compactAmount(shape?.max ?? 0)}
+      {/* Legenda con dei campioni disegnati invece che dei trattini scritti nel
+          testo: due linee diverse vanno distinte da come sono fatte, non da un
+          "— —" che sembra un refuso accanto al titolo della sezione. */}
+      <View style={styles.footer}>
+        <View style={styles.legend}>
+          <View style={styles.legendItem}>
+            <View style={[styles.swatch, { backgroundColor: color }]} />
+            <Text style={[styles.legendText, { color: palette.ink3 }]}>
+              valore
+            </Text>
+          </View>
+
+          {shape?.base && (
+            <View style={styles.legendItem}>
+              <View style={styles.swatchDashed}>
+                {[0, 1, 2].map((i) => (
+                  <View
+                    key={i}
+                    style={[styles.dash, { backgroundColor: palette.ink3 }]}
+                  />
+                ))}
+              </View>
+              <Text style={[styles.legendText, { color: palette.ink3 }]}>
+                {baselineName}
+              </Text>
+            </View>
+          )}
+        </View>
+
+        <Text style={[styles.legendText, { color: palette.ink3 }]}>
+          {compactAmount(shape?.min ?? 0)} – {compactAmount(shape?.max ?? 0)}
         </Text>
       </View>
     </View>
@@ -238,11 +259,17 @@ export function ScrubChart({
 
 const styles = StyleSheet.create({
   empty: { ...type.caption, lineHeight: 19 },
-  axis: {
+  footer: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginTop: 2,
+    marginTop: 6,
+    gap: space.md,
   },
-  axisText: { ...type.small, fontSize: 10 },
+  legend: { flexDirection: "row", gap: space.md, alignItems: "center" },
+  legendItem: { flexDirection: "row", gap: 5, alignItems: "center" },
+  legendText: { ...type.small, fontSize: 10 },
+  swatch: { width: 14, height: 2, borderRadius: 1 },
+  swatchDashed: { flexDirection: "row", gap: 2, alignItems: "center" },
+  dash: { width: 4, height: 2, borderRadius: 1 },
 });

@@ -53,10 +53,12 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   rende questa esclusione una scelta invece che un comportamento fisso.
 - `recurring_rules` → `materialize_recurring()` genera le spese ricorrenti
   ogni notte via pg_cron (mutuo, abbonamenti).
-- `investment_rules` → `materialize_investments()`, stessa logica, stesso
-  cron. **Disattivate**: da quando lo storico investimenti arriva
-  dall'estratto conto di Trade Republic, una regola che genera la rata
-  stimata duplicherebbe l'operazione vera del prossimo import.
+- `investment_rules` = i **piani di accumulo** (schermata PAC). Non generano
+  più operazioni e il loro cron è stato **rimosso**, non solo disattivato: le
+  operazioni vere arrivano dall'estratto conto del broker, e finché il job
+  esisteva riattivare un piano avrebbe ricominciato a duplicare in silenzio.
+  Ora `active` descrive un piano in corso presso il broker; la funzione
+  `materialize_investments()` resta nello schema ma non la chiama nessuno.
 - `incomes` è **sempre manuale**: stipendio e ricavi variano ogni volta,
   una regola ricorrente darebbe quasi sempre il numero sbagliato.
 - "Risparmiato" (Home → Bilancio del mese) = Introiti − Spese − Investimenti:
@@ -100,9 +102,16 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   prezzo a cui il fondo esegue l'ordine mensile è il suo valore di quel giorno
   (`asset_prices.source='fill'`). Fra un'esecuzione e l'altra il grafico resta
   fermo invece di interpolare.
-- `portfolio_daily(p_asset)` e `latest_asset_prices()` sono RPC: la serie
-  giornaliera si calcola nel database perché ricostruirla sul telefono
-  vorrebbe dire scaricare ~1700 righe di prezzi a ogni apertura.
+- `portfolio_daily(p_asset, p_group)` e `latest_asset_prices()` sono RPC: la
+  serie giornaliera si calcola nel database perché ricostruirla sul telefono
+  vorrebbe dire scaricare ~1700 righe di prezzi a ogni apertura. Il filtro per
+  gruppo serve ai grafici delle sezioni, che si caricano solo quando la
+  sezione viene aperta (`usePortfolioSeries(null)` non interroga niente).
+- La sezione ha tre schermate figlie: `AnalysisScreen` (ripartizione, anello
+  grande e lista sotto), `PacScreen` (piani di accumulo) e
+  `AssetDetailScreen`. Le sezioni per gruppo sono **chiuse di default**: con
+  quattro gruppi aperti la schermata diventa un muro da scorrere, e il saldo
+  di ciascuno è già nell'intestazione.
 - Lo storico viene dall'**esportazione operazioni di Trade Republic** (CSV con
   data, ISIN, quote, prezzo). `investments.external_id` tiene l'id operazione
   del broker, così si può riesportare e reimportare senza duplicare.

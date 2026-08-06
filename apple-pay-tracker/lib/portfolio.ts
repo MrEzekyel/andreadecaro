@@ -251,7 +251,12 @@ export type GroupSummary = {
   group: AssetGroup;
   label: string;
   value: number;
+  /** Capitale nelle quote, senza gli ordini ancora in esecuzione. */
+  investedBasis: number;
   costBasis: number;
+  pending: number;
+  priceGain: number;
+  priceGainPct: number | null;
   gain: number;
   share: number;
   positions: Position[];
@@ -263,15 +268,23 @@ export function groupPositions(
 ): GroupSummary[] {
   return GROUP_ORDER.map((group) => {
     const inGroup = positions.filter((p) => p.asset.asset_group === group);
-    const value = inGroup.reduce((s, p) => s + p.value, 0);
-    const costBasis = inGroup.reduce((s, p) => s + p.costBasis, 0);
-    const gain = inGroup.reduce((s, p) => s + p.gain, 0);
+    const sum = (pick: (p: Position) => number) =>
+      inGroup.reduce((s, p) => s + pick(p), 0);
+
+    const investedBasis = sum((p) => p.investedBasis);
+    const priceGain = sum((p) => p.priceGain);
+    const value = sum((p) => p.value);
+
     return {
       group,
       label: GROUP_LABEL[group],
       value,
-      costBasis,
-      gain,
+      investedBasis,
+      costBasis: sum((p) => p.costBasis),
+      pending: sum((p) => p.pending),
+      priceGain,
+      priceGainPct: investedBasis > 0 ? priceGain / investedBasis : null,
+      gain: priceGain + sum((p) => p.dividends),
       share: total > 0 ? value / total : 0,
       positions: inGroup.sort((a, b) => b.value - a.value),
     };

@@ -9,11 +9,13 @@ import {
   portfolioXirr,
   sumPositions,
 } from "./portfolio";
-import { Asset, Investment } from "./types";
+import { Asset, AssetGroup, Investment, InvestmentRule } from "./types";
 
 type State = {
   assets: Asset[];
   investments: Investment[];
+  /** I piani di accumulo: quanto entra ogni mese, e su quale asset. */
+  rules: InvestmentRule[];
   positions: Position[];
   totals: PortfolioTotals;
   series: SeriesPoint[];
@@ -45,6 +47,7 @@ export function usePortfolio() {
   const [state, setState] = useState<State>({
     assets: [],
     investments: [],
+    rules: [],
     positions: [],
     totals: EMPTY_TOTALS,
     series: [],
@@ -53,9 +56,10 @@ export function usePortfolio() {
   });
 
   const load = useCallback(async () => {
-    const [assetsRes, opsRes, pricesRes, seriesRes] = await Promise.all([
+    const [assetsRes, opsRes, rulesRes, pricesRes, seriesRes] = await Promise.all([
       supabase.from("assets").select("*").eq("archived", false).order("sort_order"),
       supabase.from("investments").select("*").order("occurred_at"),
+      supabase.from("investment_rules").select("*").order("amount", { ascending: false }),
       supabase.rpc("latest_asset_prices"),
       supabase.rpc("portfolio_daily"),
     ]);
@@ -80,6 +84,7 @@ export function usePortfolio() {
     setState({
       assets,
       investments,
+      rules: (rulesRes.data ?? []) as InvestmentRule[],
       positions,
       totals,
       series,
@@ -95,26 +100,44 @@ export function usePortfolio() {
   return { ...state, reload: load };
 }
 
-/** Serie giornaliera di un singolo asset, per la sua schermata di dettaglio. */
-export function useAssetSeries(assetId: string) {
+/**
+ * Serie giornaliera di una fetta di portafoglio: un singolo asset o un intero
+ * gruppo. Si carica alla prima apertura della sezione e non prima, cosi' una
+ * schermata con quattro sezioni chiuse non fa quattro interrogazioni inutili.
+ */
+export function usePortfolioSeries(
+  scope: { assetId?: string; group?: AssetGroup } | null
+) {
   const [series, setSeries] = useState<SeriesPoint[]>([]);
+  const key = scope ? `${scope.assetId ?? ""}|${scope.group ?? ""}` : null;
 
   useEffect(() => {
+    if (!scope) return;
     let alive = true;
-    supabase.rpc("portfolio_daily", { p_asset: assetId }).then(({ data }) => {
-      if (!alive) return;
-      setSeries(
-        ((data ?? []) as SeriesPoint[]).map((p) => ({
-          on_date: p.on_date,
-          value_eur: Number(p.value_eur),
-          invested_eur: Number(p.invested_eur),
-        }))
-      );
-    });
+
+    supabase
+      .rpc("portfolio_daily", {
+        p_asset: scope.assetId ?? null,
+        p_group: scope.group ?? null,
+      })
+      .then(({ data }) => {
+        if (!alive) return;
+        setSeries(
+          ((data ?? []) as SeriesPoint[]).map((p) => ({
+            on_date: p.on_date,
+            value_eur: Number(p.value_eur),
+            invested_eur: Number(p.invested_eur),
+          }))
+        );
+      });
+
     return () => {
       alive = false;
     };
-  }, [assetId]);
+    // Le due chiavi bastano a identificare la fetta: l'oggetto `scope` cambia
+    // identita' a ogni render e rilancerebbe la query all'infinito.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [key]);
 
   return series;
 }

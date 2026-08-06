@@ -14,7 +14,7 @@ import {
   sliceSeries,
 } from "../lib/portfolio";
 import { Investment } from "../lib/types";
-import { useAssetSeries } from "../lib/usePortfolio";
+import { usePortfolioSeries } from "../lib/usePortfolio";
 import { radius, space, tint, type } from "../lib/theme";
 
 const KIND_LABEL: Record<Investment["kind"], string> = {
@@ -31,9 +31,11 @@ type Props = {
 
 export default function AssetDetailScreen({ position, investments, onBack }: Props) {
   const { palette, dark } = useTheme();
-  const series = useAssetSeries(position.asset.id);
+  const series = usePortfolioSeries({ assetId: position.asset.id });
 
-  const [range, setRange] = useState<RangeKey>("all");
+  // Come nella schermata principale: un anno racconta gia' un andamento
+  // senza schiacciare gli ultimi mesi contro il bordo.
+  const [range, setRange] = useState<RangeKey>("1y");
   const [scrub, setScrub] = useState<number | null>(null);
 
   const visible = useMemo(() => sliceSeries(series, range), [series, range]);
@@ -111,7 +113,6 @@ export default function AssetDetailScreen({ position, investments, onBack }: Pro
             points={points}
             color={palette.accent}
             onScrub={setScrub}
-            baselineLabel="— — capitale versato"
           />
           <View style={styles.ranges}>
             {RANGES.map((r) => {
