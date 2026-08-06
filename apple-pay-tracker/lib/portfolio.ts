@@ -26,12 +26,20 @@ export type Position = {
   pending: number;
   price: number | null;
   priceDate: string | null;
+  /** Solo le quote possedute, al prezzo di oggi. */
+  marketValue: number;
+  /** Quanto vale la posizione in totale, ordini in esecuzione compresi. */
   value: number;
-  /** Capitale netto ancora dentro la posizione. */
+  /** Capitale netto dentro le quote: versato meno disinvestito. */
+  investedBasis: number;
+  /** Capitale impegnato in tutto, ordini in esecuzione compresi. */
   costBasis: number;
   /** Prezzo medio di carico: quanto e' costata in media una quota. */
   avgPrice: number | null;
-  /** Guadagno o perdita, dividendi inclusi. */
+  /** Solo il movimento del prezzo: e' il rendimento che mostra il broker. */
+  priceGain: number;
+  priceGainPct: number | null;
+  /** Rendimento vero: comprende i dividendi incassati. */
   gain: number;
   gainPct: number | null;
   /** Una posizione chiusa resta nello storico ma sparisce dall'allocazione. */
@@ -93,8 +101,17 @@ export function buildPositions(
     const price = latest ? Number(latest.close_eur) : null;
     // Le quote in virgola mobile non tornano mai esattamente a zero.
     const closed = quantity < 1e-9;
-    const value = closed || price === null ? 0 : quantity * price;
-    const costBasis = invested - sold;
+    const marketValue = closed || price === null ? 0 : quantity * price;
+    const investedBasis = invested - sold;
+
+    // Gli ordini addebitati e non ancora eseguiti restano nel saldo: non sono
+    // esposti al mercato, ma nemmeno spariti. E' anche cio' che fa il broker.
+    const value = marketValue + pending;
+
+    // Il rendimento si misura sulle sole quote: contarci dentro anche il
+    // denaro in transito, che per definizione non si e' ancora mosso,
+    // diluirebbe la percentuale verso lo zero.
+    const priceGain = marketValue - investedBasis;
 
     return {
       asset,
@@ -106,11 +123,15 @@ export function buildPositions(
       pending,
       price,
       priceDate: latest?.on_date ?? null,
+      marketValue,
       value,
-      costBasis,
+      investedBasis,
+      costBasis: investedBasis + pending,
       avgPrice: closed || quantity <= 0 ? null : invested / quantity,
-      gain: value + dividends - costBasis,
-      gainPct: costBasis > 0 ? (value + dividends - costBasis) / costBasis : null,
+      priceGain,
+      priceGainPct: investedBasis > 0 ? priceGain / investedBasis : null,
+      gain: priceGain + dividends,
+      gainPct: investedBasis > 0 ? (priceGain + dividends) / investedBasis : null,
       closed,
     };
   });
@@ -118,10 +139,13 @@ export function buildPositions(
 
 export type PortfolioTotals = {
   value: number;
+  marketValue: number;
   costBasis: number;
+  investedBasis: number;
   dividends: number;
   pending: number;
   fees: number;
+  priceGain: number;
   gain: number;
   gainPct: number | null;
 };
@@ -130,19 +154,31 @@ export function sumPositions(positions: Position[]): PortfolioTotals {
   const t = positions.reduce(
     (acc, p) => ({
       value: acc.value + p.value,
+      marketValue: acc.marketValue + p.marketValue,
       costBasis: acc.costBasis + p.costBasis,
+      investedBasis: acc.investedBasis + p.investedBasis,
       dividends: acc.dividends + p.dividends,
       pending: acc.pending + p.pending,
       fees: acc.fees + p.fees,
     }),
-    { value: 0, costBasis: 0, dividends: 0, pending: 0, fees: 0 }
+    {
+      value: 0,
+      marketValue: 0,
+      costBasis: 0,
+      investedBasis: 0,
+      dividends: 0,
+      pending: 0,
+      fees: 0,
+    }
   );
 
-  const gain = t.value + t.dividends - t.costBasis;
+  const priceGain = t.marketValue - t.investedBasis;
+  const gain = priceGain + t.dividends;
   return {
     ...t,
+    priceGain,
     gain,
-    gainPct: t.costBasis > 0 ? gain / t.costBasis : null,
+    gainPct: t.investedBasis > 0 ? gain / t.investedBasis : null,
   };
 }
 

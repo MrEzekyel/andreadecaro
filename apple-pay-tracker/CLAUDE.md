@@ -74,9 +74,16 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   investito" deve filtrare `kind='buy' and status='settled'` — succede in
   Home (Risparmiato) e in Statistiche.
 - `status='pending'` = ordine addebitato ma non ancora eseguito. Sui fondi
-  private market fra addebito e assegnazione delle quote passano ~2 settimane:
-  in mezzo quei soldi sono cassa impegnata, non capitale investito, e contarli
-  come investiti falserebbe prezzo medio e rendimento.
+  private market fra addebito e assegnazione delle quote passano ~2 settimane.
+  Quel denaro **conta nel valore** (al suo costo: è uscito dal conto, come fa
+  anche Trade Republic) ma **non nel rendimento**, perché non si è ancora
+  mosso e diluirebbe la percentuale verso lo zero. Da qui la coppia
+  `investedBasis` (solo le quote) / `costBasis` (quote + in esecuzione).
+- Due rendimenti, entrambi corretti e non intercambiabili: `priceGainPct` è
+  il solo movimento del prezzo, lo stesso numero che mostra il broker, ed è
+  quello negli elenchi perché è ciò che Andrea confronta; `gainPct` include i
+  dividendi incassati e compare nel dettaglio. Su un titolo che distribuisce
+  divergono parecchio (l'iBonds fa −0,27% di prezzo e +3,4% di totale).
 - `asset_prices.close_eur` è **sempre in euro**, già convertito a monte.
   Mescolare valute qui sarebbe un errore silenzioso: i numeri resterebbero
   plausibili ma sbagliati del 15%.

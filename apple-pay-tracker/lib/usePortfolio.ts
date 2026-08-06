@@ -23,10 +23,13 @@ type State = {
 
 const EMPTY_TOTALS: PortfolioTotals = {
   value: 0,
+  marketValue: 0,
   costBasis: 0,
+  investedBasis: 0,
   dividends: 0,
   pending: 0,
   fees: 0,
+  priceGain: 0,
   gain: 0,
   gainPct: null,
 };

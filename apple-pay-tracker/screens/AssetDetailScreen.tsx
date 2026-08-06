@@ -167,7 +167,23 @@ export default function AssetDetailScreen({ position, investments, onBack }: Pro
             <Fact label="Disinvestito" value={formatAmount(position.sold)} />
           )}
           {position.dividends > 0 && (
-            <Fact label="Dividendi incassati" value={formatAmount(position.dividends)} />
+            <>
+              <Fact
+                label="Dividendi incassati"
+                value={formatAmount(position.dividends)}
+              />
+              {/* Il rendimento di prezzo e' quello che mostra il broker, ma su
+                  un titolo che distribuisce racconta meta' storia: le cedole
+                  escono dal prezzo e finiscono sul conto. */}
+              <Fact
+                label="Rendimento di prezzo"
+                value={signedPct(position.priceGainPct)}
+              />
+              <Fact
+                label="Rendimento totale"
+                value={signedPct(position.gainPct)}
+              />
+            </>
           )}
           {position.pending > 0 && (
             <Fact label="In esecuzione" value={formatAmount(position.pending)} />
@@ -221,6 +237,11 @@ export default function AssetDetailScreen({ position, investments, onBack }: Pro
       </ScrollView>
     </SwipeBack>
   );
+}
+
+function signedPct(value: number | null) {
+  if (value === null) return "—";
+  return `${value >= 0 ? "+" : "−"}${Math.abs(value * 100).toFixed(2)}%`;
 }
 
 function Fact({ label, value }: { label: string; value: string }) {

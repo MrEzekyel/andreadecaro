@@ -300,7 +300,11 @@ function AssetRow({
   onPress: () => void;
 }) {
   const { palette } = useTheme();
-  const positive = position.gain >= 0;
+  // In elenco si mostra il rendimento di prezzo, lo stesso che mostra il
+  // broker: e' il numero che verra' confrontato con la sua app. I dividendi
+  // sono guadagno vero ma non stanno nel prezzo, e compaiono nel dettaglio.
+  const pct = position.priceGainPct;
+  const positive = position.priceGain >= 0;
 
   return (
     <TouchableOpacity style={styles.assetRow} onPress={onPress}>
@@ -321,7 +325,7 @@ function AssetRow({
         <Text style={[styles.assetValue, { color: palette.ink }]}>
           {formatAmount(position.closed ? position.gain : position.value)}
         </Text>
-        {position.gainPct !== null && (
+        {pct !== null && !position.closed && (
           <Text
             style={[
               styles.assetGain,
@@ -329,7 +333,7 @@ function AssetRow({
             ]}
           >
             {positive ? "+" : "−"}
-            {Math.abs(position.gainPct * 100).toFixed(1)}%
+            {Math.abs(pct * 100).toFixed(1)}%
           </Text>
         )}
       </View>
