@@ -249,9 +249,12 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
         </TouchableOpacity>
 
         <Text style={[styles.note, { color: palette.ink3 }]}>
-          Questi piani descrivono cosa versi, non creano le operazioni: quelle
-          arrivano dall'estratto conto di Trade Republic. Se le generassero
-          anche loro, ogni rata finirebbe contata due volte.
+          Ogni piano attivo inserisce la sua rata da solo il giorno stabilito,
+          segnandola come prevista: conta nel saldo, ma resta fuori dal prezzo
+          medio e dal rendimento finche' non si sa a che prezzo ha comprato.
+          Quando arriva l'estratto conto di Trade Republic, l'operazione vera
+          prende il posto della stima di quel mese — cosi' la rata non finisce
+          contata due volte.
         </Text>
       </ScrollView>
 

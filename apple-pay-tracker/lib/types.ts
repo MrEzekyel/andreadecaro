@@ -143,8 +143,12 @@ export type Investment = {
   quantity: number | null;
   unit_price: number | null;
   fee: number;
-  /** `pending` = ordine prenotato ma non ancora eseguito (private market). */
-  status: "settled" | "pending";
+  /**
+   * `settled` = eseguita, con quote e prezzo. `pending` = addebitata dal broker
+   * e in attesa di esecuzione (private market). `estimated` = rata prevista da
+   * un piano di accumulo, in attesa dell'operazione vera dall'estratto conto.
+   */
+  status: "settled" | "pending" | "estimated";
   settled_on: string | null;
   external_id: string | null;
   dedup_key: string | null;

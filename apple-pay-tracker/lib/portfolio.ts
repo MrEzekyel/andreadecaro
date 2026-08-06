@@ -22,7 +22,10 @@ export type Position = {
   sold: number;
   dividends: number;
   fees: number;
-  /** Ordini addebitati ma non ancora eseguiti: cassa impegnata, non capitale. */
+  /**
+   * Denaro uscito dal conto e non ancora diventato quote: ordini che il broker
+   * deve eseguire, piu' le rate previste dai piani in attesa dell'estratto.
+   */
   pending: number;
   price: number | null;
   priceDate: string | null;
@@ -81,7 +84,10 @@ export function buildPositions(
     let pending = 0;
 
     for (const op of ops) {
-      if (op.status === "pending") {
+      // Senza quote e senza prezzo un'operazione non puo' entrare nel prezzo
+      // medio ne' nel rendimento: sarebbe un acquisto mai avvenuto a un prezzo
+      // mai pagato. Vale il suo importo e basta.
+      if (op.status !== "settled") {
         pending += Number(op.amount);
         continue;
       }
@@ -188,7 +194,7 @@ export type CashFlow = { date: string; amount: number };
 export function cashFlows(investments: Investment[]): CashFlow[] {
   const flows: CashFlow[] = [];
   for (const op of investments) {
-    if (op.status === "pending") continue;
+    if (op.status !== "settled") continue;
     const date = effectiveDay(op);
     const amount = Number(op.amount);
     if (op.kind === "buy") flows.push({ date, amount: -amount });

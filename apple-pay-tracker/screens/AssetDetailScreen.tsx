@@ -210,6 +210,7 @@ export default function AssetDetailScreen({ position, investments, onBack }: Pro
                 <Text style={[styles.opKind, { color: palette.ink }]}>
                   {KIND_LABEL[op.kind]}
                   {op.status === "pending" ? " · in esecuzione" : ""}
+                  {op.status === "estimated" ? " · rata prevista" : ""}
                 </Text>
                 <Text style={[styles.opMeta, { color: palette.ink3 }]}>
                   {formatDate(effectiveDay(op))}
@@ -221,7 +222,7 @@ export default function AssetDetailScreen({ position, investments, onBack }: Pro
                   styles.opAmount,
                   {
                     color:
-                      op.kind === "buy" && op.status !== "pending"
+                      op.kind === "buy" && op.status === "settled"
                         ? palette.ink
                         : op.kind === "buy"
                           ? palette.ink3

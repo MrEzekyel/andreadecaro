@@ -53,12 +53,14 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   rende questa esclusione una scelta invece che un comportamento fisso.
 - `recurring_rules` → `materialize_recurring()` genera le spese ricorrenti
   ogni notte via pg_cron (mutuo, abbonamenti).
-- `investment_rules` = i **piani di accumulo** (schermata PAC). Non generano
-  più operazioni e il loro cron è stato **rimosso**, non solo disattivato: le
-  operazioni vere arrivano dall'estratto conto del broker, e finché il job
-  esisteva riattivare un piano avrebbe ricominciato a duplicare in silenzio.
-  Ora `active` descrive un piano in corso presso il broker; la funzione
-  `materialize_investments()` resta nello schema ma non la chiama nessuno.
+- `investment_rules` = i **piani di accumulo** (schermata PAC).
+  `materialize_investments()` inserisce la rata da sola il giorno stabilito,
+  via pg_cron, **come `status='estimated'`**: è una previsione, non un
+  acquisto: non ha quote né prezzo, quindi vale il suo importo e resta fuori
+  da prezzo medio e rendimento. Il trigger `drop_superseded_estimates` la
+  cancella appena arriva l'operazione vera dello stesso mese per quello
+  stesso asset (`source='import'`) — è l'unica cosa che impedisce a ogni
+  import di raddoppiare le rate del periodo che copre.
 - `incomes` è **sempre manuale**: stipendio e ricavi variano ogni volta,
   una regola ricorrente darebbe quasi sempre il numero sbagliato.
 - "Risparmiato" (Home → Bilancio del mese) = Introiti − Spese − Investimenti:
@@ -75,12 +77,15 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   `amount` resta sempre positivo. Ogni query che voglia dire "quanto ho
   investito" deve filtrare `kind='buy' and status='settled'` — succede in
   Home (Risparmiato) e in Statistiche.
-- `status='pending'` = ordine addebitato ma non ancora eseguito. Sui fondi
-  private market fra addebito e assegnazione delle quote passano ~2 settimane.
-  Quel denaro **conta nel valore** (al suo costo: è uscito dal conto, come fa
-  anche Trade Republic) ma **non nel rendimento**, perché non si è ancora
-  mosso e diluirebbe la percentuale verso lo zero. Da qui la coppia
-  `investedBasis` (solo le quote) / `costBasis` (quote + in esecuzione).
+- Tutto ciò che non è `status='settled'` è denaro uscito dal conto e non
+  ancora diventato quote: `pending` (il broker deve eseguire — sui private
+  market passano ~2 settimane) ed `estimated` (rata prevista da un piano).
+  Quel denaro **conta nel valore** al suo costo — è uscito dal conto, come fa
+  anche Trade Republic — ma **non nel rendimento**, perché il prezzo a cui
+  comprerà non si sa ancora e diluirebbe la percentuale verso lo zero. Da qui
+  la coppia `investedBasis` (solo le quote) / `costBasis` (quote + non
+  eseguito). Nel codice il discriminante è sempre `status !== "settled"`, mai
+  un elenco dei due valori: aggiungerne un terzo non deve rompere i conti.
 - Due rendimenti, entrambi corretti e non intercambiabili: `priceGainPct` è
   il solo movimento del prezzo, lo stesso numero che mostra il broker, ed è
   quello negli elenchi perché è ciò che Andrea confronta; `gainPct` include i

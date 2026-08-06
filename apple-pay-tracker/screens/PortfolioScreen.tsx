@@ -241,9 +241,11 @@ export default function PortfolioScreen() {
         <View style={styles.pendingRow}>
           <Icon name="clock" size={16} color={palette.ink3} />
           <Text style={[styles.pendingText, { color: palette.ink2 }]}>
-            {formatAmount(totals.pending)} addebitati e non ancora convertiti in
-            quote. I fondi private market eseguono gli ordini a finestre, non il
-            giorno stesso.
+            {formatAmount(totals.pending)} usciti dal conto e non ancora
+            diventati quote: rate previste dai piani in attesa dell'estratto, e
+            ordini private market, che i fondi eseguono a finestre e non il
+            giorno stesso. Contano nel saldo ma non nel rendimento, perche' il
+            prezzo a cui compreranno non si sa ancora.
           </Text>
         </View>
       )}
