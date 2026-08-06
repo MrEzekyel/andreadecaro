@@ -103,15 +103,50 @@ export type SpendingLimit = {
   created_at: string;
 };
 
+/** I tre raggruppamenti del portafoglio, gli stessi che usa Trade Republic. */
+export type AssetGroup = "conto_titoli" | "crypto" | "private_market";
+
+export type Asset = {
+  id: string;
+  user_id: string;
+  name: string;
+  asset_group: AssetGroup;
+  isin: string | null;
+  price_source: "yahoo" | "manual";
+  price_symbol: string | null;
+  quote_currency: string;
+  sort_order: number;
+  archived: boolean;
+  created_at: string;
+};
+
+export type AssetPrice = {
+  asset_id: string;
+  on_date: string;
+  close_eur: number;
+  /** `fill` = prezzo di un'esecuzione reale sul conto. */
+  source: "yahoo" | "manual" | "fill";
+};
+
 export type Investment = {
   id: string;
   user_id: string;
+  asset_id: string | null;
   amount: number;
   label: string;
   card_name: string | null;
   note: string | null;
   occurred_at: string;
-  source: "manual" | "recurring";
+  source: "manual" | "recurring" | "import";
+  /** `amount` resta sempre positivo: la direzione del denaro la porta `kind`. */
+  kind: "buy" | "sell" | "dividend";
+  quantity: number | null;
+  unit_price: number | null;
+  fee: number;
+  /** `pending` = ordine prenotato ma non ancora eseguito (private market). */
+  status: "settled" | "pending";
+  settled_on: string | null;
+  external_id: string | null;
   dedup_key: string | null;
   created_at: string;
 };

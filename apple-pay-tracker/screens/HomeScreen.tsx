@@ -87,6 +87,11 @@ export default function HomeScreen() {
       supabase
         .from("investments")
         .select("amount")
+        // "Investito questo mese" sono i soldi usciti dal conto per comprare:
+        // vendite e dividendi sono denaro che rientra, e un ordine ancora da
+        // eseguire non ha comprato niente.
+        .eq("kind", "buy")
+        .eq("status", "settled")
         .gte("occurred_at", start.toISOString())
         .lt("occurred_at", end.toISOString()),
     ]);
@@ -191,23 +196,32 @@ export default function HomeScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <TouchableOpacity
-          style={styles.head}
-          activeOpacity={0.6}
-          onPress={() => setPickerOpen(true)}
-          accessibilityRole="button"
-          accessibilityLabel={`${monthTitle(month)} ${month.getFullYear()}`}
-          accessibilityHint="Apre il selettore di mese e anno"
-        >
-          <View style={styles.headPair}>
+        <View style={styles.head}>
+          <TouchableOpacity
+            style={styles.headPair}
+            activeOpacity={0.6}
+            onPress={() => setPickerOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`${monthTitle(month)} ${month.getFullYear()}`}
+            accessibilityHint="Apre il selettore di mese e anno"
+          >
             <Text style={[styles.title, { color: palette.ink }]}>
               {monthTitle(month)}
             </Text>
             <Text style={[styles.year, { color: palette.ink3 }]}>
               {month.getFullYear()}
             </Text>
-          </View>
-        </TouchableOpacity>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => openSettings("root")}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+            accessibilityRole="button"
+            accessibilityLabel="Impostazioni"
+          >
+            <Icon name="sliders-horizontal" size={19} color={palette.ink3} />
+          </TouchableOpacity>
+        </View>
 
         <View>
           <Text style={[styles.label, { color: palette.ink3 }]}>
@@ -379,14 +393,13 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.xl },
-  head: {},
-  headPair: {
+  head: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     justifyContent: "space-between",
-    width: "100%",
     paddingVertical: space.sm,
   },
+  headPair: { flexDirection: "row", alignItems: "baseline", gap: space.sm },
   title: { ...type.title, fontSize: 27, letterSpacing: -0.3 },
   year: { ...type.body, fontWeight: "500" },
   label: { ...type.label, marginBottom: space.sm },

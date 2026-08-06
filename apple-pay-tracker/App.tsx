@@ -18,16 +18,20 @@ import { radius, space, type } from "./lib/theme";
 import AuthScreen from "./screens/AuthScreen";
 import HomeScreen from "./screens/HomeScreen";
 import PaymentsScreen from "./screens/PaymentsScreen";
+import PortfolioScreen from "./screens/PortfolioScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import StatsScreen from "./screens/StatsScreen";
 
-type Tab = "home" | "payments" | "stats" | "settings";
+type Tab = "home" | "payments" | "stats" | "portfolio" | "settings";
 
+// Impostazioni non e' piu' una scheda: ci si arriva dall'ingranaggio in Home.
+// Le quattro schede restano tutte destinazioni che si guardano, non si
+// configurano.
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "home", label: "Home", icon: "house" },
   { key: "payments", label: "Spese", icon: "list" },
   { key: "stats", label: "Statistiche", icon: "chart-pie" },
-  { key: "settings", label: "Impostazioni", icon: "sliders-horizontal" },
+  { key: "portfolio", label: "Investimenti", icon: "trending-up" },
 ];
 
 function Shell() {
@@ -55,6 +59,7 @@ function Shell() {
           {tab === "home" && <HomeScreen />}
           {tab === "payments" && <PaymentsScreen />}
           {tab === "stats" && <StatsScreen />}
+          {tab === "portfolio" && <PortfolioScreen />}
           {tab === "settings" && (
             <SettingsScreen initialPage={settingsPage} openNonce={settingsNonce} />
           )}
@@ -88,10 +93,7 @@ function Shell() {
               key={item.key}
               item={item}
               active={tab === item.key}
-              onPress={() => {
-                if (item.key === "settings") openSettings("root");
-                else setTab(item.key);
-              }}
+              onPress={() => setTab(item.key)}
             />
           ))}
         </View>

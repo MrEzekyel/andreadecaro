@@ -189,6 +189,10 @@ export default function StatsScreen() {
       supabase
         .from("investments")
         .select("amount, occurred_at")
+        // Come in Home: contano solo gli acquisti eseguiti, non i rientri di
+        // denaro (vendite, dividendi) ne' gli ordini ancora in esecuzione.
+        .eq("kind", "buy")
+        .eq("status", "settled")
         .gte("occurred_at", historyStart.toISOString()),
     ]);
 

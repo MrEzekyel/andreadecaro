@@ -7,7 +7,6 @@ export type SettingsPage =
   | "recurring"
   | "people"
   | "automations"
-  | "investments"
   | "income";
 
 type Nav = {

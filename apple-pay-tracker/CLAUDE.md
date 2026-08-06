@@ -10,16 +10,20 @@ Update dentro Expo Go (vedi sotto), niente Apple Developer Program.
   (deve restare compatibile con Expo Go)
 - **Supabase**: Postgres + Row Level Security + Edge Function + pg_cron
   - project ref: `wcmxwhmiexhhbqvadbig`
-- `react-native-svg` per tutti i grafici (BarChart, TrendChart, CategoryDonut),
-  nessuna libreria di charting esterna
+- `react-native-svg` per tutti i grafici (BarChart, TrendChart, CategoryDonut,
+  ScrubChart), nessuna libreria di charting esterna
 - `lucide-react-native` per le icone
 - Niente `react-native-gesture-handler`/`reanimated`: drag & drop e gesti
-  (riordino categorie, swipe periodo in Statistiche, ghiera mesi) sono fatti
-  a mano con `PanResponder` + `Animated` di React Native core, per restare
-  dentro ai moduli già inclusi in Expo Go. Il mese in Home si cambia con un
-  selettore a foglio (`MonthYearPicker`, apertura al tocco), non più a
-  swipe; in Statistiche il periodo si cambia sia con le frecce sia con lo
-  swipe
+  (riordino categorie, swipe periodo in Statistiche, ghiera mesi, lettura al
+  tocco del grafico investimenti) sono fatti a mano con `PanResponder` +
+  `Animated` di React Native core, per restare dentro ai moduli già inclusi in
+  Expo Go. Il mese in Home si cambia con un selettore a foglio
+  (`MonthYearPicker`, apertura al tocco), non più a swipe; in Statistiche il
+  periodo si cambia sia con le frecce sia con lo swipe
+- Schede in basso: Home, Spese, Statistiche, Investimenti. **Impostazioni non
+  è una scheda**: ci si arriva dall'ingranaggio in alto a destra in Home
+  (`useNav().openSettings`), perché le schede sono destinazioni che si
+  guardano, non si configurano
 
 ## Design system
 
@@ -50,11 +54,51 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 - `recurring_rules` → `materialize_recurring()` genera le spese ricorrenti
   ogni notte via pg_cron (mutuo, abbonamenti).
 - `investment_rules` → `materialize_investments()`, stessa logica, stesso
-  cron, ma per gli investimenti (piani di accumulo).
+  cron. **Disattivate**: da quando lo storico investimenti arriva
+  dall'estratto conto di Trade Republic, una regola che genera la rata
+  stimata duplicherebbe l'operazione vera del prossimo import.
 - `incomes` è **sempre manuale**: stipendio e ricavi variano ogni volta,
   una regola ricorrente darebbe quasi sempre il numero sbagliato.
 - "Risparmiato" (Home → Bilancio del mese) = Introiti − Spese − Investimenti:
   quello che resta sul conto senza essere né speso né investito.
+### Portafoglio investimenti
+
+- `assets` = cosa si possiede (nome, gruppo `conto_titoli`/`crypto`/
+  `private_market`, ISIN, come recuperarne il prezzo). Prima l'asset era testo
+  libero nel campo `investments.label` e si era gia' rotto da solo: gli
+  acquisti manuali dicevano "Apollo PM", le regole "Apollo", e per il database
+  erano due cose diverse.
+- `investments` è un **registro di operazioni**, non solo di versamenti:
+  `kind` vale `buy`/`sell`/`dividend` e porta la direzione del denaro, mentre
+  `amount` resta sempre positivo. Ogni query che voglia dire "quanto ho
+  investito" deve filtrare `kind='buy' and status='settled'` — succede in
+  Home (Risparmiato) e in Statistiche.
+- `status='pending'` = ordine addebitato ma non ancora eseguito. Sui fondi
+  private market fra addebito e assegnazione delle quote passano ~2 settimane:
+  in mezzo quei soldi sono cassa impegnata, non capitale investito, e contarli
+  come investiti falserebbe prezzo medio e rendimento.
+- `asset_prices.close_eur` è **sempre in euro**, già convertito a monte.
+  Mescolare valute qui sarebbe un errore silenzioso: i numeri resterebbero
+  plausibili ma sbagliati del 15%.
+- La Edge Function `sync-prices` (pg_cron ogni sera) riempie `asset_prices` da
+  Yahoo Finance, convertendo con i cambi storici di frankfurter.app quando la
+  quotazione non è in euro. **Si valida da sola**: confronta i prezzi scaricati
+  con quelli delle esecuzioni reali (`source='fill'`) e, se lo scarto mediano
+  supera la soglia, non scrive niente. Serve davvero — esistono quotazioni che
+  dichiarano una valuta e ne servono un'altra (`CBU8.DE` dice EUR e restituisce
+  storico in USD). Si guarda la *mediana* e non il massimo perché un ordine
+  eseguito a metà giornata su un asset volatile può distare parecchio dalla
+  chiusura senza che nulla sia rotto.
+- Per i private market il NAV arriva **gratis dalle proprie esecuzioni**: il
+  prezzo a cui il fondo esegue l'ordine mensile è il suo valore di quel giorno
+  (`asset_prices.source='fill'`). Fra un'esecuzione e l'altra il grafico resta
+  fermo invece di interpolare.
+- `portfolio_daily(p_asset)` e `latest_asset_prices()` sono RPC: la serie
+  giornaliera si calcola nel database perché ricostruirla sul telefono
+  vorrebbe dire scaricare ~1700 righe di prezzi a ogni apertura.
+- Lo storico viene dall'**esportazione operazioni di Trade Republic** (CSV con
+  data, ISIN, quote, prezzo). `investments.external_id` tiene l'id operazione
+  del broker, così si può riesportare e reimportare senza duplicare.
 - `DetailTarget.month` (screens/DetailScreen.tsx) porta il mese da cui si
   apre il dettaglio di categoria/esercente, cosi' il grafico si posiziona li'
   invece che sull'ultimo mese: ogni nuovo punto d'ingresso a `openDetail`
