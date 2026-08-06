@@ -13,6 +13,7 @@ import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, formatDate, splitAmount } from "../lib/format";
 import {
   GroupSummary,
+  periodPriceGain,
   Position,
   RANGES,
   RangeKey,
@@ -315,7 +316,20 @@ function GroupSection({
   );
 
   const at = scrub === null ? null : visible[scrub];
-  const positive = group.priceGain >= 0;
+
+  // Aperta, la percentuale in testa segue cio' che il grafico sta mostrando:
+  // da inizio del periodo scelto fino al punto sotto il dito, o a oggi se non
+  // si sta trascinando. Chiusa mostra sempre il totale, perche' senza il
+  // grafico sotto un "+3% nell'ultimo mese" non avrebbe un periodo da
+  // ancorare e sembrerebbe un numero a caso.
+  const period = useMemo(() => {
+    if (!open || visible.length < 2) return null;
+    const upTo = scrub === null ? visible : visible.slice(0, scrub + 1);
+    return periodPriceGain(upTo);
+  }, [open, visible, scrub]);
+
+  const shownPct = period?.pct ?? group.priceGainPct;
+  const positive = (period?.amount ?? group.priceGain) >= 0;
 
   return (
     <View>
@@ -348,7 +362,7 @@ function GroupSection({
           <Text style={[styles.groupValue, { color: palette.ink }]}>
             {formatAmount(group.value)}
           </Text>
-          {group.priceGainPct !== null && (
+          {shownPct !== null && (
             <Text
               style={[
                 styles.groupGain,
@@ -356,7 +370,7 @@ function GroupSection({
               ]}
             >
               {positive ? "+" : "−"}
-              {Math.abs(group.priceGainPct * 100).toFixed(1)}%
+              {Math.abs(shownPct * 100).toFixed(1)}%
             </Text>
           )}
         </View>

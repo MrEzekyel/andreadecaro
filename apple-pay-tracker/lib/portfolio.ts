@@ -320,6 +320,29 @@ export function sliceSeries(series: SeriesPoint[], range: RangeKey): SeriesPoint
 }
 
 /**
+ * Guadagno di prezzo fra il primo e l'ultimo punto di una serie, al netto dei
+ * versamenti fatti nel frattempo.
+ *
+ * Senza togliere i versamenti, un mese in cui e' entrata una rata sembrerebbe
+ * sempre "in guadagno" anche a prezzi fermi, perche' il valore sale per il
+ * denaro nuovo e non per il mercato. Si isola il movimento di prezzo con la
+ * stessa logica del rendimento totale (`priceGain`): quanto valeva la
+ * posizione a inizio periodo e' il capitale esposto al mercato in quel
+ * momento, quindi e' anche il denominatore giusto per la percentuale.
+ */
+export function periodPriceGain(points: SeriesPoint[]) {
+  if (points.length < 2) return { amount: 0, pct: null as number | null };
+  const first = points[0];
+  const last = points[points.length - 1];
+  const contributed = last.invested_eur - first.invested_eur;
+  const amount = last.value_eur - first.value_eur - contributed;
+  return {
+    amount,
+    pct: first.value_eur > 0 ? amount / first.value_eur : null,
+  };
+}
+
+/**
  * Proiezione a interesse composto del piano attuale.
  *
  * Volutamente non estrapola il rendimento passato: due anni di storia non

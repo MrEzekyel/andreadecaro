@@ -128,6 +128,20 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   vorrebbe dire scaricare ~1700 righe di prezzi a ogni apertura. Il filtro per
   gruppo serve ai grafici delle sezioni, che si caricano solo quando la
   sezione viene aperta (`usePortfolioSeries(null)` non interroga niente).
+  **Attenzione a `create or replace` quando cambia la firma**: se la nuova
+  versione ha parametri diversi da quella vecchia, `create or replace` crea
+  un secondo overload invece di sostituirla, e se entrambe sono chiamabili a
+  zero argomenti la scelta fra le due è ambigua per PostgREST (va a volte sì
+  a volte no, secondo la cache dello schema). Successo con `portfolio_daily`
+  fra la 0021 e la 0024: prima di aggiungere un parametro con default a una
+  funzione esistente, droppare la firma vecchia nella stessa migrazione.
+- `periodPriceGain()` (lib/portfolio.ts) isola il guadagno di prezzo fra due
+  punti di una serie, al netto dei versamenti fatti nel mezzo — altrimenti un
+  mese in cui è entrata una rata sembrerebbe sempre "in guadagno" anche a
+  prezzi fermi. Le sezioni per gruppo la usano per far seguire alla
+  percentuale in testa il periodo scelto nel grafico (1M/6M/1A/Tutto, e lo
+  scrub) invece di mostrare sempre il totale, che senza il grafico sotto non
+  avrebbe più senso.
 - La sezione ha tre schermate figlie: `AnalysisScreen` (ripartizione, anello
   grande e lista sotto), `PacScreen` (piani di accumulo) e
   `AssetDetailScreen`. Le sezioni per gruppo sono **chiuse di default**: con
