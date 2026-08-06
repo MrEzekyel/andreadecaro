@@ -55,15 +55,22 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   ogni notte via pg_cron (mutuo, abbonamenti).
 - `investment_rules` = i **piani di accumulo** (schermata PAC). Il ciclo è
   interamente automatico e **non richiede mai un import**:
-  1. `materialize_investments()` (cron 03:00) inserisce la rata il giorno
-     stabilito come `status='estimated'` — senza quote né prezzo, perché a
-     quell'ora non si sanno ancora.
-  2. `sync-prices` (21:30) scarica la chiusura del giorno.
-  3. `settle_plan_instalments()` (22:00) calcola `quote = importo / prezzo` e
-     la porta a `settled`. Usa la **prima seduta dal giorno della rata in poi**,
-     non l'ultima precedente: se il 3 cade di sabato il broker esegue lunedì, e
-     la chiusura di venerdì sarebbe di due giorni prima dell'acquisto.
-  Lo scarto rispetto all'eseguito vero è 0,3-0,4% sugli ETF, ~2% su Solana.
+  1. `materialize_investments()` (cron 05:00 UTC) inserisce la rata il giorno
+     stabilito come `status='estimated'`, datata **alle 10:00 ora italiana**.
+     L'orario è scritto come `at time zone 'Europe/Rome'` e non come un orario
+     UTC fisso: altrimenti a ogni cambio di ora legale l'acquisto slitterebbe
+     di un'ora, e con un prezzo intraday quello slittamento si vedrebbe.
+  2. La Edge Function `settle-instalments` (cron 09:00 e 20:00 UTC) cerca la
+     **quotazione intraday di quell'istante** (Yahoo `interval=5m`), calcola
+     `quote = importo / prezzo` e porta la rata a `settled`.
+  Prende la prima quotazione **da quel momento in poi**, mai una precedente: se
+  la rata cade a mercato chiuso il broker compra alla riapertura, e un prezzo
+  anteriore sarebbe uno a cui in quel momento non si poteva più comprare. Se
+  non c'è ancora nulla la rata resta in attesa e ci si riprova, invece di
+  ripiegare su un prezzo che non c'entra — è il caso di `CHPX.MI`, così poco
+  scambiato che certi giorni la prima quotazione arriva nel pomeriggio.
+  Scarto misurato sulle operazioni vere del 3 agosto: −0,07% ECPI, −0,45% AI
+  Semi, −0,52% S&P, −2,78% Solana.
   I fondi private market non hanno prezzo pubblico: restano `estimated` (cioè
   valorizzati al costo) finché non arriva un NAV.
 - L'import dell'estratto conto resta possibile ma **facoltativo**: il trigger
