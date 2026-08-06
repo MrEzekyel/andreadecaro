@@ -355,8 +355,8 @@ function GroupSection({
   const period = useMemo(() => {
     if (!open || visible.length < 2) return null;
     const upTo = scrub === null ? visible : visible.slice(0, scrub + 1);
-    return periodPriceGain(upTo);
-  }, [open, visible, scrub]);
+    return periodPriceGain(upTo, group.investedBasis);
+  }, [open, visible, scrub, group.investedBasis]);
 
   const shownPct = period?.pct ?? group.priceGainPct;
   const positive = (period?.amount ?? group.priceGain) >= 0;

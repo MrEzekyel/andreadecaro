@@ -339,12 +339,19 @@ export function sliceSeries(series: SeriesPoint[], range: RangeKey): SeriesPoint
  *
  * Senza togliere i versamenti, un mese in cui e' entrata una rata sembrerebbe
  * sempre "in guadagno" anche a prezzi fermi, perche' il valore sale per il
- * denaro nuovo e non per il mercato. Si isola il movimento di prezzo con la
- * stessa logica del rendimento totale (`priceGain`): quanto valeva la
- * posizione a inizio periodo e' il capitale esposto al mercato in quel
- * momento, quindi e' anche il denominatore giusto per la percentuale.
+ * denaro nuovo e non per il mercato.
+ *
+ * La percentuale si divide per `investedBasis` — il capitale versato totale
+ * di OGGI, passato da chi chiama — e non per il valore del primo punto del
+ * periodo. Dividere per il valore a inizio periodo sembra piu' preciso ma si
+ * rompe su una posizione giovane: i primi giorni di un gruppo appena aperto
+ * valgono poche decine di euro, e un guadagno di 20 euro diviso una base di
+ * 50 diventa un fantasioso +40% invece del +3% reale. La base fissa non
+ * esplode mai vicino allo zero, ed e' la stessa gia' usata per il rendimento
+ * totale: la percentuale di periodo e quella totale restano confrontabili
+ * invece di raccontare due storie diverse con la stessa unita' di misura.
  */
-export function periodPriceGain(points: SeriesPoint[]) {
+export function periodPriceGain(points: SeriesPoint[], investedBasis: number) {
   if (points.length < 2) return { amount: 0, pct: null as number | null };
   const first = points[0];
   const last = points[points.length - 1];
@@ -352,7 +359,7 @@ export function periodPriceGain(points: SeriesPoint[]) {
   const amount = last.value_eur - first.value_eur - contributed;
   return {
     amount,
-    pct: first.value_eur > 0 ? amount / first.value_eur : null,
+    pct: investedBasis > 0 ? amount / investedBasis : null,
   };
 }
 
