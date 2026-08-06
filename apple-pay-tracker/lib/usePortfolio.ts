@@ -81,7 +81,7 @@ export function usePortfolio() {
     const positions = buildPositions(assets, investments, prices);
     const totals = sumPositions(positions);
 
-    setState({
+    const next: State = {
       assets,
       investments,
       rules: (rulesRes.data ?? []) as InvestmentRule[],
@@ -90,7 +90,13 @@ export function usePortfolio() {
       series,
       xirr: portfolioXirr(investments, totals.value),
       loading: false,
-    });
+    };
+    setState(next);
+    // Restituite anche direttamente: chi ha in mano una posizione presa da uno
+    // stato precedente (es. la schermata di dettaglio aperta) altrimenti la
+    // ritroverebbe aggiornata solo al render successivo, mai in questo stesso
+    // giro — lo stato di React non e' pronto subito dopo averlo impostato.
+    return next;
   }, []);
 
   useEffect(() => {

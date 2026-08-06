@@ -71,8 +71,11 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   scambiato che certi giorni la prima quotazione arriva nel pomeriggio.
   Scarto misurato sulle operazioni vere del 3 agosto: −0,07% ECPI, −0,45% AI
   Semi, −0,52% S&P, −2,78% Solana.
-  I fondi private market non hanno prezzo pubblico: restano `estimated` (cioè
-  valorizzati al costo) finché non arriva un NAV.
+  I fondi private market seguono una strada diversa e più semplice: non
+  aspettano nessuna quotazione, entrano `settled` da subito con l'ultimo NAV
+  conosciuto in quel momento (vedi sotto). Lasciarli `estimated` — cioè fuori
+  da "investito questo mese" e da ogni somma che filtra sugli acquisti — dava
+  la sensazione di "500 diventano 450" senza un motivo leggibile.
 - L'import dell'estratto conto resta possibile ma **facoltativo**: il trigger
   `drop_superseded_estimates` cancella la rata calcolata di quel mese per quel
   asset appena ne arriva una con `source='import'`. Guarda `source='recurring'`
@@ -94,14 +97,34 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   investito" deve filtrare `kind='buy' and status='settled'` — succede in
   Home (Risparmiato) e in Statistiche.
 - Tutto ciò che non è `status='settled'` è denaro uscito dal conto e non
-  ancora diventato quote: `pending` (il broker deve eseguire — sui private
-  market passano ~2 settimane) ed `estimated` (rata prevista da un piano).
-  Quel denaro **conta nel valore** al suo costo — è uscito dal conto, come fa
-  anche Trade Republic — ma **non nel rendimento**, perché il prezzo a cui
-  comprerà non si sa ancora e diluirebbe la percentuale verso lo zero. Da qui
-  la coppia `investedBasis` (solo le quote) / `costBasis` (quote + non
-  eseguito). Nel codice il discriminante è sempre `status !== "settled"`, mai
-  un elenco dei due valori: aggiungerne un terzo non deve rompere i conti.
+  ancora diventato quote: resta solo `estimated` (rata di un piano su un
+  asset a prezzo pubblico, in attesa della quotazione intraday) ed è
+  transitorio — si risolve entro la giornata. `pending` esiste ancora nello
+  schema ma non dovrebbe più comparire in pratica: prima segnava anche i
+  fondi private market in attesa dell'esecuzione del broker, ora quelli
+  entrano `settled` da subito (vedi sotto). Quel denaro **conta nel valore**
+  al suo costo — è uscito dal conto, come fa anche Trade Republic — ma **non
+  nel rendimento**, perché il prezzo non si sa ancora e diluirebbe la
+  percentuale verso lo zero. Da qui la coppia `investedBasis` (solo le quote)
+  / `costBasis` (quote + non eseguito). Nel codice il discriminante è sempre
+  `status !== "settled"`, mai un elenco dei due valori.
+- **I fondi private market (Apollo, EQT) non aspettano un prezzo del broker**:
+  ogni rata entra `settled` da subito, usando l'ultimo NAV noto in quel
+  momento (`asset_prices` più recente con `on_date <= data_rata`). Non è
+  un'approssimazione a caso: è l'unico dato onesto disponibile finché non ne
+  arriva uno più recente, e il valore si muove in avanti da lì. Verificato
+  che **nessuna fonte automatica esiste** per questi due ELTIF (Yahoo non li
+  conosce, eltif.info non pubblica un NAV nell'HTML, l'unico endpoint
+  raggiungibile di FundConnect è un PDF il cui contenuto per questi ISIN è un
+  template vuoto — testato scaricando ed estraendo il testo del PDF davvero,
+  non per sentito dire). Per questo l'aggiornamento è manuale: dal dettaglio
+  dell'asset (bottone "Aggiorna valore") si digita il **valore totale della
+  posizione così come lo mostra Trade Republic** — mai un prezzo per quota,
+  che TR non mostra per questi fondi — e il codice lo divide per le quote già
+  possedute per ricavare il prezzo unitario da salvare in `asset_prices`
+  (`source='manual'`). Oltre `MANUAL_PRICE_STALE_DAYS` (35, preso dal ritmo
+  reale dei NAV storici ~28-35gg) un promemoria compare sia nel dettaglio
+  dell'asset sia in cima a Investimenti.
 - Due rendimenti, entrambi corretti e non intercambiabili: `priceGainPct` è
   il solo movimento del prezzo, lo stesso numero che mostra il broker, ed è
   quello negli elenchi perché è ciò che Andrea confronta; `gainPct` include i

@@ -1,21 +1,38 @@
 import React, { useMemo, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { Icon } from "../components/Icon";
 import { ScrubChart } from "../components/ScrubChart";
+import { Sheet } from "../components/Sheet";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, formatDate, splitAmount } from "../lib/format";
 import {
   GROUP_LABEL,
+  MANUAL_PRICE_STALE_DAYS,
   Position,
   RANGES,
   RangeKey,
+  daysSince,
   effectiveDay,
   sliceSeries,
 } from "../lib/portfolio";
+import { supabase } from "../lib/supabase";
 import { Investment } from "../lib/types";
 import { usePortfolioSeries } from "../lib/usePortfolio";
 import { radius, space, tint, type } from "../lib/theme";
+
+function parseAmountInput(value: string): number | null {
+  const parsed = Number(value.replace(",", ".").trim());
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
 
 const KIND_LABEL: Record<Investment["kind"], string> = {
   buy: "Acquisto",
@@ -27,9 +44,16 @@ type Props = {
   position: Position;
   investments: Investment[];
   onBack: () => void;
+  /** Ricarica il portafoglio dopo un aggiornamento manuale del valore. */
+  onSaved: () => void;
 };
 
-export default function AssetDetailScreen({ position, investments, onBack }: Props) {
+export default function AssetDetailScreen({
+  position,
+  investments,
+  onBack,
+  onSaved,
+}: Props) {
   const { palette, dark } = useTheme();
   const series = usePortfolioSeries({ assetId: position.asset.id });
 
@@ -37,6 +61,60 @@ export default function AssetDetailScreen({ position, investments, onBack }: Pro
   // senza schiacciare gli ultimi mesi contro il bordo.
   const [range, setRange] = useState<RangeKey>("1y");
   const [scrub, setScrub] = useState<number | null>(null);
+
+  const [valueSheet, setValueSheet] = useState(false);
+  const [valueInput, setValueInput] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  const isManual = position.asset.price_source === "manual";
+  const stale =
+    isManual &&
+    (!position.priceDate || daysSince(position.priceDate) > MANUAL_PRICE_STALE_DAYS);
+
+  function openValueSheet() {
+    setValueInput(position.value > 0 ? String(position.value.toFixed(2)).replace(".", ",") : "");
+    setValueSheet(true);
+  }
+
+  async function saveValue() {
+    const parsed = parseAmountInput(valueInput);
+    if (parsed === null) {
+      Alert.alert("Valore non valido", "Inserisci un importo maggiore di zero.");
+      return;
+    }
+    if (position.quantity <= 0) {
+      Alert.alert(
+        "Nessuna quota registrata",
+        "Non risultano ancora versamenti su questo fondo."
+      );
+      return;
+    }
+
+    // Trade Republic mostra il valore totale della posizione, mai un prezzo
+    // per quota: si chiede quello, e si ricava il prezzo dividendo per le
+    // quote gia' possedute, cosi' il resto dell'app puo' continuare a
+    // ragionare in quote*prezzo senza saperlo.
+    const price = parsed / position.quantity;
+
+    setSaving(true);
+    const { error } = await supabase.from("asset_prices").upsert(
+      {
+        asset_id: position.asset.id,
+        on_date: new Date().toISOString().slice(0, 10),
+        close_eur: Number(price.toFixed(8)),
+        source: "manual",
+      },
+      { onConflict: "asset_id,on_date" }
+    );
+    setSaving(false);
+
+    if (error) {
+      Alert.alert("Non salvato", error.message);
+      return;
+    }
+    setValueSheet(false);
+    onSaved();
+  }
 
   const visible = useMemo(() => sliceSeries(series, range), [series, range]);
   const points = useMemo(
@@ -163,6 +241,25 @@ export default function AssetDetailScreen({ position, investments, onBack }: Pro
                 : "non disponibile"
             }
           />
+          {isManual && (
+            <TouchableOpacity style={styles.updateRow} onPress={openValueSheet}>
+              <Icon
+                name={stale ? "alert-circle" : "pencil"}
+                size={14}
+                color={stale ? palette.over : palette.accent}
+              />
+              <Text
+                style={[
+                  styles.updateText,
+                  { color: stale ? palette.over : palette.accent },
+                ]}
+              >
+                {position.priceDate
+                  ? `Aggiorna valore · fermo da ${daysSince(position.priceDate)} giorni`
+                  : "Inserisci il valore attuale"}
+              </Text>
+            </TouchableOpacity>
+          )}
           <Fact label="Capitale versato" value={formatAmount(position.invested)} />
           {position.sold > 0 && (
             <Fact label="Disinvestito" value={formatAmount(position.sold)} />
@@ -194,11 +291,12 @@ export default function AssetDetailScreen({ position, investments, onBack }: Pro
           )}
         </View>
 
-        {position.asset.price_source === "manual" && (
+        {isManual && (
           <Text style={[styles.note, { color: palette.ink3 }]}>
-            Questo fondo non ha un prezzo pubblico giornaliero: il valore si
-            aggiorna quando il fondo esegue un ordine, e fra un'esecuzione e
-            l'altra il grafico resta fermo invece di inventare una curva.
+            Questo fondo non ha un prezzo pubblico: nessuna fonte automatica
+            esiste per un ELTIF cosi'. Il valore resta quello dell'ultimo
+            versamento finche' non lo aggiorni tu da Trade Republic — "Aggiorna
+            valore" qui sopra.
           </Text>
         )}
 
@@ -237,6 +335,43 @@ export default function AssetDetailScreen({ position, investments, onBack }: Pro
           ))}
         </View>
       </ScrollView>
+
+      <Sheet
+        visible={valueSheet}
+        onClose={() => setValueSheet(false)}
+        title="Aggiorna valore"
+      >
+        <Text style={[styles.sheetHint, { color: palette.ink3 }]}>
+          Apri Trade Republic e guarda quanto vale oggi {position.asset.name}.
+          Non un prezzo per quota — quello non lo mostra nemmeno TR per questo
+          fondo — il valore totale della posizione, cosi' com'e' scritto li'.
+        </Text>
+        <TextInput
+          value={valueInput}
+          onChangeText={setValueInput}
+          keyboardType="decimal-pad"
+          placeholder="0,00"
+          placeholderTextColor={palette.ink3}
+          autoFocus
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface2,
+              color: palette.ink,
+              borderColor: palette.hairline,
+            },
+          ]}
+        />
+        <TouchableOpacity
+          style={[styles.save, { backgroundColor: palette.accent }]}
+          onPress={saveValue}
+          disabled={saving}
+        >
+          <Text style={[styles.saveText, { color: palette.onAccent }]}>
+            {saving ? "Salvo…" : "Salva"}
+          </Text>
+        </TouchableOpacity>
+      </Sheet>
     </SwipeBack>
   );
 }
@@ -291,6 +426,28 @@ const styles = StyleSheet.create({
   factLabel: { ...type.caption, flex: 1 },
   factValue: { ...type.amount },
   note: { ...type.caption, lineHeight: 18 },
+  updateRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 8,
+  },
+  updateText: { ...type.small, fontWeight: "500" },
+  sheetHint: { ...type.caption, lineHeight: 18, marginBottom: space.md },
+  input: {
+    borderRadius: radius.field,
+    borderWidth: 1,
+    paddingHorizontal: space.md,
+    paddingVertical: 12,
+    ...type.body,
+  },
+  save: {
+    marginTop: space.lg,
+    paddingVertical: 14,
+    borderRadius: radius.button,
+    alignItems: "center",
+  },
+  saveText: { ...type.body, fontWeight: "500" },
   opRow: {
     flexDirection: "row",
     alignItems: "center",

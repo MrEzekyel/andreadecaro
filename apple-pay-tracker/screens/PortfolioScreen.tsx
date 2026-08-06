@@ -13,10 +13,12 @@ import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, formatDate, splitAmount } from "../lib/format";
 import {
   GroupSummary,
+  MANUAL_PRICE_STALE_DAYS,
   periodPriceGain,
   Position,
   RANGES,
   RangeKey,
+  daysSince,
   groupPositions,
   sliceSeries,
 } from "../lib/portfolio";
@@ -103,6 +105,15 @@ export default function PortfolioScreen() {
     .filter((r) => r.frequency === "monthly")
     .reduce((sum, r) => sum + Number(r.amount), 0);
 
+  // Fondi senza prezzo pubblico il cui ultimo valore noto e' vecchio: nessuna
+  // fonte automatica esiste per questi due ELTIF, quindi il promemoria e'
+  // l'unica cosa che tiene il dato onesto senza chiedere niente ogni mese.
+  const staleManual = open.filter(
+    (p) =>
+      p.asset.price_source === "manual" &&
+      (!p.priceDate || daysSince(p.priceDate) > MANUAL_PRICE_STALE_DAYS)
+  );
+
   // Trascinando sul grafico l'intestazione racconta quel giorno invece di oggi:
   // il numero grande e il punto sotto il dito devono dire la stessa cosa.
   const at = scrub === null ? null : visible[scrub];
@@ -121,6 +132,13 @@ export default function PortfolioScreen() {
           (op) => op.asset_id === openAsset.asset.id
         )}
         onBack={() => setOpenAsset(null)}
+        onSaved={async () => {
+          const fresh = await portfolio.reload();
+          const updated = fresh.positions.find(
+            (p) => p.asset.id === openAsset.asset.id
+          );
+          if (updated) setOpenAsset(updated);
+        }}
       />
     );
   }
@@ -242,13 +260,25 @@ export default function PortfolioScreen() {
         <View style={styles.pendingRow}>
           <Icon name="clock" size={16} color={palette.ink3} />
           <Text style={[styles.pendingText, { color: palette.ink2 }]}>
-            {formatAmount(totals.pending)} usciti dal conto e non ancora
-            diventati quote: sono i versamenti sui fondi private market, che
-            eseguono gli ordini a finestre e non hanno un prezzo pubblico
-            giornaliero. Valgono il loro costo e restano fuori dal rendimento,
-            perche' il prezzo a cui compreranno non si sa ancora.
+            {formatAmount(totals.pending)} versati su un fondo di cui non si
+            conosce ancora nessun valore: valgono il loro costo finche' non
+            arriva il primo aggiornamento.
           </Text>
         </View>
+      )}
+
+      {staleManual.length > 0 && (
+        <TouchableOpacity
+          style={styles.pendingRow}
+          onPress={() => setOpenAsset(staleManual[0])}
+        >
+          <Icon name="alert-circle" size={16} color={palette.over} />
+          <Text style={[styles.pendingText, { color: palette.ink2 }]}>
+            {staleManual.length === 1
+              ? `Il valore di ${staleManual[0].asset.name} e' fermo da un po': aggiornalo da Trade Republic quando puoi.`
+              : `${staleManual.map((p) => p.asset.name).join(" e ")} hanno un valore fermo da un po': aggiornali da Trade Republic quando puoi.`}
+          </Text>
+        </TouchableOpacity>
       )}
 
       {groups.map((group) => (

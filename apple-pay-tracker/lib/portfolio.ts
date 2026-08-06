@@ -6,6 +6,20 @@ export const GROUP_LABEL: Record<AssetGroup, string> = {
   private_market: "Private market",
 };
 
+/**
+ * Oltre questa distanza dall'ultimo valore noto un fondo a prezzo manuale
+ * merita un promemoria. Presa dal ritmo reale dei NAV di Apollo/EQT nello
+ * storico importato: aggiornano ogni 28-35 giorni, quindi 35 e' il punto in
+ * cui il silenzio smette di essere normale e comincia a essere un dato
+ * vecchio.
+ */
+export const MANUAL_PRICE_STALE_DAYS = 35;
+
+export function daysSince(dateIso: string) {
+  const ms = Date.now() - new Date(dateIso + "T00:00:00Z").getTime();
+  return Math.floor(ms / 86_400_000);
+}
+
 export const GROUP_ORDER: AssetGroup[] = [
   "conto_titoli",
   "crypto",

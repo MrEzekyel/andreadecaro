@@ -251,10 +251,12 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
         <Text style={[styles.note, { color: palette.ink3 }]}>
           Ogni piano attivo inserisce la sua rata da solo il giorno stabilito,
           alle 10 del mattino, e la completa con la quotazione di quel momento:
-          non c'e' niente da caricare. I fondi private market restano al loro
-          costo finche' non pubblicano un valore, perche' un prezzo pubblico
-          non ce l'hanno. Se un giorno carichi l'estratto conto, le operazioni
-          vere prendono il posto di quelle calcolate.
+          non c'e' niente da caricare. I fondi private market non hanno un
+          prezzo pubblico — nessuna fonte automatica esiste per un ELTIF cosi'
+          — quindi la rata entra subito con l'ultimo valore noto, e resta
+          quello finche' non lo aggiorni tu dal dettaglio del fondo. Se un
+          giorno carichi l'estratto conto, le operazioni vere prendono il
+          posto di quelle calcolate.
         </Text>
       </ScrollView>
 
