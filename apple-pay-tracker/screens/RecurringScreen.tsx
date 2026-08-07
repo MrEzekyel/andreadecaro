@@ -11,6 +11,7 @@ import {
 import { CardPicker } from "../components/CardPicker";
 import { CategoryPicker } from "../components/CategoryPicker";
 import { Icon } from "../components/Icon";
+import { LoadError } from "../components/LoadError";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { Sheet } from "../components/Sheet";
 import { useData } from "../lib/DataContext";
@@ -39,6 +40,7 @@ export default function RecurringScreen({ onBack }: { onBack: () => void }) {
   const { categoryById } = useData();
 
   const [rules, setRules] = useState<RecurringRule[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<RecurringRule | null>(null);
 
@@ -51,11 +53,12 @@ export default function RecurringScreen({ onBack }: { onBack: () => void }) {
   const [weekday, setWeekday] = useState(1);
 
   const load = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error: failure } = await supabase
       .from("recurring_rules")
       .select("*")
       .order("next_run_on");
-    if (data) setRules(data as RecurringRule[]);
+    setError(failure?.message ?? null);
+    if (!failure) setRules((data ?? []) as RecurringRule[]);
   }, []);
 
   useEffect(() => {
@@ -201,7 +204,9 @@ export default function RecurringScreen({ onBack }: { onBack: () => void }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.list}>
-        {rules.length === 0 && (
+        {error && <LoadError message={error} onRetry={load} />}
+
+        {!error && rules.length === 0 && (
           <Text style={[styles.empty, { color: palette.ink3 }]}>
             Nessuna spesa ricorrente. Aggiungi mutuo, rata dell'auto o
             abbonamenti che vengono scalati dal conto senza passare da Apple Pay.

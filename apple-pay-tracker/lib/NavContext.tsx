@@ -7,7 +7,8 @@ export type SettingsPage =
   | "recurring"
   | "people"
   | "automations"
-  | "income";
+  | "income"
+  | "export";
 
 type Nav = {
   /** Porta alla scheda Impostazioni gia' aperta su una sua sottopagina. */

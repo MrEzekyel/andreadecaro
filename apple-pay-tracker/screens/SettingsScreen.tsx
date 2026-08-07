@@ -9,6 +9,7 @@ import { radius, space, type } from "../lib/theme";
 import { useLimits } from "../lib/useLimits";
 import AutomationsScreen from "./AutomationsScreen";
 import CategoriesScreen from "./CategoriesScreen";
+import ExportScreen from "./ExportScreen";
 import IncomeScreen from "./IncomeScreen";
 import LimitsScreen from "./LimitsScreen";
 import OwedScreen from "./OwedScreen";
@@ -64,6 +65,10 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
 
   if (page === "income") {
     return <IncomeScreen onBack={() => setPage("root")} />;
+  }
+
+  if (page === "export") {
+    return <ExportScreen onBack={() => setPage("root")} />;
   }
 
   return (
@@ -169,6 +174,13 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
           label="Introiti"
           value="Gestisci"
           onPress={() => setPage("income")}
+        />
+        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+        <SettingRow
+          icon="file-down"
+          label="Esporta i dati"
+          value="CSV"
+          onPress={() => setPage("export")}
         />
       </View>
 

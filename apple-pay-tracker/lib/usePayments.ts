@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { firstError } from "./loadError";
 import { supabase } from "./supabase";
 import { Payment } from "./types";
 
@@ -30,6 +31,7 @@ export function usePayments(month: Date) {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [previous, setPrevious] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const { start, end } = monthRange(month);
@@ -57,8 +59,16 @@ export function usePayments(month: Date) {
         .lt("occurred_at", start.toISOString()),
     ]);
 
-    if (!current.error && current.data) setPayments(current.data as Payment[]);
-    if (!earlier.error && earlier.data) setPrevious(earlier.data as Payment[]);
+    const failure = firstError(current, earlier);
+    setError(failure);
+
+    // Le righe vecchie restano finche' non arriva una lettura riuscita: chi
+    // guarda vede l'errore al loro posto, e al "Riprova" ritrova i suoi dati
+    // invece di una schermata che nel frattempo si e' svuotata.
+    if (!failure) {
+      setPayments((current.data ?? []) as Payment[]);
+      setPrevious((earlier.data ?? []) as Payment[]);
+    }
     setLoading(false);
   }, [month]);
 
@@ -102,5 +112,5 @@ export function usePayments(month: Date) {
       .reduce((sum, payment) => sum + Number(payment.effective_amount), 0);
   }, [previous, month]);
 
-  return { payments, total, previousTotal, loading, reload: load };
+  return { payments, total, previousTotal, loading, error, reload: load };
 }

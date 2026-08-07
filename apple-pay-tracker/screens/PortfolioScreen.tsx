@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { Icon } from "../components/Icon";
+import { LoadError } from "../components/LoadError";
 import { ScrubChart } from "../components/ScrubChart";
 import { StatTiles } from "../components/StatTiles";
 import { useTheme } from "../lib/ThemeContext";
@@ -78,7 +79,7 @@ function RangePicker({
 export default function PortfolioScreen() {
   const { palette } = useTheme();
   const portfolio = usePortfolio();
-  const { positions, totals, series, xirr, rules, loading } = portfolio;
+  const { positions, totals, series, xirr, rules, loading, error } = portfolio;
 
   // Un anno racconta gia' un andamento senza schiacciare gli ultimi mesi
   // contro il bordo, che e' quello che fa "Tutto" man mano che la storia
@@ -136,7 +137,9 @@ export default function PortfolioScreen() {
         onBack={() => setOpenAsset(null)}
         onSaved={async () => {
           const fresh = await portfolio.reload();
-          const updated = fresh.positions.find(
+          // `null` quando la ricarica non e' riuscita: si tiene la posizione
+          // che l'utente ha davanti invece di svuotare la schermata.
+          const updated = fresh?.positions.find(
             (p) => p.asset.id === openAsset.asset.id
           );
           if (updated) setOpenAsset(updated);
@@ -184,6 +187,22 @@ export default function PortfolioScreen() {
     );
   }
 
+  // Due casi diversi, non uno. Se la lettura fallisce ma abbiamo ancora i
+  // dati di prima, il posto giusto dell'avviso e' sopra: sotto ci sono numeri
+  // veri, solo non freschi. Se invece non c'e' mai stato niente da mostrare,
+  // il portafoglio direbbe "0,00 €" — e allora l'errore prende tutto il posto.
+  if (error && positions.length === 0) {
+    return (
+      <ScrollView
+        style={{ backgroundColor: palette.ground }}
+        contentContainerStyle={styles.content}
+      >
+        <Text style={[styles.title, { color: palette.ink }]}>Investimenti</Text>
+        <LoadError message={error} onRetry={portfolio.reload} />
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView
       style={{ backgroundColor: palette.ground }}
@@ -201,6 +220,14 @@ export default function PortfolioScreen() {
       }
     >
       <Text style={[styles.title, { color: palette.ink }]}>Investimenti</Text>
+
+      {error && (
+        <LoadError
+          message={error}
+          onRetry={portfolio.reload}
+          variant="inline"
+        />
+      )}
 
       <View>
         <Text style={[styles.hero, { color: palette.ink }]}>

@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import DateTimePicker from "@react-native-community/datetimepicker";
 import { Icon } from "../components/Icon";
+import { LoadError } from "../components/LoadError";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { Sheet } from "../components/Sheet";
 import { useTheme } from "../lib/ThemeContext";
@@ -30,6 +31,7 @@ export default function IncomeScreen({ onBack }: { onBack: () => void }) {
 
   const [month, setMonth] = useState(() => new Date());
   const [incomes, setIncomes] = useState<Income[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   const [sheet, setSheet] = useState(false);
   const [editing, setEditing] = useState<Income | null>(null);
@@ -42,13 +44,14 @@ export default function IncomeScreen({ onBack }: { onBack: () => void }) {
 
   const load = useCallback(async () => {
     const { start, end } = monthRange(month);
-    const { data } = await supabase
+    const { data, error: failure } = await supabase
       .from("incomes")
       .select("*")
       .gte("occurred_at", start.toISOString())
       .lt("occurred_at", end.toISOString())
       .order("occurred_at", { ascending: false });
-    if (data) setIncomes(data as Income[]);
+    setError(failure?.message ?? null);
+    if (!failure) setIncomes((data ?? []) as Income[]);
   }, [month]);
 
   useEffect(() => {
@@ -234,6 +237,8 @@ export default function IncomeScreen({ onBack }: { onBack: () => void }) {
               </View>
             ))}
           </View>
+        ) : error ? (
+          <LoadError message={error} onRetry={load} />
         ) : (
           <Text style={[styles.empty, { color: palette.ink3 }]}>
             Nessun introito in questo mese. Aggiungi lo stipendio o i ricavi

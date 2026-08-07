@@ -10,6 +10,7 @@ import {
 import { BarChart } from "../components/BarChart";
 import { ChartCarousel, ChartPage } from "../components/ChartCarousel";
 import { Icon } from "../components/Icon";
+import { LoadError } from "../components/LoadError";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { LetterToggle } from "../components/LetterToggle";
 import { MonthWheel } from "../components/MonthWheel";
@@ -91,6 +92,7 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
   const [shareMonthReady, setShareMonthReady] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     let query = supabase
@@ -107,7 +109,12 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
       query = query.eq("category_id", target.id);
     }
 
-    const { data } = await query;
+    const { data, error: failure } = await query;
+    setError(failure?.message ?? null);
+    if (failure) {
+      setLoading(false);
+      return;
+    }
     const rows = (data ?? []) as Payment[];
     setPayments(rows);
     setLoading(false);
@@ -502,7 +509,9 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
             </View>
           ))}
 
-          {!loading && payments.length === 0 && (
+          {error && <LoadError message={error} onRetry={load} />}
+
+          {!loading && !error && payments.length === 0 && (
             <Text style={[styles.empty, { color: palette.ink3 }]}>
               Nessuna spesa registrata.
             </Text>

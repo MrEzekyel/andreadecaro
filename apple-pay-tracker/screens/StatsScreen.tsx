@@ -14,6 +14,7 @@ import { CategoryDonut, DonutSlice } from "../components/CategoryDonut";
 import { ChartCarousel, ChartPage } from "../components/ChartCarousel";
 import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
+import { LoadError } from "../components/LoadError";
 import { LetterToggle } from "../components/LetterToggle";
 import { MonthWheel } from "../components/MonthWheel";
 import { TrendChart, TrendPoint } from "../components/TrendChart";
@@ -37,6 +38,7 @@ import {
   paymentsIn,
   sameMonth,
 } from "../lib/aggregate";
+import { firstError } from "../lib/loadError";
 import { supabase } from "../lib/supabase";
 import { categoryColor, radius, space, tint, type } from "../lib/theme";
 import { Merchant, Payment } from "../lib/types";
@@ -110,6 +112,7 @@ export default function StatsScreen() {
   const [investments, setInvestments] = useState<Dated[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [grain, setGrain] = useState<Grain>("month");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   /** null = tutte le categorie. */
@@ -196,13 +199,23 @@ export default function StatsScreen() {
         .gte("occurred_at", historyStart.toISOString()),
     ]);
 
-    if (paymentsResult.data) setPayments(paymentsResult.data as Payment[]);
-    if (historyResult.data) setHistory(historyResult.data as Payment[]);
-    if (categoryHistoryResult.data)
-      setCategoryHistory(categoryHistoryResult.data as Payment[]);
-    if (merchantsResult.data) setMerchants(merchantsResult.data as Merchant[]);
-    if (incomesResult.data) setIncomes(incomesResult.data as Dated[]);
-    if (investmentsResult.data) setInvestments(investmentsResult.data as Dated[]);
+    const failure = firstError(
+      paymentsResult,
+      historyResult,
+      categoryHistoryResult,
+      merchantsResult,
+      incomesResult,
+      investmentsResult
+    );
+    setError(failure);
+    if (failure) return;
+
+    setPayments((paymentsResult.data ?? []) as Payment[]);
+    setHistory((historyResult.data ?? []) as Payment[]);
+    setCategoryHistory((categoryHistoryResult.data ?? []) as Payment[]);
+    setMerchants((merchantsResult.data ?? []) as Merchant[]);
+    setIncomes((incomesResult.data ?? []) as Dated[]);
+    setInvestments((investmentsResult.data ?? []) as Dated[]);
   }, [period]);
 
   const explorer = useExplorer(load);
@@ -785,6 +798,21 @@ export default function StatsScreen() {
     },
   ];
 
+  // Senza nessun dato letto, il totale in cima direbbe "0,00 €" e ogni
+  // grafico sarebbe vuoto: sarebbero tutte affermazioni, e tutte false.
+  // Con dati vecchi in memoria l'avviso sta invece sopra, e i numeri restano.
+  if (error && payments.length === 0 && history.length === 0) {
+    return (
+      <ScrollView
+        style={{ backgroundColor: palette.ground }}
+        contentContainerStyle={styles.content}
+      >
+        <Text style={[styles.title, { color: palette.ink }]}>Statistiche</Text>
+        <LoadError message={error} onRetry={load} />
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView
       style={{ backgroundColor: palette.ground }}
@@ -794,6 +822,8 @@ export default function StatsScreen() {
       }
     >
       <Text style={[styles.title, { color: palette.ink }]}>Statistiche</Text>
+
+      {error && <LoadError message={error} onRetry={load} variant="inline" />}
 
       <View style={[styles.segment, { backgroundColor: palette.surface2 }]}>
         {(Object.keys(PERIOD_LABEL) as PeriodKind[]).map((option) => (

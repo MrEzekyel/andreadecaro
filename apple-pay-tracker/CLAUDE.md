@@ -42,6 +42,17 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   Impostazioni.
 - I grafici mostrano sempre valori di riferimento sugli assi, non solo le
   barre/linee nude.
+- **Uno stato vuoto non deve mai poter significare "non ho letto".** Il modo
+  naturale di scrivere una lettura da Supabase (`if (data) setX(data)`) tratta
+  l'errore come un elenco vuoto, e in un'app di spese questo non produce una
+  schermata vuota ma una frase falsa sui soldi: "Nessuna spesa in questo mese"
+  quando la verità è che non siamo riusciti a chiedere. Si usano
+  `firstError()` (lib/loadError.ts) e `<LoadError>`, **al posto** del
+  contenuto e mai accanto — un totale a 0,00 con sopra un avviso resta un
+  totale a 0,00, e l'occhio legge prima il numero. Dove i dati precedenti
+  esistono ancora si tengono e l'avviso va sopra (`variant="inline"`): sono
+  vecchi, non falsi. Dove non c'è mai stato niente, l'errore prende tutta la
+  schermata.
 - I **grafici su un periodo in corso** (andamento mensile in Home e in
   Statistiche) disegnano l'asse su **tutto** il periodo — 28/30/31 giorni
   secondo il mese — e la linea si interrompe dov'è oggi. `TrendPoint.value`
@@ -224,6 +235,38 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 - Lo storico viene dall'**esportazione operazioni di Trade Republic** (CSV con
   data, ISIN, quote, prezzo). `investments.external_id` tiene l'id operazione
   del broker, così si può riesportare e reimportare senza duplicare.
+### Export dei dati
+
+- `screens/ExportScreen.tsx` (Impostazioni → Esporta i dati) produce **un CSV
+  per entità** — spese, introiti, investimenti, divisioni — e non un file
+  unico: un CSV con più sezioni ha colonne diverse per ognuna e non si apre
+  pulito in nessun foglio di calcolo.
+- `lib/csv.ts` tiene le tre scelte che decidono se il file è davvero leggibile
+  in Italia: separatore `;` (Excel italiano con `,` mette tutta la riga in una
+  cella), decimali con la virgola e **senza** separatore di migliaia, e BOM
+  UTF-8 in testa (senza, Excel legge Windows-1252 e "Caffè" diventa "CaffÃ¨").
+- Sulle spese escono **due** colonne di importo, `amount` e `effective_amount`,
+  e l'intestazione della seconda dice esplicitamente che è quella a fare i
+  totali: su una cena divisa in quattro le due differiscono, e chi apre il file
+  non avrebbe modo di saperlo.
+- `exportToCsv` restituisce righe e totale, e la schermata li mostra invitando
+  a confrontarli con l'app. È così che la promessa dell'export resta
+  verificabile invece di essere una dichiarazione.
+- Un export che fallisce a metà **non** scrive un file parziale: un CSV con tre
+  mesi su due anni è peggio di nessun CSV, perché sembra completo.
+
+### Accesso
+
+- Il recupero password va **a codice a sei cifre** (`resetPasswordForEmail` →
+  `verifyOtp` → `updateUser`), non a link: in Expo Go l'URL dell'app cambia a
+  ogni sessione e un deep link si romperebbe proprio quando l'utente è già in
+  difficoltà. Richiede `{{ .Token }}` nel template "Reset Password" su
+  Supabase (vedi `DA-FARE.md`).
+- `verifyOtp` **apre una sessione vera** prima che la password nuova sia
+  scritta: senza il segnale `onRecoveringChange`, `App.tsx` entrerebbe nell'app
+  proprio in quel momento, e se `updateUser` fallisse l'utente si ritroverebbe
+  dentro con la vecchia password senza che nessuno glielo dica.
+
 - `DetailTarget.month` (screens/DetailScreen.tsx) porta il mese da cui si
   apre il dettaglio di categoria/esercente, cosi' il grafico si posiziona li'
   invece che sull'ultimo mese: ogni nuovo punto d'ingresso a `openDetail`

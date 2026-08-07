@@ -6,6 +6,7 @@ import React, {
   useMemo,
   useState,
 } from "react";
+import { firstError } from "./loadError";
 import { supabase } from "./supabase";
 import { Category, Person } from "./types";
 
@@ -16,6 +17,7 @@ type DataContextValue = {
   personById: (id: string | null) => Person | undefined;
   reload: () => Promise<void>;
   loading: boolean;
+  error: string | null;
 };
 
 const DataContext = createContext<DataContextValue | null>(null);
@@ -24,6 +26,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     const [categoriesResult, peopleResult] = await Promise.all([
@@ -31,8 +34,15 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       supabase.from("people").select("*").order("name"),
     ]);
 
-    if (categoriesResult.data) setCategories(categoriesResult.data as Category[]);
-    if (peopleResult.data) setPeople(peopleResult.data as Person[]);
+    const failure = firstError(categoriesResult, peopleResult);
+    setError(failure);
+
+    // Senza categorie ogni spesa diventa "Da categorizzare": tenere le vecchie
+    // evita che un errore di rete riscriva a schermo la classificazione.
+    if (!failure) {
+      setCategories((categoriesResult.data ?? []) as Category[]);
+      setPeople((peopleResult.data ?? []) as Person[]);
+    }
     setLoading(false);
   }, []);
 
@@ -63,8 +73,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   );
 
   const value = useMemo(
-    () => ({ categories, categoryById, people, personById, reload, loading }),
-    [categories, categoryById, people, personById, reload, loading]
+    () => ({ categories, categoryById, people, personById, reload, loading, error }),
+    [categories, categoryById, people, personById, reload, loading, error]
   );
 
   return <DataContext.Provider value={value}>{children}</DataContext.Provider>;

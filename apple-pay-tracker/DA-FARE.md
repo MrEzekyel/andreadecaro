@@ -130,6 +130,26 @@ Poi ti basta dire *"Ehi Siri, aggiungi spesa"*.
 
 ## 🟡 Decisioni che devo sentire da te
 
+### 5bis. Template email del recupero password 🔴
+
+Il recupero password funziona **a codice a sei cifre**, non a link: in Expo Go
+l'URL dell'app cambia a ogni sessione, e un deep link si romperebbe proprio
+quando l'utente è già in difficoltà.
+
+Perché il codice arrivi, il template dell'email deve contenerlo. Su Supabase:
+
+**Authentication → Emails → Reset Password** — aggiungi al corpo del messaggio:
+
+```
+{{ .Token }}
+```
+
+Puoi lasciare anche il link esistente: il codice è un'aggiunta, non un
+sostituto. Senza questa riga l'email arriva ma è senza codice, e la schermata
+"Password dimenticata" resta bloccata sul secondo passo.
+
+---
+
 ### 6. Repository privato?
 
 Ora il codice sta in `MrEzekyel/andreadecaro`, che è **pubblico**. Il codice in

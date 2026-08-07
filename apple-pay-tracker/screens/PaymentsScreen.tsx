@@ -11,6 +11,7 @@ import {
 } from "react-native";
 import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
+import { LoadError } from "../components/LoadError";
 import { PaymentRow } from "../components/PaymentRow";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
@@ -24,7 +25,7 @@ export default function PaymentsScreen() {
   const { categories, categoryById } = useData();
 
   const [month, setMonth] = useState(() => new Date());
-  const { payments, reload } = usePayments(month);
+  const { payments, error, reload } = usePayments(month);
   const [refreshing, setRefreshing] = useState(false);
   const explorer = useExplorer(reload);
 
@@ -224,11 +225,17 @@ export default function PaymentsScreen() {
             />
           )}
           ListEmptyComponent={
-            <Text style={[styles.empty, { color: palette.ink3 }]}>
-              {filtering
-                ? "Nessuna spesa corrisponde ai filtri."
-                : `Nessuna spesa in ${monthName(month)}.`}
-            </Text>
+            // "Nessuna spesa in agosto" e "non sono riuscito a leggere" sono
+            // due cose diverse, e finivano entrambe in questa riga.
+            error ? (
+              <LoadError message={error} onRetry={reload} />
+            ) : (
+              <Text style={[styles.empty, { color: palette.ink3 }]}>
+                {filtering
+                  ? "Nessuna spesa corrisponde ai filtri."
+                  : `Nessuna spesa in ${monthName(month)}.`}
+              </Text>
+            )
           }
         />
       </View>

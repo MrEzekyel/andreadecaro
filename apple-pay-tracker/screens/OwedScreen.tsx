@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { Icon } from "../components/Icon";
+import { LoadError } from "../components/LoadError";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { Sheet } from "../components/Sheet";
 import { useData } from "../lib/DataContext";
@@ -32,6 +33,7 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
   const { people, reload: reloadPeople } = useData();
 
   const [credits, setCredits] = useState<OpenCredit[]>([]);
+  const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [showSettled, setShowSettled] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
@@ -40,14 +42,15 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
   const load = useCallback(async () => {
     // La spesa arriva in join perche' un credito senza il suo contesto
     // ("22,50 € da Leonardo") non dice abbastanza per agire.
-    const { data } = await supabase
+    const { data, error: failure } = await supabase
       .from("payment_splits")
       .select(
         "*, person:people(*), payment:payments(id, merchant_name, occurred_at, amount)"
       )
       .order("created_at", { ascending: false });
 
-    if (data) setCredits(data as unknown as OpenCredit[]);
+    setError(failure?.message ?? null);
+    if (!failure) setCredits((data ?? []) as unknown as OpenCredit[]);
   }, []);
 
   useEffect(() => {
@@ -285,7 +288,9 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
           </View>
         )}
 
-        {open.length === 0 && (
+        {error && <LoadError message={error} onRetry={load} />}
+
+        {!error && open.length === 0 && (
           <Text style={[styles.empty, { color: palette.ink3 }]}>
             Nessun credito aperto. Le quote compaiono qui quando dividi una
             spesa dalla schermata di modifica.

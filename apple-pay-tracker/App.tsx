@@ -153,6 +153,10 @@ function Root() {
   const { palette } = useTheme();
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
+  // Il recupero password apre una sessione a meta' strada, quando il codice
+  // viene accettato ma la password nuova non e' ancora stata scritta. Senza
+  // questo, l'app entrerebbe proprio li' in mezzo.
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -171,7 +175,9 @@ function Root() {
     return <View style={{ flex: 1, backgroundColor: palette.ground }} />;
   }
 
-  if (!session) return <AuthScreen />;
+  if (!session || recovering) {
+    return <AuthScreen onRecoveringChange={setRecovering} />;
+  }
 
   // Il provider dei dati vive dentro la sessione: al logout la cache delle
   // categorie viene smontata insieme a lui, senza restare appesa.

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { firstError } from "./loadError";
 import { supabase } from "./supabase";
 import { Payment, SpendingLimit } from "./types";
 
@@ -64,6 +65,7 @@ export function useLimits() {
   const [limits, setLimits] = useState<SpendingLimit[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const since = new Date(
@@ -82,8 +84,15 @@ export function useLimits() {
         .gte("occurred_at", since.toISOString()),
     ]);
 
-    if (limitsResult.data) setLimits(limitsResult.data as SpendingLimit[]);
-    if (paymentsResult.data) setPayments(paymentsResult.data as Payment[]);
+    const failure = firstError(limitsResult, paymentsResult);
+    setError(failure);
+
+    // Un limite valutato su una lista di spese vuota direbbe "0% del budget"
+    // proprio mentre non sappiamo quanto e' stato speso.
+    if (!failure) {
+      setLimits((limitsResult.data ?? []) as SpendingLimit[]);
+      setPayments((paymentsResult.data ?? []) as Payment[]);
+    }
     setLoading(false);
   }, []);
 
@@ -115,5 +124,5 @@ export function useLimits() {
     [statuses]
   );
 
-  return { statuses, monthlyOverall, alerts, loading, reload: load };
+  return { statuses, monthlyOverall, alerts, loading, error, reload: load };
 }

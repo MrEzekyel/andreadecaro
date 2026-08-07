@@ -9,6 +9,7 @@ import {
   View,
 } from "react-native";
 import { Icon } from "../components/Icon";
+import { LoadError } from "../components/LoadError";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
@@ -22,13 +23,15 @@ export default function AutomationsScreen({ onBack }: { onBack: () => void }) {
 
   const [tokens, setTokens] = useState<IngestToken[]>([]);
   const [freshToken, setFreshToken] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const loadTokens = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error: failure } = await supabase
       .from("ingest_tokens")
       .select("*")
       .order("created_at", { ascending: false });
-    if (data) setTokens(data as IngestToken[]);
+    setError(failure?.message ?? null);
+    if (!failure) setTokens((data ?? []) as IngestToken[]);
   }, []);
 
   useEffect(() => {
@@ -175,11 +178,17 @@ export default function AutomationsScreen({ onBack }: { onBack: () => void }) {
           </View>
         ))}
 
+        {/* L'elenco dei token vuoto e "non sono riuscito a leggerli" portano a
+            due azioni opposte: generarne uno, o riprovare. */}
+        {error && <LoadError message={error} onRetry={loadTokens} />}
+
+        {!error && (
         <Text style={[styles.note, { color: palette.ink3 }]}>
           {activeTokens === 0
             ? "Genera un token e incollalo nell'intestazione x-ingest-token della Shortcut."
             : "Il token si vede una volta sola. Se lo perdi, generane un altro e revoca il vecchio."}
         </Text>
+        )}
       </ScrollView>
     </View>
     </SwipeBack>

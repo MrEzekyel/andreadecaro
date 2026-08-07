@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { firstError } from "./loadError";
 import { supabase } from "./supabase";
 import {
   LatestPrice,
@@ -21,6 +22,8 @@ type State = {
   series: SeriesPoint[];
   xirr: number | null;
   loading: boolean;
+  /** Messaggio dell'ultima lettura fallita, `null` quando l'ultima e' riuscita. */
+  error: string | null;
 };
 
 const EMPTY_TOTALS: PortfolioTotals = {
@@ -53,6 +56,7 @@ export function usePortfolio() {
     series: [],
     xirr: null,
     loading: true,
+    error: null,
   });
 
   const load = useCallback(async () => {
@@ -63,6 +67,15 @@ export function usePortfolio() {
       supabase.rpc("latest_asset_prices"),
       supabase.rpc("portfolio_daily"),
     ]);
+
+    const failure = firstError(assetsRes, opsRes, rulesRes, pricesRes, seriesRes);
+    if (failure) {
+      // Un portafoglio calcolato su liste vuote direbbe "valore 0,00 €", che
+      // e' l'unica frase peggiore di "non ho letto" su una schermata di
+      // investimenti. Lo stato precedente resta com'e'.
+      setState((previous) => ({ ...previous, loading: false, error: failure }));
+      return null;
+    }
 
     const assets = (assetsRes.data ?? []) as Asset[];
     const investments = (opsRes.data ?? []) as Investment[];
@@ -90,6 +103,7 @@ export function usePortfolio() {
       series,
       xirr: portfolioXirr(investments, totals.value),
       loading: false,
+      error: null,
     };
     setState(next);
     // Restituite anche direttamente: chi ha in mano una posizione presa da uno

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { EditPaymentSheet } from "../components/EditPaymentSheet";
 import { Icon } from "../components/Icon";
+import { LoadError } from "../components/LoadError";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
@@ -54,6 +55,7 @@ export default function TransactionDetailScreen({
   const [editing, setEditing] = useState(false);
   const [splitIntent, setSplitIntent] = useState(false);
   const [splits, setSplits] = useState<PaymentSplit[]>([]);
+  const [splitsError, setSplitsError] = useState<string | null>(null);
   const [merchantTotal, setMerchantTotal] = useState<{
     count: number;
     total: number;
@@ -66,7 +68,12 @@ export default function TransactionDetailScreen({
     ]);
 
     if (fresh.data) setPayment(fresh.data as Payment);
-    if (splitRows.data) setSplits(splitRows.data as PaymentSplit[]);
+
+    // La spesa resta quella su cui l'utente ha toccato, quindi un errore qui
+    // non falsifica l'importo. Le quote si': senza, la schermata direbbe
+    // "non divisa" su una spesa divisa, e l'intero importo sembrerebbe tuo.
+    setSplitsError(splitRows.error?.message ?? null);
+    if (!splitRows.error) setSplits((splitRows.data ?? []) as PaymentSplit[]);
 
     if (initial.merchant_id) {
       const { data } = await supabase
@@ -227,6 +234,10 @@ export default function TransactionDetailScreen({
               </View>
             ))}
           </View>
+
+          {splitsError && (
+            <LoadError message={splitsError} onRetry={load} variant="inline" />
+          )}
 
           {splits.length > 0 && (
             <View>

@@ -10,6 +10,7 @@ import {
 import { CategoryDonut, DonutSlice } from "../components/CategoryDonut";
 import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
+import { LoadError } from "../components/LoadError";
 import { LimitCard } from "../components/LimitCard";
 import { MonthYearPicker } from "../components/MonthYearPicker";
 import { PaymentRow } from "../components/PaymentRow";
@@ -44,7 +45,7 @@ export default function HomeScreen() {
 
   const [month, setMonth] = useState(() => new Date());
   const [pickerOpen, setPickerOpen] = useState(false);
-  const { payments, total, previousTotal, reload } = usePayments(month);
+  const { payments, total, previousTotal, error, reload } = usePayments(month);
   const { monthlyOverall, alerts, reload: reloadLimits } = useLimits();
   const [refreshing, setRefreshing] = useState(false);
   const explorer = useExplorer(reload);
@@ -88,6 +89,10 @@ export default function HomeScreen() {
 
   const [monthlyIncome, setMonthlyIncome] = useState(0);
   const [monthlyInvested, setMonthlyInvested] = useState(0);
+  // "Risparmiato" e' una sottrazione fra tre numeri: se anche uno solo non
+  // arriva, il risultato e' un importo inventato. Meglio non mostrare il
+  // riquadro che mostrarlo sbagliato.
+  const [balanceError, setBalanceError] = useState(false);
 
   // A differenza delle rate ricorrenti, introiti e investimenti sono
   // legati al mese guardato: cambiano sfogliando il calendario.
@@ -111,16 +116,16 @@ export default function HomeScreen() {
         .lt("occurred_at", end.toISOString()),
     ]);
 
-    if (incomeResult.data) {
-      setMonthlyIncome(
-        incomeResult.data.reduce((sum, r) => sum + Number(r.amount), 0)
-      );
-    }
-    if (investResult.data) {
-      setMonthlyInvested(
-        investResult.data.reduce((sum, r) => sum + Number(r.amount), 0)
-      );
-    }
+    const failed = Boolean(incomeResult.error || investResult.error);
+    setBalanceError(failed);
+    if (failed) return;
+
+    setMonthlyIncome(
+      (incomeResult.data ?? []).reduce((sum, r) => sum + Number(r.amount), 0)
+    );
+    setMonthlyInvested(
+      (investResult.data ?? []).reduce((sum, r) => sum + Number(r.amount), 0)
+    );
   }, [month]);
 
   useEffect(() => {
@@ -273,6 +278,13 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Al posto del contenuto, non accanto: un totale a 0,00 con sopra un
+            avviso resta un totale a 0,00, e l'occhio legge prima il numero. */}
+        {error ? (
+          <LoadError message={error} onRetry={onRefresh} />
+        ) : (
+          <>
+
         <View>
           <Text style={[styles.label, { color: palette.ink3 }]}>
             {viewingCurrentMonth ? "Speso questo mese" : "Speso nel mese"}
@@ -313,7 +325,7 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {(monthlyIncome > 0 || monthlyInvested > 0) && (
+        {!balanceError && (monthlyIncome > 0 || monthlyInvested > 0) && (
           <View>
             <Text style={[styles.label, { color: palette.ink3 }]}>
               Bilancio del mese
@@ -426,6 +438,8 @@ export default function HomeScreen() {
             Nessuna spesa in questo mese. Configura la Shortcut sul telefono
             oppure aggiungine una a mano.
           </Text>
+        )}
+          </>
         )}
       </ScrollView>
 
