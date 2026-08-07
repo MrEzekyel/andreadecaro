@@ -267,6 +267,29 @@ export function portfolioXirr(
   return xirr([...cashFlows(investments), { date: today, amount: currentValue }]);
 }
 
+/**
+ * Lo stesso rendimento annualizzato, ristretto agli asset di un gruppo.
+ *
+ * Vale la pena averlo per gruppo e non solo sul totale: su un portafoglio in
+ * cui una fetta e' entrata due anni fa e un'altra sei mesi fa, il numero
+ * complessivo non dice quale delle due stia effettivamente rendendo.
+ */
+export function groupXirr(
+  investments: Investment[],
+  assets: Asset[],
+  group: AssetGroup,
+  currentValue: number,
+  today = new Date().toISOString().slice(0, 10)
+): number | null {
+  if (currentValue <= 0) return null;
+  const inGroup = new Set(
+    assets.filter((a) => a.asset_group === group).map((a) => a.id)
+  );
+  const ops = investments.filter((op) => op.asset_id && inGroup.has(op.asset_id));
+  if (ops.length === 0) return null;
+  return xirr([...cashFlows(ops), { date: today, amount: currentValue }]);
+}
+
 export type GroupSummary = {
   group: AssetGroup;
   label: string;

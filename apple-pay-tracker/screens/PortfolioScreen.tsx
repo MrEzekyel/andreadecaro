@@ -14,7 +14,6 @@ import { formatAmount, formatDate, splitAmount } from "../lib/format";
 import {
   GroupSummary,
   MANUAL_PRICE_STALE_DAYS,
-  periodPriceGain,
   Position,
   RANGES,
   RangeKey,
@@ -23,10 +22,11 @@ import {
   sliceSeries,
 } from "../lib/portfolio";
 import { AssetGroup } from "../lib/types";
-import { usePortfolio, usePortfolioSeries } from "../lib/usePortfolio";
+import { usePortfolio } from "../lib/usePortfolio";
 import { radius, space, tint, type } from "../lib/theme";
 import AnalysisScreen from "./AnalysisScreen";
 import AssetDetailScreen from "./AssetDetailScreen";
+import GroupDetailScreen from "./GroupDetailScreen";
 import PacScreen from "./PacScreen";
 
 export const GROUP_ICON: Record<AssetGroup, string> = {
@@ -86,6 +86,7 @@ export default function PortfolioScreen() {
   const [scrub, setScrub] = useState<number | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [openAsset, setOpenAsset] = useState<Position | null>(null);
+  const [openGroup, setOpenGroup] = useState<AssetGroup | null>(null);
   const [page, setPage] = useState<"root" | "analysis" | "pac">("root");
 
   const visible = useMemo(() => sliceSeries(series, range), [series, range]);
@@ -139,6 +140,22 @@ export default function PortfolioScreen() {
           );
           if (updated) setOpenAsset(updated);
         }}
+      />
+    );
+  }
+
+  const gruppoAperto = openGroup
+    ? groups.find((g) => g.group === openGroup)
+    : null;
+
+  if (gruppoAperto) {
+    return (
+      <GroupDetailScreen
+        group={gruppoAperto}
+        assets={portfolio.assets}
+        investments={portfolio.investments}
+        onOpenAsset={setOpenAsset}
+        onBack={() => setOpenGroup(null)}
       />
     );
   }
@@ -272,7 +289,7 @@ export default function PortfolioScreen() {
           style={styles.pendingRow}
           onPress={() => setOpenAsset(staleManual[0])}
         >
-          <Icon name="alert-circle" size={16} color={palette.over} />
+          <Icon name="circle-alert" size={16} color={palette.over} />
           <Text style={[styles.pendingText, { color: palette.ink2 }]}>
             {staleManual.length === 1
               ? `Il valore di ${staleManual[0].asset.name} e' fermo da un po': aggiornalo da Trade Republic quando puoi.`
@@ -286,6 +303,7 @@ export default function PortfolioScreen() {
           key={group.group}
           group={group}
           onOpenAsset={setOpenAsset}
+          onOpenGroup={() => setOpenGroup(group.group)}
         />
       ))}
 
@@ -314,52 +332,28 @@ export default function PortfolioScreen() {
 }
 
 /**
- * Sezione richiudibile: chiusa mostra il saldo e come sta andando, aperta il
- * suo grafico e le posizioni dentro.
+ * Sezione richiudibile: chiusa mostra il saldo e come sta andando, aperta i
+ * titoli che contiene.
  *
- * Chiuse di default perche' con quattro gruppi aperti la schermata diventa un
+ * Chiuse di default perche' con tutti i gruppi aperti la schermata diventa un
  * muro da scorrere, e il saldo di ogni gruppo e' gia' nell'intestazione.
+ * Dentro ci stanno solo i titoli: grafico, ripartizione e rendimento vivono
+ * nella pagina della sezione, dove hanno lo spazio per essere letti invece di
+ * stare compressi in un elenco.
  */
 function GroupSection({
   group,
   onOpenAsset,
+  onOpenGroup,
 }: {
   group: GroupSummary;
   onOpenAsset: (p: Position) => void;
+  onOpenGroup: () => void;
 }) {
   const { palette } = useTheme();
   const [open, setOpen] = useState(false);
-  const [range, setRange] = useState<RangeKey>("1y");
-  const [scrub, setScrub] = useState<number | null>(null);
 
-  // La serie si scarica solo quando la sezione viene aperta la prima volta.
-  const series = usePortfolioSeries(open ? { group: group.group } : null);
-  const visible = useMemo(() => sliceSeries(series, range), [series, range]);
-  const points = useMemo(
-    () =>
-      visible.map((p) => ({
-        date: p.on_date,
-        value: p.value_eur,
-        baseline: p.invested_eur,
-      })),
-    [visible]
-  );
-
-  const at = scrub === null ? null : visible[scrub];
-
-  // Aperta, la percentuale in testa segue cio' che il grafico sta mostrando:
-  // da inizio del periodo scelto fino al punto sotto il dito, o a oggi se non
-  // si sta trascinando. Chiusa mostra sempre il totale, perche' senza il
-  // grafico sotto un "+3% nell'ultimo mese" non avrebbe un periodo da
-  // ancorare e sembrerebbe un numero a caso.
-  const period = useMemo(() => {
-    if (!open || visible.length < 2) return null;
-    const upTo = scrub === null ? visible : visible.slice(0, scrub + 1);
-    return periodPriceGain(upTo, group.investedBasis);
-  }, [open, visible, scrub, group.investedBasis]);
-
-  const shownPct = period?.pct ?? group.priceGainPct;
-  const positive = (period?.amount ?? group.priceGain) >= 0;
+  const positive = group.priceGain >= 0;
 
   return (
     <View>
@@ -383,7 +377,7 @@ function GroupSection({
           <Text style={[styles.groupMeta, { color: palette.ink3 }]}>
             versato {formatAmount(group.investedBasis)}
             {group.pending > 0
-              ? ` · ${formatAmount(group.pending)} in esecuzione`
+              ? ` \u00b7 ${formatAmount(group.pending)} in esecuzione`
               : ""}
           </Text>
         </View>
@@ -392,15 +386,15 @@ function GroupSection({
           <Text style={[styles.groupValue, { color: palette.ink }]}>
             {formatAmount(group.value)}
           </Text>
-          {shownPct !== null && (
+          {group.priceGainPct !== null && (
             <Text
               style={[
                 styles.groupGain,
                 { color: positive ? palette.good : palette.over },
               ]}
             >
-              {positive ? "+" : "−"}
-              {Math.abs(shownPct * 100).toFixed(1)}%
+              {positive ? "+" : "\u2212"}
+              {Math.abs(group.priceGainPct * 100).toFixed(1)}%
             </Text>
           )}
         </View>
@@ -408,29 +402,6 @@ function GroupSection({
 
       {open && (
         <View style={styles.groupBody}>
-          <View style={styles.chartBlock}>
-            <ScrubChart
-              points={points}
-              color={palette.accent}
-              onScrub={setScrub}
-              height={140}
-            />
-            <View style={styles.groupChartFoot}>
-              <RangePicker
-                range={range}
-                onChange={(r) => {
-                  setRange(r);
-                  setScrub(null);
-                }}
-              />
-              {at && (
-                <Text style={[styles.scrubDate, { color: palette.ink2 }]}>
-                  {formatAmount(at.value_eur)} · {formatDate(at.on_date)}
-                </Text>
-              )}
-            </View>
-          </View>
-
           {group.positions.map((position) => (
             <AssetRow
               key={position.asset.id}
@@ -438,6 +409,16 @@ function GroupSection({
               onPress={() => onOpenAsset(position)}
             />
           ))}
+
+          <TouchableOpacity
+            style={[styles.groupMore, { borderColor: palette.hairline }]}
+            onPress={onOpenGroup}
+          >
+            <Icon name="chart-line" size={15} color={palette.accent} />
+            <Text style={[styles.groupMoreText, { color: palette.accent }]}>
+              Andamento e analisi
+            </Text>
+          </TouchableOpacity>
         </View>
       )}
     </View>
@@ -565,14 +546,18 @@ const styles = StyleSheet.create({
   groupNumbers: { alignItems: "flex-end", gap: 2 },
   groupValue: { ...type.amount },
   groupGain: { ...type.small, fontWeight: "500" },
-  groupBody: { paddingLeft: space.xl, gap: space.md, paddingBottom: space.sm },
-  groupChartFoot: {
+  groupBody: { paddingLeft: space.xl, paddingBottom: space.sm },
+  groupMore: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    gap: space.sm,
+    justifyContent: "center",
+    gap: 6,
+    marginTop: space.sm,
+    paddingVertical: 11,
+    borderRadius: radius.button,
+    borderWidth: 1,
   },
-  scrubDate: { ...type.small, fontWeight: "500" },
+  groupMoreText: { ...type.body, fontWeight: "500" },
   assetRow: {
     flexDirection: "row",
     alignItems: "center",

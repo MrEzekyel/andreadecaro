@@ -244,7 +244,7 @@ export default function AssetDetailScreen({
           {isManual && (
             <TouchableOpacity style={styles.updateRow} onPress={openValueSheet}>
               <Icon
-                name={stale ? "alert-circle" : "pencil"}
+                name={stale ? "circle-alert" : "pencil"}
                 size={14}
                 color={stale ? palette.over : palette.accent}
               />
