@@ -100,7 +100,7 @@ export default function GroupDetailScreen({
   );
 
   const versamenti = useMemo(
-    () => monthlyContributions(investments, assets, group.group),
+    () => monthlyContributions(investments, assets, group.group, 24),
     [investments, assets, group.group]
   );
 
@@ -245,6 +245,9 @@ export default function GroupDetailScreen({
               buckets={versamenti}
               metric="amount"
               color={palette.accent}
+              // Con lo scorrimento ogni mese ha la sua aria: senza, sopra la
+              // decina di colonne le etichette si sovrappongono.
+              minColumnWidth={46}
               average={versamentoTipico}
               selectedKey={meseScelto}
               onSelect={(b) =>

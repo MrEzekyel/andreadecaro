@@ -1,5 +1,5 @@
-import React from "react";
-import { View } from "react-native";
+import React, { useRef } from "react";
+import { ScrollView, View } from "react-native";
 import Svg, { Line, Rect, Text as SvgText } from "react-native-svg";
 import { useTheme } from "../lib/ThemeContext";
 import { Bucket } from "../lib/aggregate";
@@ -29,6 +29,14 @@ type Props = {
   average?: number | null;
   /** Colore delle colonne sotto lo zero; serve solo ai grafici con negativi. */
   negativeColor?: string;
+  /**
+   * Larghezza minima per colonna. Impostandola il grafico smette di
+   * comprimersi nello spazio disponibile e scorre in orizzontale: oltre una
+   * decina di periodi le etichette sotto le colonne si sovrappongono fino a
+   * diventare illeggibili, e stringere le barre non risolve, sposta solo il
+   * problema.
+   */
+  minColumnWidth?: number;
 };
 
 /** Passo "tondo" piu' vicino a `raw`: 1, 2, 2.5 o 5 per decade. */
@@ -48,8 +56,10 @@ export function BarChart({
   onSelect,
   average,
   negativeColor,
+  minColumnWidth,
 }: Props) {
   const { palette } = useTheme();
+  const scroller = useRef<ScrollView>(null);
 
   const values = buckets.map((b) => (metric === "amount" ? b.total : b.count));
   const peak = Math.max(...values, 0);
@@ -74,7 +84,14 @@ export function BarChart({
     if (Math.abs(value) > step / 100) ticks.push(value);
   }
 
-  const plotWidth = WIDTH - GUTTER;
+  // Scorrendo, l'asse dei valori esce dal disegno e viene ridisegnato fermo
+  // accanto: se scorresse via anche lui le colonne resterebbero senza scala.
+  const scorre =
+    minColumnWidth != null && GUTTER + buckets.length * minColumnWidth > WIDTH;
+  const gutter = scorre ? 0 : GUTTER;
+  const width = scorre ? buckets.length * minColumnWidth! : WIDTH;
+
+  const plotWidth = width - gutter;
   const barWidth = Math.max(
     (plotWidth - GAP * (buckets.length - 1)) / Math.max(buckets.length, 1),
     2
@@ -95,24 +112,27 @@ export function BarChart({
   const tickLabel = (value: number) =>
     metric === "amount" ? compactAmount(value) : String(Math.round(value));
 
-  return (
-    <View>
-      <Svg width="100%" height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`}>
+  const disegno = (
+    <Svg
+        width={scorre ? width : "100%"}
+        height={HEIGHT}
+        viewBox={`0 0 ${width} ${HEIGHT}`}
+      >
         {ticks.map((value) => {
           const y = yOf(value);
           return (
             <React.Fragment key={`tick-${value}`}>
               <Line
-                x1={GUTTER}
+                x1={gutter}
                 y1={y}
-                x2={WIDTH}
+                x2={width}
                 y2={y}
                 stroke={palette.hairline}
                 strokeWidth={1}
                 opacity={0.7}
               />
               <SvgText
-                x={GUTTER - 6}
+                x={gutter - 6}
                 y={y + 3}
                 textAnchor="end"
                 fontSize={8}
@@ -127,9 +147,9 @@ export function BarChart({
         {/* Lo zero e' sempre marcato: con i negativi non e' piu' il fondo del
             grafico, ed e' la linea rispetto a cui si legge il segno. */}
         <Line
-          x1={GUTTER}
+          x1={gutter}
           y1={zeroY}
-          x2={WIDTH}
+          x2={width}
           y2={zeroY}
           stroke={palette.hairline}
           strokeWidth={1}
@@ -137,7 +157,7 @@ export function BarChart({
 
         {buckets.map((bucket, index) => {
           const value = values[index];
-          const x = GUTTER + index * (barWidth + GAP);
+          const x = gutter + index * (barWidth + GAP);
           const valueY = yOf(value);
 
           // Un periodo a zero resta visibile come traccia: distinguere
@@ -217,9 +237,9 @@ export function BarChart({
 
         {averageY !== null && (
           <Line
-            x1={GUTTER}
+            x1={gutter}
             y1={averageY}
-            x2={WIDTH}
+            x2={width}
             y2={averageY}
             stroke={palette.limit}
             strokeWidth={1.5}
@@ -227,7 +247,41 @@ export function BarChart({
             opacity={0.75}
           />
         )}
+    </Svg>
+  );
+
+  if (!scorre) return <View>{disegno}</View>;
+
+  return (
+    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+      {/* L'asse dei valori sta fuori dallo scorrimento: e' il riferimento
+          rispetto a cui si leggono le colonne, e seguirle scivolando via lo
+          renderebbe inutile proprio mentre serve. */}
+      <Svg width={GUTTER} height={HEIGHT}>
+        {ticks.map((value) => (
+          <SvgText
+            key={`axis-${value}`}
+            x={GUTTER - 6}
+            y={yOf(value) + 3}
+            textAnchor="end"
+            fontSize={8}
+            fill={palette.ink3}
+          >
+            {tickLabel(value)}
+          </SvgText>
+        ))}
       </Svg>
+
+      <ScrollView
+        ref={scroller}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        // Si parte dal periodo piu' recente: e' quello che si vuole vedere
+        // aprendo la schermata, non il piu' vecchio.
+        onContentSizeChange={() => scroller.current?.scrollToEnd({ animated: false })}
+      >
+        {disegno}
+      </ScrollView>
     </View>
   );
 }
