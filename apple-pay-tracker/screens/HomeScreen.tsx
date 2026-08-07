@@ -11,6 +11,7 @@ import { CategoryDonut, DonutSlice } from "../components/CategoryDonut";
 import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
+import { MonthCheck } from "../components/MonthCheck";
 import { LimitCard } from "../components/LimitCard";
 import { MonthYearPicker } from "../components/MonthYearPicker";
 import { PaymentRow } from "../components/PaymentRow";
@@ -335,6 +336,10 @@ export default function HomeScreen() {
           </View>
         </View>
 
+        {/* Solo sul mese corrente: sfogliando l'archivio la domanda sul mese
+            scorso sarebbe fuori posto. */}
+        {viewingCurrentMonth && <MonthCheck onReview={setMonth} />}
+
         {!balanceError && (monthlyIncome > 0 || monthlyInvested > 0) && (
           <View>
             <Text style={[styles.label, { color: palette.ink3 }]}>
@@ -451,8 +456,9 @@ export default function HomeScreen() {
 
         {payments.length === 0 && (
           <Text style={[styles.empty, { color: palette.ink3 }]}>
-            Nessuna spesa in questo mese. Configura la Shortcut sul telefono
-            oppure aggiungine una a mano.
+            Nessuna spesa in questo mese. I pagamenti Apple Pay entrano da
+            soli una volta configurata l'automazione; contanti, bonifici e
+            addebiti diretti si aggiungono a mano o con Siri.
           </Text>
         )}
           </>

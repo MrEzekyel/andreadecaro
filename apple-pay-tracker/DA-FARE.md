@@ -168,6 +168,39 @@ recupero restano bloccati sulla schermata del codice.
 
 ---
 
+### 5ter. Il file `.shortcut` da distribuire 🟡
+
+Oggi per attivare l'automazione servono dieci passi a mano (punto 4 qui sopra).
+Va bene per te, non per chi paga: è lavoro di integrazione di sistema, e il
+mese di prova gli si brucia nel setup.
+
+La soluzione è un comando **già costruito**, che l'utente scarica e in cui
+incolla il token in un campo solo. Devo costruirlo su un iPhone, quindi la
+prima parte è tua — una volta sola.
+
+**Cosa costruire** (Comandi Rapidi → Automazione → Transazione):
+
+1. **Ricevi transazione come input** (c'è già)
+2. **Chiedi input** → Tipo: Testo → Richiesta: `Incolla il token dell'app`
+   → poi **Imposta variabile** `token`
+   *(questo è il campo unico che l'utente compila; se preferisci, si può
+   sostituire con un "Testo" fisso da modificare a mano)*
+3. **Ottieni contenuto URL** — come al punto 4, con `x-ingest-token` = la
+   variabile `token`
+4. ⚠️ **Il passo che oggi manca**: subito dopo, aggiungi
+   **Se** *Contenuto URL* **non contiene** `"ok":true` →
+   **Mostra notifica**: `Spesa non registrata: <Esercente> <Importo>`
+
+Il punto 4 è la mitigazione delle perdite: Shortcuts non ritenta mai, quindi
+oggi una spesa fatta con il telefono offline sparisce e non lo sa nessuno. Con
+la notifica almeno te ne accorgi nel momento in cui succede e puoi aggiungerla
+a mano. Costa un'azione e chiude il buco più grosso dell'automazione.
+
+**Poi**: Condividi → *Copia link iCloud*, e mandami il link. Lo aggancio alla
+schermata Automazioni al posto delle istruzioni.
+
+---
+
 ### 6. Repository privato?
 
 Ora il codice sta in `MrEzekyel/andreadecaro`, che è **pubblico**. Il codice in

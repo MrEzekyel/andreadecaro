@@ -318,6 +318,25 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   apre il dettaglio di categoria/esercente, cosi' il grafico si posiziona li'
   invece che sull'ultimo mese: ogni nuovo punto d'ingresso a `openDetail`
   dovrebbe passarlo, quando un mese di riferimento esiste davvero.
+- **La copertura dell'automazione va detta, non lasciata scoprire.** Il trigger
+  Wallet vede solo Apple Pay: restano fuori contanti, bonifici, addebiti
+  diretti SDD (in Italia quasi tutte le utenze), carte fisiche non in Wallet e
+  acquisti online fuori da Apple Pay — realisticamente il 40-60% della spesa di
+  un utente italiano non entra da sola. La promessa è *"ogni pagamento Apple
+  Pay entra da solo, il resto in tre secondi con Siri"*, e compare nel
+  `README.md`, nel testo vuoto della Home e in cima ad Automazioni. Un'app che
+  promette "tutte le tue spese" e non registra la bolletta della luce non ha un
+  problema di funzionalità ma di fiducia, e si scopre nella prima settimana.
+- `month_checks` + `components/MonthCheck.tsx` sono la rete contro le **perdite
+  silenziose**: Shortcuts non ritenta mai, quindi una spesa fatta con il
+  telefono offline non arriva e nessuno se ne accorge — il totale resta
+  sbagliato in difetto e sembra corretto. Non esistendo una sorgente di verità
+  contro cui riconciliare in automatico (l'app non parla con la banca), l'unica
+  cosa onesta è chiederlo a chi l'estratto conto ce l'ha, **una volta**, a mese
+  chiuso. Deve restare un aiuto e non un lavoro: un tocco per rispondere, e si
+  spegne per sempre dalla scheda stessa. Se la lettura del totale fallisce la
+  scheda non compare — chiedere "corrisponde?" mostrando un totale non letto
+  sarebbe la stessa bugia che il controllo esiste per scoprire.
 - L'ingestione da Apple Pay passa da una **Shortcut iOS** (trigger
   "Wallet"/"Transazione") che chiama l'Edge Function `ingest-payment` con un
   token per-utente (Impostazioni → Automazioni). Scatta sia per pagamenti

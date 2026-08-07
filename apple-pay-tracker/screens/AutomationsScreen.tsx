@@ -97,6 +97,16 @@ export default function AutomationsScreen({ onBack }: { onBack: () => void }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Detto qui e non solo nel README: e' la schermata in cui uno decide
+            se fidarsi dell'automazione, ed e' meglio che scopra il limite
+            adesso invece che quando manca la bolletta della luce. */}
+        <Text style={[styles.intro, { color: palette.ink2 }]}>
+          L'automazione vede i pagamenti <Text style={{ fontWeight: "500" }}>Apple Pay</Text>{" "}
+          e li registra da sola. Non vede contanti, bonifici, addebiti diretti
+          né le carte fisiche fuori da Wallet: quelli si aggiungono a mano o
+          con Siri.
+        </Text>
+
         <Text style={[styles.label, { color: palette.ink3 }]}>
           Collegamento Shortcut
         </Text>
@@ -196,6 +206,7 @@ export default function AutomationsScreen({ onBack }: { onBack: () => void }) {
 }
 
 const styles = StyleSheet.create({
+  intro: { ...type.body, lineHeight: 21, marginBottom: space.xs },
   container: { flex: 1 },
   head: {
     flexDirection: "row",

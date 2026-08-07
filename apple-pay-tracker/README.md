@@ -1,7 +1,18 @@
 # Apple Pay Tracker
 
-App mobile (Expo / React Native) che registra automaticamente i pagamenti
-Apple Pay e li categorizza in base all'esercente.
+App mobile (Expo / React Native). **Ogni pagamento Apple Pay entra da solo e
+si categorizza in base all'esercente. Il resto lo aggiungi in tre secondi con
+Siri.**
+
+Quel "il resto" non è una postilla: il trigger Wallet di iOS vede soltanto i
+pagamenti Apple Pay. Restano fuori contanti, bonifici, **addebiti diretti SDD**
+— cioè quasi tutte le utenze in Italia — carte fisiche non aggiunte a Wallet e
+acquisti online fuori da Apple Pay. Su un utente italiano medio l'automazione
+copre realisticamente il 40-60% della spesa reale.
+
+È scritto qui in cima di proposito. Un'app che promette "tutte le tue spese,
+automaticamente" e poi non registra la bolletta della luce non ha un problema
+di funzionalità: ha un problema di fiducia, e si scopre nella prima settimana.
 
 > ⚠️ Questo repository è **pubblico**. Non committare mai il file `.env`, la
 > `service_role` key o i token di ingestione. `.env` è già in `.gitignore`.
