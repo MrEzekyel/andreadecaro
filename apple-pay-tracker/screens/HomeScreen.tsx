@@ -27,6 +27,7 @@ import {
   splitAmount,
 } from "../lib/format";
 import { categoryColor, radius, space, type } from "../lib/theme";
+import { Merchant } from "../lib/types";
 import { supabase } from "../lib/supabase";
 import { useLimits } from "../lib/useLimits";
 import {
@@ -70,6 +71,20 @@ export default function HomeScreen() {
   useEffect(() => {
     loadRecurring();
   }, [loadRecurring]);
+
+  // Serve solo a riconoscere mutuo/rate marcati come costi fissi, per dare
+  // all'andamento cumulato la stessa baseline usata in Statistiche: non
+  // dipende dal mese guardato, come le regole ricorrenti sopra.
+  const [merchants, setMerchants] = useState<Merchant[]>([]);
+
+  const loadMerchants = useCallback(async () => {
+    const { data } = await supabase.from("merchants").select("*");
+    if (data) setMerchants(data as Merchant[]);
+  }, []);
+
+  useEffect(() => {
+    loadMerchants();
+  }, [loadMerchants]);
 
   const [monthlyIncome, setMonthlyIncome] = useState(0);
   const [monthlyInvested, setMonthlyInvested] = useState(0);
@@ -144,6 +159,29 @@ export default function HomeScreen() {
     [byCategory, categoryById, dark, palette.uncategorized]
   );
 
+  const excludedMerchantIds = useMemo(
+    () => new Set(merchants.filter((m) => m.excluded_from_stats).map((m) => m.id)),
+    [merchants]
+  );
+
+  const isFixedCost = useCallback(
+    (payment: (typeof payments)[number]) =>
+      payment.excluded_from_stats ||
+      Boolean(payment.merchant_id && excludedMerchantIds.has(payment.merchant_id)),
+    [excludedMerchantIds]
+  );
+
+  // Home non ha il toggle "escludi costi fissi": mutuo e rate contano sempre
+  // nel totale. Ma nel grafico non devono comparire il giorno in cui sono
+  // stati registrati come se fossero una spesa qualunque — sono un impegno
+  // certo fin dall'inizio del mese, non qualcosa che "arriva" quel giorno.
+  const fixedCostsTotal = useMemo(() => {
+    const variable = payments
+      .filter((p) => !isFixedCost(p))
+      .reduce((sum, p) => sum + Number(p.effective_amount), 0);
+    return total - variable;
+  }, [payments, isFixedCost, total]);
+
   /** Spesa cumulata giorno per giorno, fino a oggi se il mese e' in corso. */
   const trend = useMemo<TrendPoint[]>(() => {
     const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate();
@@ -151,6 +189,7 @@ export default function HomeScreen() {
 
     const perDay = new Array(days).fill(0);
     for (const payment of payments) {
+      if (isFixedCost(payment)) continue;
       const day = new Date(payment.occurred_at).getDate();
       perDay[day - 1] += Number(payment.effective_amount);
     }
@@ -158,15 +197,16 @@ export default function HomeScreen() {
     // Si emettono tutti i giorni del mese, non solo quelli passati: i giorni
     // futuri valgono `null` e danno al grafico la larghezza del mese intero,
     // cosi' la linea si ferma dov'e' oggi invece di stiracchiarsi fino al
-    // bordo destro facendo sembrare finito un mese appena cominciato.
+    // bordo destro facendo sembrare finito un mese appena cominciato. La
+    // linea parte gia' dal totale dei costi fissi invece che da zero.
     const points: TrendPoint[] = [];
-    let running = 0;
+    let running = fixedCostsTotal;
     for (let i = 0; i < days; i++) {
       if (i < elapsed) running += perDay[i];
       points.push({ label: String(i + 1), value: i < elapsed ? running : null });
     }
     return points;
-  }, [payments, month, viewingCurrentMonth]);
+  }, [payments, month, viewingCurrentMonth, isFixedCost, fixedCostsTotal]);
 
   const limitAmount =
     viewingCurrentMonth && monthlyOverall
@@ -185,7 +225,13 @@ export default function HomeScreen() {
 
   async function onRefresh() {
     setRefreshing(true);
-    await Promise.all([reload(), reloadLimits(), loadRecurring(), loadBalance()]);
+    await Promise.all([
+      reload(),
+      reloadLimits(),
+      loadRecurring(),
+      loadBalance(),
+      loadMerchants(),
+    ]);
     setRefreshing(false);
   }
 

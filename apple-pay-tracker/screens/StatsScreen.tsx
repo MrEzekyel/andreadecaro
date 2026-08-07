@@ -219,21 +219,30 @@ export default function StatsScreen() {
     [merchants]
   );
 
+  const isFixedCost = useCallback(
+    (payment: Payment) =>
+      payment.excluded_from_stats ||
+      Boolean(payment.merchant_id && excludedMerchantIds.has(payment.merchant_id)),
+    [excludedMerchantIds]
+  );
+
   const applyExclusion = useCallback(
-    (list: Payment[]) => {
-      if (!excludeMarked) return list;
-      return list.filter(
-        (p) =>
-          !p.excluded_from_stats &&
-          !(p.merchant_id && excludedMerchantIds.has(p.merchant_id))
-      );
-    },
-    [excludeMarked, excludedMerchantIds]
+    (list: Payment[]) => (excludeMarked ? list.filter((p) => !isFixedCost(p)) : list),
+    [excludeMarked, isFixedCost]
   );
 
   const rankable = useMemo(
     () => applyExclusion(payments),
     [payments, applyExclusion]
+  );
+
+  // Sempre solo la parte variabile, a prescindere dal toggle: serve a
+  // calcolare il totale dei costi fissi (che deve restare un numero fisso,
+  // non sparire quando il toggle e' spento) e a dare al grafico cumulato la
+  // sola progressione giorno per giorno che non sia gia' mutuo/rate.
+  const variablePayments = useMemo(
+    () => payments.filter((p) => !isFixedCost(p)),
+    [payments, isFixedCost]
   );
 
   const total = payments.reduce((sum, p) => sum + Number(p.effective_amount), 0);
@@ -245,7 +254,8 @@ export default function StatsScreen() {
   // stessa cosa dei grafici sotto invece di restare sempre sul totale pieno:
   // due numeri diversi con lo stesso significato apparente confondono.
   const heroTotal = excludeMarked ? rankableTotal : total;
-  const fixedCostsTotal = total - rankableTotal;
+  const fixedCostsTotal =
+    total - variablePayments.reduce((sum, p) => sum + Number(p.effective_amount), 0);
 
   // Il limite mensile ha senso come riferimento solo sul mese corrente.
   const limitAmount =
@@ -256,14 +266,17 @@ export default function StatsScreen() {
   /**
    * Spesa cumulata lungo il periodo, un punto per intervallo trascorso.
    *
-   * Usa `rankable` (payments gia' filtrati dal toggle "escludi costi fissi")
-   * e non `payments`: altrimenti il grafico includerebbe sempre mutuo e rate
-   * anche a toggle acceso, mentre il totale sopra e le classifiche sotto no —
-   * tre numeri diversi con lo stesso significato apparente.
+   * Accumula solo `variablePayments`: mutuo e rate non vanno spalmati sul
+   * giorno in cui sono stati registrati, perche' sono un impegno certo fin
+   * dall'inizio del periodo, non una spesa che "arriva" quel giorno. Con
+   * "escludi costi fissi" spento la linea parte quindi gia' dal totale dei
+   * costi fissi (`fixedCostsTotal`) invece che da zero; con il toggle acceso
+   * quel totale non fa parte del racconto e la linea parte da zero come
+   * prima.
    */
   const trend = useMemo<TrendPoint[]>(() => {
     const slots = new Array(bucketCount(period)).fill(0);
-    for (const payment of rankable) {
+    for (const payment of variablePayments) {
       slots[bucketOf(period, payment.occurred_at)] += Number(
         payment.effective_amount
       );
@@ -271,7 +284,7 @@ export default function StatsScreen() {
 
     const elapsed = Math.max(bucketsElapsed(period), 1);
     const points: TrendPoint[] = [];
-    let running = 0;
+    let running = excludeMarked ? 0 : fixedCostsTotal;
 
     // Come in Home: si emette tutto il periodo, con `null` da qui in avanti.
     // Sono i punti futuri a dare al grafico la larghezza vera del mese (o
@@ -294,7 +307,7 @@ export default function StatsScreen() {
       points.push({ label, value: i < elapsed ? running : null });
     }
     return points;
-  }, [rankable, period]);
+  }, [variablePayments, period, excludeMarked, fixedCostsTotal]);
 
   /** Mesi disponibili per la ghiera della ripartizione, dal primo movimento a oggi. */
   const donutMonths = useMemo(() => {

@@ -67,6 +67,12 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   **classifiche** ("dove spendo di più") ma mai dai **totali** — mutuo e
   rate sono spese vere. Il toggle "escludi costi fissi" in Statistiche
   rende questa esclusione una scelta invece che un comportamento fisso.
+  Nell'**andamento cumulato** (Statistiche e Home) i costi fissi non si
+  sommano il giorno in cui sono stati registrati come una spesa qualunque:
+  sono un impegno certo fin dall'inizio del periodo, quindi la linea parte
+  già dal loro totale (`fixedCostsTotal`) e accumula solo la parte
+  variabile giorno per giorno. Home non ha il toggle e li include sempre;
+  in Statistiche la baseline sparisce quando il toggle è acceso.
 - `recurring_rules` → `materialize_recurring()` genera le spese ricorrenti
   ogni notte via pg_cron (mutuo, abbonamenti).
 - `investment_rules` = i **piani di accumulo** (schermata PAC). Il ciclo è
