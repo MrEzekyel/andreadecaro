@@ -367,6 +367,26 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   spegne per sempre dalla scheda stessa. Se la lettura del totale fallisce la
   scheda non compare — chiedere "corrisponde?" mostrando un totale non letto
   sarebbe la stessa bugia che il controllo esiste per scoprire.
+- **Un'automazione iOS non si può condividere**: il pulsante Condividi esiste
+  solo sui comandi rapidi normali, quindi un `.shortcut` dell'automazione non è
+  generabile. Da qui la struttura: la logica sta in un comando rapido
+  condivisibile («Registra spesa») e l'automazione lo chiama in due azioni. È
+  anche il motivo per cui `P5` si può chiudere davvero — il pezzo complicato si
+  distribuisce con un link iCloud.
+- Il ramo di fallimento del comando rapido scrive la spesa in
+  `spese-non-inviate.txt`, **una riga JSON per spesa**, identica al corpo che
+  avrebbe mandato in rete. `lib/recoverPayments.ts` la rilegge da
+  Impostazioni → Automazioni. `amount` resta la **stringa formattata** di
+  Wallet e non un numero: è lì dentro che c'è la valuta, e normalizzarla
+  troppo presto riaprirebbe il difetto che la multi-valuta ha chiuso.
+- Il recupero riapplica la stessa finestra anti-doppione di cinque minuti
+  della Edge Function, perché la Shortcut non sa se il timeout sia scattato
+  prima o dopo che la spesa fosse registrata: lo stesso file si può reimportare
+  quante volte si vuole.
+- **`Se Contenuti URL presenta qualsiasi valore` non è un test di successo**:
+  `ingest-payment` risponde con un JSON anche sugli errori, quindi quella
+  condizione è sempre vera e il ramo di fallimento non scatta mai. Va usato
+  *contiene* `"ok":true`.
 - L'ingestione da Apple Pay passa da una **Shortcut iOS** (trigger
   "Wallet"/"Transazione") che chiama l'Edge Function `ingest-payment` con un
   token per-utente (Impostazioni → Automazioni). Scatta sia per pagamenti

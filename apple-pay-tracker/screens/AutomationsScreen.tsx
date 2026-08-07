@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
+import { RecoverSheet } from "../components/RecoverSheet";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
@@ -191,6 +192,8 @@ export default function AutomationsScreen({ onBack }: { onBack: () => void }) {
         {/* L'elenco dei token vuoto e "non sono riuscito a leggerli" portano a
             due azioni opposte: generarne uno, o riprovare. */}
         {error && <LoadError message={error} onRetry={loadTokens} />}
+
+        <RecoverSheet onDone={loadTokens} />
 
         {!error && (
         <Text style={[styles.note, { color: palette.ink3 }]}>

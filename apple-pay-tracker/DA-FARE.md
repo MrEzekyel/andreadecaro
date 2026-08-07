@@ -132,6 +132,12 @@ Poi ti basta dire *"Ehi Siri, aggiungi spesa"*.
 
 ### 5bis. I due template email 🔴
 
+> I due file HTML pronti da incollare sono in
+> `supabase/templates/confirm-signup.html` e
+> `supabase/templates/reset-password.html`. Sono nello stile dell'app: fondo
+> caldo, accento argilla, pesi bassi. Copia il contenuto di ognuno nel campo
+> *Message body* del template corrispondente.
+
 L'app non usa **nessuna pagina web**: né per confermare l'indirizzo alla
 registrazione, né per recuperare la password. Entrambe le cose vanno a
 **codice a sei cifre**, verificato dall'app via API.
@@ -168,36 +174,76 @@ recupero restano bloccati sulla schermata del codice.
 
 ---
 
-### 5ter. Il file `.shortcut` da distribuire 🟡
+### 5ter. Il comando rapido condivisibile 🔴
 
-Oggi per attivare l'automazione servono dieci passi a mano (punto 4 qui sopra).
-Va bene per te, non per chi paga: è lavoro di integrazione di sistema, e il
-mese di prova gli si brucia nel setup.
+#### Prima: c'è un difetto nell'automazione di adesso
 
-La soluzione è un comando **già costruito**, che l'utente scarica e in cui
-incolla il token in un campo solo. Devo costruirlo su un iPhone, quindi la
-prima parte è tua — una volta sola.
+La condizione `Se Contenuti URL **presenta qualsiasi valore**` non è un test di
+successo. `ingest-payment` risponde con un JSON **anche quando fallisce**
+(`{"error":"unauthorized"}`, `{"error":"..."}`), quindi quel body "presenta un
+valore" esattamente come `{"ok":true}`.
 
-**Cosa costruire** (Comandi Rapidi → Automazione → Transazione):
+Conseguenza: il ramo "Altrimenti" non scatta quasi mai, e arriva **"Pagamento
+inviato con successo"** anche quando la spesa non è stata registrata. Il
+controllo c'è ma dice sempre di sì.
+
+La condizione giusta è: `Contenuti URL` **contiene** `"ok":true`
+
+#### Poi: un'automazione non si può condividere
+
+iOS non permette di esportare le automazioni — il pulsante Condividi esiste
+solo sui comandi rapidi normali. Un file `.shortcut` dell'automazione non è
+generabile, e non per un limite nostro.
+
+La struttura giusta è quindi rovesciata: **la logica sta in un comando rapido
+condivisibile**, e l'automazione lo chiama in due azioni. Così il pezzo
+complicato si distribuisce con un link iCloud e a chi lo installa restano due
+tocchi invece di dieci.
+
+#### Il comando rapido «Registra spesa»
+
+Comandi Rapidi → **+** → nelle impostazioni del comando attiva
+*Mostra nel foglio di condivisione* e imposta il tipo di input su **Qualsiasi**.
+
+| # | Azione | Configurazione |
+| --- | --- | --- |
+| 1 | **Ottieni contenuti di URL** | URL: quello in Impostazioni → Automazioni · Metodo `POST` · Intestazione `x-ingest-token` = il token · Corpo **JSON** con `merchant` = *Esercente*, `amount` = *Importo*, `source` = `shortcut` |
+| 2 | **Se** | `Contenuti URL` **contiene** `"ok":true` |
+| 3 | *(dentro Se)* **Mostra notifica** | opzionale — se la tieni, ogni pagamento ti notifica |
+| 4 | **Altrimenti** | |
+| 5 | *(dentro Altrimenti)* **Testo** | `{"merchant":"«Esercente»","amount":"«Importo»","occurred_at":"«Data corrente formattata ISO 8601»"}` |
+| 6 | *(dentro Altrimenti)* **Aggiungi a file** | File: `spese-non-inviate.txt` in iCloud Drive → Comandi Rapidi · **Attiva "Aggiungi nuova riga"** |
+| 7 | *(dentro Altrimenti)* **Mostra notifica** | `Spesa non registrata: «Esercente» «Importo» — recuperala dall'app` |
+| 8 | **Fine del blocco Se** | |
+
+I passi **5–6 sono quelli che oggi mancano** e sono il motivo per cui una
+spesa fatta offline si perde per sempre. Con loro finisce in un file, e
+dall'app la reimporti da **Impostazioni → Automazioni → Recupera spese non
+inviate**. I doppioni vengono riconosciuti, quindi puoi reimportare lo stesso
+file quante volte vuoi senza fare danni.
+
+> ⚠️ Nel passo 5 l'importo va inserito come **variabile**, non riscritto a
+> mano: dentro quella stringa c'è anche la valuta ("12,99 €", "£12.99"), ed è
+> da lì che l'app capisce che una spesa era in sterline. Perderla riporterebbe
+> il difetto che la multi-valuta ha appena chiuso.
+
+#### L'automazione, ridotta a due azioni
+
+Comandi Rapidi → Automazione → **Transazione** (o Wallet):
 
 1. **Ricevi transazione come input** (c'è già)
-2. **Chiedi input** → Tipo: Testo → Richiesta: `Incolla il token dell'app`
-   → poi **Imposta variabile** `token`
-   *(questo è il campo unico che l'utente compila; se preferisci, si può
-   sostituire con un "Testo" fisso da modificare a mano)*
-3. **Ottieni contenuto URL** — come al punto 4, con `x-ingest-token` = la
-   variabile `token`
-4. ⚠️ **Il passo che oggi manca**: subito dopo, aggiungi
-   **Se** *Contenuto URL* **non contiene** `"ok":true` →
-   **Mostra notifica**: `Spesa non registrata: <Esercente> <Importo>`
+2. **Esegui comando rapido** → «Registra spesa», con input la transazione
 
-Il punto 4 è la mitigazione delle perdite: Shortcuts non ritenta mai, quindi
-oggi una spesa fatta con il telefono offline sparisce e non lo sa nessuno. Con
-la notifica almeno te ne accorgi nel momento in cui succede e puoi aggiungerla
-a mano. Costa un'azione e chiude il buco più grosso dell'automazione.
+Attiva **Esegui immediatamente**. Lascia *Notifica in caso di esecuzione*
+disattivata: le notifiche che servono le manda già il comando rapido, e solo
+quando c'è qualcosa da dire.
 
-**Poi**: Condividi → *Copia link iCloud*, e mandami il link. Lo aggancio alla
-schermata Automazioni al posto delle istruzioni.
+#### Da mandarmi
+
+Dal comando rapido «Registra spesa» → **Condividi → Copia link iCloud**.
+Con quello aggancio il link alla schermata Automazioni al posto delle
+istruzioni, e per chiunque altro il setup diventa: apri il link, incolla il
+token, crea l'automazione a due azioni.
 
 ---
 

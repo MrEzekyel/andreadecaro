@@ -1,0 +1,61 @@
+<!--
+  Template Supabase: Authentication → Emails → Confirm signup
+
+  Il codice e' l'unica cosa che l'utente deve fare, quindi e' l'unica cosa
+  grande. Niente {{ .ConfirmationURL }}: lasciando il link accanto al codice
+  l'utente clicca il link — e' piu' naturale che digitare sei cifre — e finisce
+  sul Site URL del progetto, che se non e' mai stato impostato e' localhost.
+
+  Tabelle e stili inline, non flexbox e non <style>: Outlook e Gmail ne
+  ignorano meta'. Il fondo caldo #f0eee6 e l'accento argilla #c2613f sono
+  quelli dell'app; i pesi restano bassi come nel resto del design system.
+-->
+<table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0eee6;margin:0;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;">
+  <tr>
+    <td align="center">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0" style="max-width:440px;background-color:#faf9f5;border-radius:14px;border:1px solid #e3e1d9;">
+        <tr>
+          <td style="padding:32px 32px 0 32px;">
+            <p style="margin:0 0 4px 0;font-size:12px;font-weight:500;letter-spacing:0.06em;text-transform:uppercase;color:#8a8880;">
+              Apple Pay Tracker
+            </p>
+            <h1 style="margin:0 0 12px 0;font-size:24px;font-weight:500;line-height:1.25;color:#141413;">
+              Conferma il tuo indirizzo
+            </h1>
+            <p style="margin:0 0 28px 0;font-size:15px;line-height:1.5;color:#5f5e5a;">
+              Inserisci questo codice nell'app per completare la registrazione.
+            </p>
+          </td>
+        </tr>
+
+        <tr>
+          <td align="center" style="padding:0 32px;">
+            <table cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f6e9e2;border-radius:10px;">
+              <tr>
+                <td align="center" style="padding:22px 16px;">
+                  <span style="font-size:34px;font-weight:500;letter-spacing:0.24em;color:#c2613f;font-variant-numeric:tabular-nums;">{{ .Token }}</span>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <tr>
+          <td style="padding:24px 32px 32px 32px;">
+            <p style="margin:0 0 20px 0;font-size:13px;line-height:1.5;color:#8a8880;">
+              Il codice scade fra un'ora. Serve a verificare che l'indirizzo sia
+              davvero tuo: senza, un domani non potresti recuperare la password.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" border="0">
+              <tr><td style="border-top:1px solid #e3e1d9;font-size:0;line-height:0;">&nbsp;</td></tr>
+            </table>
+            <p style="margin:16px 0 0 0;font-size:12px;line-height:1.5;color:#8a8880;">
+              Se non hai creato tu questo account, ignora questa email: senza il
+              codice non succede niente.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td>
+  </tr>
+</table>
