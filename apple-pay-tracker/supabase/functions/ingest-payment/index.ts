@@ -349,6 +349,14 @@ Deno.serve(async (req) => {
 
   const source = resolveSource(body.source);
 
+  // La conversione avviene prima della deduplicazione, non dopo: quello che
+  // finisce in `payments.amount` e' l'importo in euro, e il controllo sui
+  // doppioni piu' sotto confronta proprio quella colonna. Convertendo dopo, un
+  // secondo scatto della Shortcut su una spesa in sterline cercherebbe "12.99"
+  // trovando "15.02" e registrerebbe il doppione.
+  const converted = currency ? await toEur(amount, currency, occurredAt) : null;
+  const amountEur = converted ? converted.eur : amount;
+
   // Il token e' valido: segna l'uso senza bloccare l'ingestione se fallisce.
   await supabase
     .from("ingest_tokens")
@@ -368,7 +376,7 @@ Deno.serve(async (req) => {
       .from("payments")
       .select("id")
       .eq("user_id", userId)
-      .eq("amount", amount)
+      .eq("amount", amountEur)
       .ilike("merchant_raw", merchantRaw)
       .gte("occurred_at", since)
       .limit(1);
@@ -464,18 +472,13 @@ Deno.serve(async (req) => {
     }
   }
 
-  // La conversione avviene qui e non a valle: `amount` deve essere in euro
-  // gia' quando la riga nasce, altrimenti ogni somma dell'app mescolerebbe
-  // valute diverse fino alla notte successiva.
-  const converted = currency ? await toEur(amount, currency, occurredAt) : null;
-
   const { data: inserted, error } = await supabase
     .from("payments")
     .insert({
       user_id: userId,
-      // Senza cambio si tiene il numero grezzo: e' il meglio disponibile, e
-      // `fx_rate` nullo segnala che va ancora sistemato.
-      amount: converted ? converted.eur : amount,
+      // Senza cambio `amountEur` e' il numero grezzo: e' il meglio disponibile,
+      // e `fx_rate` nullo segnala che va ancora sistemato.
+      amount: amountEur,
       original_amount: currency ? amount : null,
       original_currency: currency,
       fx_rate: converted ? converted.rate : null,
