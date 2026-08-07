@@ -253,10 +253,17 @@ export default function StatsScreen() {
       ? Number(monthlyOverall.limit.amount)
       : null;
 
-  /** Spesa cumulata lungo il periodo, un punto per intervallo trascorso. */
+  /**
+   * Spesa cumulata lungo il periodo, un punto per intervallo trascorso.
+   *
+   * Usa `rankable` (payments gia' filtrati dal toggle "escludi costi fissi")
+   * e non `payments`: altrimenti il grafico includerebbe sempre mutuo e rate
+   * anche a toggle acceso, mentre il totale sopra e le classifiche sotto no —
+   * tre numeri diversi con lo stesso significato apparente.
+   */
   const trend = useMemo<TrendPoint[]>(() => {
     const slots = new Array(bucketCount(period)).fill(0);
-    for (const payment of payments) {
+    for (const payment of rankable) {
       slots[bucketOf(period, payment.occurred_at)] += Number(
         payment.effective_amount
       );
@@ -287,7 +294,7 @@ export default function StatsScreen() {
       points.push({ label, value: i < elapsed ? running : null });
     }
     return points;
-  }, [payments, period]);
+  }, [rankable, period]);
 
   /** Mesi disponibili per la ghiera della ripartizione, dal primo movimento a oggi. */
   const donutMonths = useMemo(() => {

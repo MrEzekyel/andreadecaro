@@ -48,6 +48,10 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   vale `null` per i periodi non ancora arrivati, e vanno passati lo stesso:
   sono loro a dare al grafico la larghezza vera. Senza, i giorni trascorsi si
   stiracchiano su tutta la larghezza e il 7 del mese sembra già la fine.
+  Quando c'è un limite, `TrendChart` disegna anche una **retta di ritmo**
+  (punteggiata, dal primo giorno a valore 0 all'ultimo giorno al limite):
+  è il riferimento "spendendo lo stesso ogni giorno arriveresti qui", fisso
+  su tutto il periodo e non solo sui giorni già trascorsi.
 - Quando più numeri sono legati fra loro, mostrare la **relazione** invece
   dell'elenco: `ValueSplit` disegna valore = capitale + guadagno come una
   barra composta, perché tre righe di testo lasciano al lettore il lavoro di

@@ -129,6 +129,16 @@ export function TrendChart({
   const limitY =
     limit != null && limit > 0 && limit <= chartMax ? yOf(limit) : null;
 
+  // Ritmo lineare: se si spendesse lo stesso importo ogni giorno del
+  // periodo, si arriverebbe al limite esattamente l'ultimo giorno. E' una
+  // retta dal primo giorno (0) all'ultimo (il limite), sopra tutto il
+  // periodo intero e non solo i giorni gia' trascorsi — altrimenti non
+  // sarebbe un riferimento fisso ma si sposterebbe ogni giorno.
+  const paceLine =
+    limitY !== null
+      ? { x1: xOf(0), y1: BASE, x2: xOf(points.length - 1), y2: limitY }
+      : null;
+
   return (
     <View>
       <Svg width="100%" height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`}>
@@ -196,6 +206,20 @@ export function TrendChart({
               {`LIMITE ${formatAmount(limit as number)}`}
             </SvgText>
           </>
+        )}
+
+        {paceLine !== null && (
+          <Line
+            x1={paceLine.x1}
+            y1={paceLine.y1}
+            x2={paceLine.x2}
+            y2={paceLine.y2}
+            stroke={palette.limit}
+            strokeWidth={1}
+            strokeDasharray="1 3"
+            strokeLinecap="round"
+            opacity={0.5}
+          />
         )}
 
         <Path d={area} fill="url(#trendFill)" />
