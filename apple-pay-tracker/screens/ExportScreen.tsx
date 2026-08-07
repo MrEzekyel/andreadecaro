@@ -11,7 +11,7 @@ import {
 import { Icon } from "../components/Icon";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useTheme } from "../lib/ThemeContext";
-import { exportToCsv, ExportKind } from "../lib/exportData";
+import { exportToCsv, ExportKind, NothingToExport } from "../lib/exportData";
 import { formatAmount } from "../lib/format";
 import { radius, space, type } from "../lib/theme";
 
@@ -20,8 +20,6 @@ const EXPORTS: {
   icon: string;
   label: string;
   description: string;
-  /** Come leggere il totale che compare a export fatto. */
-  totalLabel: string;
 }[] = [
   {
     kind: "payments",
@@ -29,14 +27,12 @@ const EXPORTS: {
     label: "Spese",
     description:
       "Data, esercente, categoria, metodo di pagamento, importo pagato e quota tua.",
-    totalLabel: "totale speso",
   },
   {
     kind: "incomes",
     icon: "wallet",
     label: "Introiti",
     description: "Stipendio e ricavi, con data e descrizione.",
-    totalLabel: "totale incassato",
   },
   {
     kind: "investments",
@@ -44,14 +40,12 @@ const EXPORTS: {
     label: "Investimenti",
     description:
       "Ogni operazione: acquisti, vendite e dividendi, con quote, prezzo e commissioni.",
-    totalLabel: "totale investito",
   },
   {
     kind: "splits",
     icon: "users",
     label: "Divisioni",
     description: "Le quote delle spese divise, con chi deve cosa e cosa è saldato.",
-    totalLabel: "ancora da ricevere",
   },
 ];
 
@@ -67,15 +61,24 @@ export default function ExportScreen({ onBack }: { onBack: () => void }) {
   const [running, setRunning] = useState<ExportKind | null>(null);
 
   async function run(kind: ExportKind) {
-    const entry = EXPORTS.find((e) => e.kind === kind);
     setRunning(kind);
     try {
-      const { rows, total } = await exportToCsv(kind);
+      const { rows, total, totalColumn } = await exportToCsv(kind);
+      // Il controllo proposto e' uno che l'utente puo' davvero fare: sommare
+      // una colonna del file appena ricevuto. Chiedergli di confrontarlo con
+      // un totale dell'app non funzionerebbe — tranne che per le divisioni,
+      // quel numero a schermo non esiste o risponde a un'altra domanda — e
+      // sommare la colonna e' anche il modo piu' diretto di accorgersi se il
+      // file fosse incompleto.
       Alert.alert(
         "Esportato",
-        `${rows} ${rows === 1 ? "riga" : "righe"} · ${entry?.totalLabel} ${formatAmount(total)}.\n\nControlla che il totale corrisponda a quello che vedi nell'app.`
+        `${rows} ${rows === 1 ? "riga" : "righe"}.\n\nSommando la colonna «${totalColumn}» devi ritrovare ${formatAmount(total)}. Se non torna, il file è incompleto.`
       );
     } catch (error) {
+      if (error instanceof NothingToExport) {
+        Alert.alert("Niente da esportare", error.message);
+        return;
+      }
       Alert.alert(
         "Export non riuscito",
         error instanceof Error ? error.message : "Riprova fra poco."

@@ -63,6 +63,16 @@ export function EditPaymentSheet({
   const [saving, setSaving] = useState(false);
 
   const [split, setSplit] = useState<SplitState>(emptySplit);
+  /**
+   * Vero quando le quote gia' salvate non si sono potute leggere.
+   *
+   * Senza questo, il foglio si presenta come una spesa non divisa e il
+   * salvataggio successivo cancella le quote vere: `my_share` torna a null e
+   * la delete non reinserisce niente. Una cena da 80 euro divisa in quattro
+   * rientrerebbe nel mese per 80 invece che per 20, e i crediti sparirebbero
+   * da "Mi devono" — una perdita di dati che *aumenta* le spese in silenzio.
+   */
+  const [splitUnknown, setSplitUnknown] = useState(false);
   const [siblingCount, setSiblingCount] = useState(0);
   const [applyToAll, setApplyToAll] = useState(true);
   const [remember, setRemember] = useState(true);
@@ -82,6 +92,7 @@ export function EditPaymentSheet({
     setRemember(true);
     setSiblingCount(0);
     setSplit(focusSplit ? { ...emptySplit, enabled: true } : emptySplit);
+    setSplitUnknown(false);
 
     // Le quote gia' salvate vanno ricaricate come importi esatti: e' l'unica
     // modalita' che rappresenta fedelmente qualunque divisione precedente,
@@ -90,8 +101,9 @@ export function EditPaymentSheet({
       .from("payment_splits")
       .select("person_id, amount_owed")
       .eq("payment_id", payment.id)
-      .then(({ data }) => {
-        if (!data || data.length === 0) return;
+      .then(({ data, error }) => {
+        setSplitUnknown(Boolean(error));
+        if (error || !data || data.length === 0) return;
         setSplit({
           enabled: true,
           mode: "exact",
@@ -143,6 +155,10 @@ export function EditPaymentSheet({
       return;
     }
 
+    // Si tocca la divisione solo se l'abbiamo letta, o se l'utente l'ha
+    // impostata lui in questa sessione — in quel caso vuole sovrascriverla.
+    const riscriviQuote = !splitUnknown || split.enabled;
+
     const splitResult = computeSplit(parsedAmount, split);
     if (!splitResult.valid) {
       Alert.alert(
@@ -163,7 +179,7 @@ export function EditPaymentSheet({
         note: note.trim() || null,
         card_name: card.trim() || null,
         occurred_at: occurredAt.toISOString(),
-        my_share: split.enabled ? splitResult.myShare : null,
+        ...(riscriviQuote ? { my_share: split.enabled ? splitResult.myShare : null } : {}),
       })
       .eq("id", payment.id);
 
@@ -176,6 +192,16 @@ export function EditPaymentSheet({
     // Le quote vengono riscritte da zero: gestire l'insieme differenziale
     // (chi e' stato tolto, chi aggiunto, chi cambiato) sarebbe piu' codice
     // per lo stesso risultato, e questa tabella e' piccola per definizione.
+    // Ma "da zero" vale solo se sappiamo da cosa partiamo: se la lettura era
+    // fallita e l'utente non ha toccato la divisione, le quote restano dove
+    // sono invece di essere azzerate da un editor che non le ha mai viste.
+    if (!riscriviQuote) {
+      setSaving(false);
+      onSaved();
+      onClose();
+      return;
+    }
+
     await supabase.from("payment_splits").delete().eq("payment_id", payment.id);
 
     if (split.enabled && split.personIds.length > 0) {
@@ -373,6 +399,13 @@ export function EditPaymentSheet({
         <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
           Divisione
         </Text>
+        {splitUnknown && (
+          <Text style={[styles.splitUnknown, { color: palette.ink3 }]}>
+            Non sono riuscito a leggere le quote di questa spesa. Restano come
+            sono: salvando non le cancelli, ma per modificarle serve la
+            connessione.
+          </Text>
+        )}
         <SplitEditor
           total={parseAmountInput(amount) ?? 0}
           split={split}
@@ -459,6 +492,7 @@ function Checkbox({
 }
 
 const styles = StyleSheet.create({
+  splitUnknown: { ...type.small, lineHeight: 16, marginBottom: space.sm },
   fieldLabel: { ...type.caption, marginBottom: 6 },
   input: {
     borderWidth: 1,

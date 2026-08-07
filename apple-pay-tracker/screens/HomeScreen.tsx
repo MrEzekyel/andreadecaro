@@ -55,18 +55,17 @@ export default function HomeScreen() {
   // Le rate configurate non dipendono dal mese guardato: cambiano solo
   // quando le regole cambiano, non quando si sfoglia il calendario.
   const loadRecurring = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("recurring_rules")
       .select("amount")
       .eq("active", true)
       .eq("frequency", "monthly");
 
-    if (data) {
-      setRecurring({
-        count: data.length,
-        monthlyTotal: data.reduce((sum, r) => sum + Number(r.amount), 0),
-      });
-    }
+    if (error) return;
+    setRecurring({
+      count: (data ?? []).length,
+      monthlyTotal: (data ?? []).reduce((sum, r) => sum + Number(r.amount), 0),
+    });
   }, []);
 
   useEffect(() => {
@@ -77,10 +76,16 @@ export default function HomeScreen() {
   // all'andamento cumulato la stessa baseline usata in Statistiche: non
   // dipende dal mese guardato, come le regole ricorrenti sopra.
   const [merchants, setMerchants] = useState<Merchant[]>([]);
+  const [merchantsUnknown, setMerchantsUnknown] = useState(false);
 
   const loadMerchants = useCallback(async () => {
-    const { data } = await supabase.from("merchants").select("*");
-    if (data) setMerchants(data as Merchant[]);
+    const { data, error } = await supabase.from("merchants").select("*");
+    // Senza gli esercenti non si sa piu' quali spese sono costi fissi, e
+    // l'andamento cumulato perderebbe la sua linea di partenza facendo saltare
+    // il mutuo il giorno in cui e' registrato. Nessun numero diventa falso, ma
+    // il grafico cambia forma: meglio dirlo che lasciarlo intuire.
+    setMerchantsUnknown(Boolean(error));
+    if (!error) setMerchants((data ?? []) as Merchant[]);
   }, []);
 
   useEffect(() => {
@@ -278,12 +283,17 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Al posto del contenuto, non accanto: un totale a 0,00 con sopra un
-            avviso resta un totale a 0,00, e l'occhio legge prima il numero. */}
-        {error ? (
+        {/* Due casi. Senza niente in memoria il totale direbbe "0,00 €" e
+            sarebbe un'affermazione falsa: l'errore prende tutto il posto. Con
+            i dati del mese ancora in memoria — `usePayments` li tiene apposta —
+            nasconderli sarebbe l'errore opposto: sono vecchi, non falsi. */}
+        {error && payments.length === 0 ? (
           <LoadError message={error} onRetry={onRefresh} />
         ) : (
           <>
+            {error && (
+              <LoadError message={error} onRetry={onRefresh} variant="inline" />
+            )}
 
         <View>
           <Text style={[styles.label, { color: palette.ink3 }]}>
@@ -385,6 +395,12 @@ export default function HomeScreen() {
               limit={limitAmount}
               color={palette.accent}
             />
+            {merchantsUnknown && (
+              <Text style={[styles.chartNote, { color: palette.ink3 }]}>
+                I costi fissi non sono stati riconosciuti: la linea parte da
+                zero invece che dal loro totale.
+              </Text>
+            )}
           </View>
         )}
 
@@ -456,6 +472,7 @@ export default function HomeScreen() {
 }
 
 const styles = StyleSheet.create({
+  chartNote: { ...type.small, fontSize: 10.5, lineHeight: 15, marginTop: space.sm },
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.xl },
   head: {
     flexDirection: "row",

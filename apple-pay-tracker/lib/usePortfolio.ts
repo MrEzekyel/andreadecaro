@@ -172,6 +172,7 @@ export function usePortfolioSeries(
   scope: { assetId?: string; group?: AssetGroup } | null
 ) {
   const [series, setSeries] = useState<SeriesPoint[]>([]);
+  const [failed, setFailed] = useState(false);
   const key = scope ? `${scope.assetId ?? ""}|${scope.group ?? ""}` : null;
 
   useEffect(() => {
@@ -183,8 +184,15 @@ export function usePortfolioSeries(
         p_asset: scope.assetId ?? null,
         p_group: scope.group ?? null,
       })
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (!alive) return;
+        // Una serie vuota non e' neutra: senza punti il calcolo sul periodo
+        // scelto non si puo' fare e la percentuale ripiega su quella di
+        // sempre, restando pero' stampata sotto l'etichetta "1M" o "6M". Un
+        // rendimento vero riferito a un altro arco di tempo e' piu' insidioso
+        // di uno zero, perche' e' plausibile.
+        setFailed(Boolean(error));
+        if (error) return;
         setSeries(
           ((data ?? []) as SeriesPoint[]).map((p) => ({
             on_date: p.on_date,
@@ -202,5 +210,8 @@ export function usePortfolioSeries(
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key]);
 
-  return series;
+  // `failed` distingue "questa fetta non ha ancora storia" da "la storia non
+  // l'ho letta": nel primo caso il grafico vuoto e' la verita', nel secondo
+  // ogni numero calcolato sul periodo sarebbe inventato.
+  return { series, failed };
 }

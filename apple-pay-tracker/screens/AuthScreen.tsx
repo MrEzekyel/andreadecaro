@@ -1,3 +1,4 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useState } from "react";
 import {
   ActivityIndicator,
@@ -14,6 +15,15 @@ import { Icon } from "../components/Icon";
 import { useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
+
+/**
+ * Segna che c'e' un cambio password iniziato e non concluso.
+ *
+ * Vive su disco e non in memoria perche' deve sopravvivere alla chiusura
+ * dell'app: e' l'unica cosa che distingue "sessione legittima" da "sessione
+ * aperta da verifyOtp e mai completata".
+ */
+export const RECOVERY_FLAG = "recupero-password-in-corso";
 
 type Mode = "signin" | "signup" | "recover";
 
@@ -120,6 +130,12 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
 
     setLoading(true);
     onRecoveringChange?.(true);
+    // Marcatore persistente, non solo stato in memoria: `verifyOtp` apre una
+    // sessione vera e la salva su AsyncStorage, quindi chiudendo l'app fra le
+    // due chiamate al rilancio si entrerebbe con la vecchia password credendo
+    // di averla cambiata. Al prossimo avvio App.tsx trova questo marcatore e
+    // chiude la sessione a meta' invece di fidarsene.
+    await AsyncStorage.setItem(RECOVERY_FLAG, email);
 
     const { error: verifyError } = await supabase.auth.verifyOtp({
       email,
@@ -128,6 +144,7 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
     });
 
     if (verifyError) {
+      await AsyncStorage.removeItem(RECOVERY_FLAG);
       onRecoveringChange?.(false);
       setLoading(false);
       Alert.alert(
@@ -143,12 +160,14 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
       // La sessione aperta da verifyOtp resta valida ma la password e' ancora
       // quella vecchia: restare dentro darebbe l'idea che abbia funzionato.
       await supabase.auth.signOut();
+      await AsyncStorage.removeItem(RECOVERY_FLAG);
       onRecoveringChange?.(false);
       setLoading(false);
       Alert.alert("Non è stato possibile salvare la password", updateError.message);
       return;
     }
 
+    await AsyncStorage.removeItem(RECOVERY_FLAG);
     setLoading(false);
     onRecoveringChange?.(false);
     goTo("signin");

@@ -195,14 +195,18 @@ export default function IncomeScreen({ onBack }: { onBack: () => void }) {
           </TouchableOpacity>
         </View>
 
-        <View>
-          <Text style={[styles.label, { color: palette.ink3 }]}>
-            Entrato nel mese
-          </Text>
-          <Text style={[styles.hero, { color: palette.ink }]}>
-            {formatAmount(total)}
-          </Text>
-        </View>
+        {/* Il totale sparisce quando la lettura e' fallita: "0,00 €" e'
+            un'affermazione, e sarebbe falsa. */}
+        {!error && (
+          <View>
+            <Text style={[styles.label, { color: palette.ink3 }]}>
+              Entrato nel mese
+            </Text>
+            <Text style={[styles.hero, { color: palette.ink }]}>
+              {formatAmount(total)}
+            </Text>
+          </View>
+        )}
 
         {incomes.length > 0 ? (
           <View

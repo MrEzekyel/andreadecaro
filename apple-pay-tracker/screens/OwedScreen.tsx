@@ -191,21 +191,25 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        <View>
-          <Text style={[styles.label, { color: palette.ink3 }]}>
-            Totale da recuperare
-          </Text>
-          <Text style={[styles.hero, { color: palette.ink }]}>
-            {amount.whole}
-            <Text style={[styles.heroCents, { color: palette.ink3 }]}>
-              {amount.cents}
+        {/* "Totale da recuperare 0,00 € da 0 persone" con la rete spenta
+            direbbe a chi legge che non gli deve piu' niente nessuno. */}
+        {!error && (
+          <View>
+            <Text style={[styles.label, { color: palette.ink3 }]}>
+              Totale da recuperare
             </Text>
-          </Text>
-          <Text style={[styles.heroMeta, { color: palette.ink2 }]}>
-            da {byPerson.length}{" "}
-            {byPerson.length === 1 ? "persona" : "persone"}
-          </Text>
-        </View>
+            <Text style={[styles.hero, { color: palette.ink }]}>
+              {amount.whole}
+              <Text style={[styles.heroCents, { color: palette.ink3 }]}>
+                {amount.cents}
+              </Text>
+            </Text>
+            <Text style={[styles.heroMeta, { color: palette.ink2 }]}>
+              da {byPerson.length}{" "}
+              {byPerson.length === 1 ? "persona" : "persone"}
+            </Text>
+          </View>
+        )}
 
         {open.length > 0 && (
           <View

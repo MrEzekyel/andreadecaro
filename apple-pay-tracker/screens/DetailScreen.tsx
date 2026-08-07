@@ -446,26 +446,28 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <View>
-          <View style={styles.totalRow}>
-            <Text style={[styles.totalLabel, { color: palette.ink2 }]}>
-              Totale speso
+        {!error && (
+          <View>
+            <View style={styles.totalRow}>
+              <Text style={[styles.totalLabel, { color: palette.ink2 }]}>
+                Totale speso
+              </Text>
+              <Text style={[styles.totalValue, { color: palette.ink }]}>
+                {formatAmount(allTimeTotal)}
+              </Text>
+            </View>
+
+            <Text style={[styles.label, { color: palette.ink3 }]}>
+              {periodLabel}
             </Text>
-            <Text style={[styles.totalValue, { color: palette.ink }]}>
-              {formatAmount(allTimeTotal)}
+            <Text style={[styles.hero, { color: palette.ink }]}>
+              {amount.whole}
+              <Text style={[styles.heroCents, { color: palette.ink3 }]}>
+                {amount.cents}
+              </Text>
             </Text>
           </View>
-
-          <Text style={[styles.label, { color: palette.ink3 }]}>
-            {periodLabel}
-          </Text>
-          <Text style={[styles.hero, { color: palette.ink }]}>
-            {amount.whole}
-            <Text style={[styles.heroCents, { color: palette.ink3 }]}>
-              {amount.cents}
-            </Text>
-          </Text>
-        </View>
+        )}
 
         {payments.length > 0 && <ChartCarousel pages={pages} />}
 

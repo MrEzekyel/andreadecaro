@@ -76,7 +76,7 @@ export default function GroupDetailScreen({
   const [ordine, setOrdine] = useState<Ordine>("valore");
   const [meseScelto, setMeseScelto] = useState<string | null>(null);
 
-  const series = usePortfolioSeries({ group: group.group });
+  const { series, failed: seriesFailed } = usePortfolioSeries({ group: group.group });
   const visible = useMemo(() => sliceSeries(series, range), [series, range]);
   const points = useMemo(
     () =>
@@ -131,9 +131,12 @@ export default function GroupDetailScreen({
 
   const heroValue = at ? at.value_eur : group.value;
   const amount = splitAmount(heroValue);
-  const gainAmount = period?.amount ?? group.priceGain;
-  const gainPct = period?.pct ?? group.priceGainPct;
-  const positive = gainAmount >= 0;
+  // Senza la serie non si sa quanto ha reso *nel periodo scelto*: mostrare il
+  // totale di sempre sotto l'etichetta "1M" sarebbe un numero vero riferito a
+  // un altro arco di tempo.
+  const gainAmount = seriesFailed ? null : (period?.amount ?? group.priceGain);
+  const gainPct = seriesFailed ? null : (period?.pct ?? group.priceGainPct);
+  const positive = (gainAmount ?? 0) >= 0;
   const gainColor = positive ? palette.good : palette.over;
 
   const slices = group.positions.map((p, i) => ({
@@ -178,10 +181,12 @@ export default function GroupDetailScreen({
             </Text>
           </Text>
           <View style={styles.gainRow}>
-            <Text style={[styles.gain, { color: gainColor }]}>
-              {positive ? "+" : "−"}
-              {formatAmount(Math.abs(gainAmount))}
-            </Text>
+            {gainAmount !== null && (
+              <Text style={[styles.gain, { color: gainColor }]}>
+                {positive ? "+" : "−"}
+                {formatAmount(Math.abs(gainAmount))}
+              </Text>
+            )}
             {gainPct !== null && (
               <Text style={[styles.gain, { color: gainColor }]}>
                 {positive ? "+" : "−"}
@@ -189,7 +194,11 @@ export default function GroupDetailScreen({
               </Text>
             )}
             <Text style={[styles.heroMeta, { color: palette.ink3 }]}>
-              {at ? formatDate(at.on_date) : `su ${formatAmount(group.investedBasis)} versati`}
+              {seriesFailed
+                ? "rendimento non disponibile"
+                : at
+                  ? formatDate(at.on_date)
+                  : `su ${formatAmount(group.investedBasis)} versati`}
             </Text>
           </View>
         </View>

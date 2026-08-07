@@ -1,6 +1,8 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { StatusBar } from "expo-status-bar";
 import React, { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
   SafeAreaView,
   StyleSheet,
   Text,
@@ -15,7 +17,7 @@ import { NavProvider, SettingsPage } from "./lib/NavContext";
 import { ThemeProvider, useTheme } from "./lib/ThemeContext";
 import { supabase } from "./lib/supabase";
 import { radius, space, type } from "./lib/theme";
-import AuthScreen from "./screens/AuthScreen";
+import AuthScreen, { RECOVERY_FLAG } from "./screens/AuthScreen";
 import HomeScreen from "./screens/HomeScreen";
 import PaymentsScreen from "./screens/PaymentsScreen";
 import PortfolioScreen from "./screens/PortfolioScreen";
@@ -159,10 +161,28 @@ function Root() {
   const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
+    // Una sessione trovata all'avvio non basta a fidarsi: potrebbe essere
+    // quella aperta da `verifyOtp` e mai completata da `updateUser` (app
+    // chiusa nel mezzo). Vale ancora la vecchia password, e l'utente crede di
+    // averla cambiata — se ne accorgerebbe solo dal prossimo dispositivo.
+    (async () => {
+      const interrotto = await AsyncStorage.getItem(RECOVERY_FLAG);
+      if (interrotto) {
+        await AsyncStorage.removeItem(RECOVERY_FLAG);
+        await supabase.auth.signOut();
+        setSession(null);
+        setLoading(false);
+        Alert.alert(
+          "Password non cambiata",
+          "Il cambio password si è interrotto prima di essere salvato: vale ancora quella vecchia. Riprova da «Password dimenticata»."
+        );
+        return;
+      }
+
+      const { data } = await supabase.auth.getSession();
       setSession(data.session);
       setLoading(false);
-    });
+    })();
 
     const { data: listener } = supabase.auth.onAuthStateChange(
       (_event, next) => setSession(next)

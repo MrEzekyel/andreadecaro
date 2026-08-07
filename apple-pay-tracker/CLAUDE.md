@@ -52,7 +52,20 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   totale a 0,00, e l'occhio legge prima il numero. Dove i dati precedenti
   esistono ancora si tengono e l'avviso va sopra (`variant="inline"`): sono
   vecchi, non falsi. Dove non c'è mai stato niente, l'errore prende tutta la
-  schermata.
+  schermata. **Il numero grande sparisce**: nascondere un totale è onesto,
+  affermare `0,00 €` no.
+- La regola vale anche **in scrittura**, ed è lì che costa di più: una lettura
+  fallita non deve poter diventare la base di un `update`/`delete`. In
+  `EditPaymentSheet` le quote non lette bloccano la riscrittura della
+  divisione (`splitUnknown` → `riscriviQuote`), perché altrimenti salvare
+  anche solo una nota cancellerebbe le quote vere, riportando
+  `effective_amount` all'intero pagato: una cena da 80 € divisa in quattro
+  rientrerebbe nel mese per 80 invece che per 20. È l'unico caso in cui il
+  difetto **aumenta** le spese in silenzio.
+- Un dato calcolato su un periodo va nascosto, non sostituito col totale di
+  sempre: `usePortfolioSeries` restituisce `{ series, failed }` proprio perché
+  una percentuale vera ma riferita a un altro arco di tempo è più insidiosa di
+  uno zero — è plausibile.
 - I **grafici su un periodo in corso** (andamento mensile in Home e in
   Statistiche) disegnano l'asse su **tutto** il periodo — 28/30/31 giorni
   secondo il mese — e la linea si interrompe dov'è oggi. `TrendPoint.value`
@@ -253,7 +266,21 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   a confrontarli con l'app. È così che la promessa dell'export resta
   verificabile invece di essere una dichiarazione.
 - Un export che fallisce a metà **non** scrive un file parziale: un CSV con tre
-  mesi su due anni è peggio di nessun CSV, perché sembra completo.
+  mesi su due anni è peggio di nessun CSV, perché sembra completo. Per lo
+  stesso motivo `readAll` **pagina sempre** con `.range()`: PostgREST tronca a
+  1000 righe *senza restituire un errore*, quindi il controllo sull'errore
+  esplicito non intercetta il troncamento. L'ordinamento secondario su `id`
+  serve perché `occurred_at` ha duplicati (le rate di un piano cadono tutte
+  alle 10:00) e un ordinamento ambiguo farebbe comparire la stessa riga in due
+  pagine saltandone un'altra.
+- Il totale riportato a fine export **non** è "il totale che mostra l'app":
+  tranne che per le divisioni quel numero a schermo non esiste (Home e
+  Statistiche sono sempre per periodo) o risponde a un'altra domanda —
+  "Capitale versato" è al netto dei disinvestimenti e solo sugli asset non
+  archiviati, mentre il file contiene ogni operazione. È invece la somma di una
+  **colonna precisa del file**, che l'utente può rifare nel foglio di calcolo:
+  è un controllo eseguibile davvero, ed è anche il modo più diretto di
+  accorgersi di un troncamento.
 
 ### Accesso
 
@@ -266,6 +293,11 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   scritta: senza il segnale `onRecoveringChange`, `App.tsx` entrerebbe nell'app
   proprio in quel momento, e se `updateUser` fallisse l'utente si ritroverebbe
   dentro con la vecchia password senza che nessuno glielo dica.
+- Quella sessione viene anche **persistita su AsyncStorage**, quindi lo stato
+  in memoria non basta: chiudendo l'app fra `verifyOtp` e `updateUser`, al
+  rilancio `getSession()` troverebbe una sessione valida e si entrerebbe con la
+  vecchia password credendo di averla cambiata. Il marcatore `RECOVERY_FLAG`
+  sopravvive al rilancio e fa chiudere la sessione a metà all'avvio.
 
 - `DetailTarget.month` (screens/DetailScreen.tsx) porta il mese da cui si
   apre il dettaglio di categoria/esercente, cosi' il grafico si posiziona li'

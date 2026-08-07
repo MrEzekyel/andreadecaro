@@ -55,7 +55,7 @@ export default function AssetDetailScreen({
   onSaved,
 }: Props) {
   const { palette, dark } = useTheme();
-  const series = usePortfolioSeries({ assetId: position.asset.id });
+  const { series } = usePortfolioSeries({ assetId: position.asset.id });
 
   // Come nella schermata principale: un anno racconta gia' un andamento
   // senza schiacciare gli ultimi mesi contro il bordo.
