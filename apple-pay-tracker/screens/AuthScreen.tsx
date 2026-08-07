@@ -49,13 +49,21 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
-  /** Nel recupero: `false` chiede l'email, `true` chiede codice e password. */
-  const [codeSent, setCodeSent] = useState(false);
+  /**
+   * Quale conferma stiamo aspettando, se ne aspettiamo una.
+   *
+   * `"signup"` dopo la registrazione, `"recovery"` dopo la richiesta di
+   * recupero. Un solo campo invece di due booleani, perche' i due stati si
+   * escludono e tenerli separati permetterebbe di finire in entrambi.
+   */
+  const [pendingCode, setPendingCode] = useState<null | "signup" | "recovery">(
+    null
+  );
   const [code, setCode] = useState("");
 
   function goTo(next: Mode) {
     setMode(next);
-    setCodeSent(false);
+    setPendingCode(null);
     setCode("");
     setPassword("");
     setShowPassword(false);
@@ -71,10 +79,18 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
     }
 
     setLoading(true);
-    const { error } =
-      mode === "signin"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+
+    if (mode === "signin") {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      setLoading(false);
+      if (error) Alert.alert("Errore", error.message);
+      return;
+    }
+
+    const { data, error } = await supabase.auth.signUp({ email, password });
     setLoading(false);
 
     if (error) {
@@ -82,12 +98,52 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
       return;
     }
 
-    if (mode === "signup") {
-      Alert.alert(
-        "Account creato",
-        "Se il progetto Supabase richiede la conferma via email, controlla la posta prima di accedere."
-      );
+    // Con la conferma via email attiva `signUp` non apre nessuna sessione: si
+    // chiede il codice. Con la conferma disattivata la sessione arriva subito
+    // e si e' gia' dentro. Si guarda cosa e' tornato invece di assumere una
+    // delle due configurazioni: cambiarla sulla dashboard non deve rompere
+    // l'app.
+    if (data.session) return;
+
+    setPendingCode("signup");
+    Alert.alert(
+      "Controlla la posta",
+      `Ti abbiamo mandato un codice a sei cifre a ${email}. Serve a confermare che l'indirizzo è tuo: senza, un domani non potresti recuperare la password.`
+    );
+  }
+
+  /** Conferma l'indirizzo con il codice ricevuto, e con quello entra. */
+  async function confirmSignup() {
+    if (code.trim().length < 6) {
+      Alert.alert("Codice incompleto", "Inserisci le sei cifre che hai ricevuto.");
+      return;
     }
+
+    setLoading(true);
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: code.trim(),
+      type: "signup",
+    });
+    setLoading(false);
+
+    if (error) {
+      Alert.alert(
+        "Codice non valido",
+        "Il codice è sbagliato o è scaduto. Richiedine uno nuovo."
+      );
+      return;
+    }
+  }
+
+  async function resendSignupCode() {
+    setLoading(true);
+    const { error } = await supabase.auth.resend({ type: "signup", email });
+    setLoading(false);
+    Alert.alert(
+      error ? "Non è stato possibile inviare il codice" : "Codice inviato",
+      error ? error.message : `Controlla la posta di ${email}.`
+    );
   }
 
   async function sendCode() {
@@ -108,7 +164,7 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
     // Supabase risponde allo stesso modo se l'email non esiste, per non
     // rivelare quali indirizzi sono registrati. Il messaggio lo rispecchia
     // invece di promettere un codice che potrebbe non arrivare mai.
-    setCodeSent(true);
+    setPendingCode("recovery");
     Alert.alert(
       "Controlla la posta",
       `Se esiste un account per ${email}, fra pochi istanti riceverai un codice a sei cifre.`
@@ -174,32 +230,52 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
   }
 
   const recovering = mode === "recover";
-  const title = recovering
-    ? codeSent
+  const attesaRecupero = pendingCode === "recovery";
+  const attesaRegistrazione = pendingCode === "signup";
+
+  const title = attesaRegistrazione
+    ? "Conferma il tuo indirizzo"
+    : attesaRecupero
       ? "Scegli una nuova password"
-      : "Recupera l'accesso"
-    : "Apple Pay Tracker";
-  const subtitle = recovering
-    ? codeSent
+      : recovering
+        ? "Recupera l'accesso"
+        : "Apple Pay Tracker";
+
+  const subtitle = attesaRegistrazione
+    ? `Inserisci il codice che abbiamo mandato a ${email}.`
+    : attesaRecupero
       ? `Inserisci il codice inviato a ${email} e la password che vuoi usare da ora.`
-      : "Ti mandiamo un codice via email per reimpostare la password."
-    : mode === "signin"
-      ? "Accedi per vedere le tue spese."
-      : "Crea il tuo account personale.";
+      : recovering
+        ? "Ti mandiamo un codice via email per reimpostare la password."
+        : mode === "signin"
+          ? "Accedi per vedere le tue spese."
+          : "Crea il tuo account personale.";
 
   const passwordPlaceholder = recovering ? "Nuova password" : "Password";
-  const action = recovering
-    ? codeSent
+
+  const action = attesaRegistrazione
+    ? confirmSignup
+    : attesaRecupero
       ? resetPassword
-      : sendCode
-    : submit;
-  const actionLabel = recovering
-    ? codeSent
+      : recovering
+        ? sendCode
+        : submit;
+
+  const actionLabel = attesaRegistrazione
+    ? "Conferma ed entra"
+    : attesaRecupero
       ? "Salva e accedi"
-      : "Invia il codice"
-    : mode === "signin"
-      ? "Accedi"
-      : "Registrati";
+      : recovering
+        ? "Invia il codice"
+        : mode === "signin"
+          ? "Accedi"
+          : "Registrati";
+
+  /** L'email non si tocca piu' finche' un codice e' in volo: e' legato a quella. */
+  const mostraEmail = pendingCode === null;
+  const mostraCodice = pendingCode !== null;
+  /** In registrazione la password l'ha gia' scelta; nel recupero la sceglie ora. */
+  const mostraPassword = attesaRecupero || (!recovering && pendingCode === null);
 
   return (
     <KeyboardAvoidingView
@@ -210,10 +286,10 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
         <Text style={[styles.title, { color: palette.ink }]}>{title}</Text>
         <Text style={[styles.subtitle, { color: palette.ink2 }]}>{subtitle}</Text>
 
-        {/* Nel secondo passo l'email non si tocca piu': il codice e' legato a
-            quell'indirizzo, e cambiarlo qui lo renderebbe silenziosamente
+        {/* Con un codice in volo l'email non si tocca piu': il codice e' legato
+            a quell'indirizzo, e cambiarlo qui lo renderebbe silenziosamente
             invalido. */}
-        {!(recovering && codeSent) && (
+        {mostraEmail && (
           <TextInput
             value={email}
             onChangeText={setEmail}
@@ -233,7 +309,7 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
           />
         )}
 
-        {recovering && codeSent && (
+        {mostraCodice && (
           <TextInput
             value={code}
             onChangeText={setCode}
@@ -255,7 +331,7 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
           />
         )}
 
-        {!(recovering && !codeSent) && (
+        {mostraPassword && (
           <View
             style={[
               styles.input,
@@ -307,10 +383,10 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
           )}
         </TouchableOpacity>
 
-        {recovering && codeSent && (
+        {mostraCodice && (
           <TouchableOpacity
             style={styles.switch}
-            onPress={sendCode}
+            onPress={attesaRegistrazione ? resendSignupCode : sendCode}
             disabled={loading}
           >
             <Text style={[styles.switchText, { color: palette.ink2 }]}>
@@ -319,7 +395,7 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
           </TouchableOpacity>
         )}
 
-        {mode === "signin" && (
+        {mode === "signin" && pendingCode === null && (
           <TouchableOpacity
             style={styles.switch}
             onPress={() => goTo("recover")}
@@ -332,14 +408,16 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
 
         <TouchableOpacity
           style={styles.switch}
-          onPress={() => goTo(mode === "signin" ? "signup" : "signin")}
+          onPress={() => goTo(mode === "signin" && !pendingCode ? "signup" : "signin")}
         >
           <Text style={[styles.switchText, { color: palette.ink2 }]}>
-            {mode === "signin"
-              ? "Non hai un account? Registrati"
-              : mode === "signup"
-                ? "Hai già un account? Accedi"
-                : "Torna all'accesso"}
+            {pendingCode !== null
+              ? "Annulla"
+              : mode === "signin"
+                ? "Non hai un account? Registrati"
+                : mode === "signup"
+                  ? "Hai già un account? Accedi"
+                  : "Torna all'accesso"}
           </Text>
         </TouchableOpacity>
       </View>

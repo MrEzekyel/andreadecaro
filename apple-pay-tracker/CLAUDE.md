@@ -284,6 +284,21 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 
 ### Accesso
 
+- **Nessun flusso di autenticazione usa una pagina web.** Né la conferma
+  dell'indirizzo alla registrazione (`signUp` → `verifyOtp` con
+  `type: "signup"`) né il recupero password: entrambi vanno a codice a sei
+  cifre. Servono `{{ .Token }}` in **entrambi** i template Supabase, e il link
+  va tolto — lasciandolo accanto al codice l'utente clicca quello, e finisce
+  sul `Site URL` del progetto (`http://localhost:3000` se non impostato).
+  Nessuna *Redirect URL* da autorizzare, di conseguenza.
+- La conferma dell'indirizzo non è un dettaglio burocratico: **il recupero
+  password vale solo quanto l'email è verificata**. Chi si registra con un
+  indirizzo sbagliato si costruisce anni di storico su un account che non
+  potrà mai recuperare — lo stesso difetto di `P1`, rientrato da un'altra
+  porta.
+- `signUp` non assume nessuna configurazione: se torna una sessione, "Confirm
+  email" è disattivata e si è gia dentro; se non torna, si chiede il codice.
+  Cambiare quell'impostazione sulla dashboard non deve rompere l'app.
 - Il recupero password va **a codice a sei cifre** (`resetPasswordForEmail` →
   `verifyOtp` → `updateUser`), non a link: in Expo Go l'URL dell'app cambia a
   ogni sessione e un deep link si romperebbe proprio quando l'utente è già in

@@ -130,23 +130,41 @@ Poi ti basta dire *"Ehi Siri, aggiungi spesa"*.
 
 ## 🟡 Decisioni che devo sentire da te
 
-### 5bis. Template email del recupero password 🔴
+### 5bis. I due template email 🔴
 
-Il recupero password funziona **a codice a sei cifre**, non a link: in Expo Go
-l'URL dell'app cambia a ogni sessione, e un deep link si romperebbe proprio
-quando l'utente è già in difficoltà.
+L'app non usa **nessuna pagina web**: né per confermare l'indirizzo alla
+registrazione, né per recuperare la password. Entrambe le cose vanno a
+**codice a sei cifre**, verificato dall'app via API.
 
-Perché il codice arrivi, il template dell'email deve contenerlo. Su Supabase:
+È una scelta, non un ripiego: in Expo Go l'URL dell'app cambia a ogni
+sessione, quindi un link di ritorno sarebbe fragile proprio nel momento in cui
+l'utente è già in difficoltà. E il link di default porta al `Site URL` del
+progetto, che se non è mai stato impostato è `http://localhost:3000` — una
+pagina morta.
 
-**Authentication → Emails → Reset Password** — aggiungi al corpo del messaggio:
+Servono due modifiche su **Authentication → Emails**:
 
-```
-{{ .Token }}
-```
+**Confirm signup** e **Reset Password** — in entrambi i template:
 
-Puoi lasciare anche il link esistente: il codice è un'aggiunta, non un
-sostituto. Senza questa riga l'email arriva ma è senza codice, e la schermata
-"Password dimenticata" resta bloccata sul secondo passo.
+1. aggiungi al corpo del messaggio:
+
+   ```
+   {{ .Token }}
+   ```
+
+2. **togli il link** (`{{ .ConfirmationURL }}`).
+
+Il punto 2 conta quanto il punto 1: lasciando il link accanto al codice,
+l'utente cliccherà il link — è più naturale che digitare sei cifre — e
+finirebbe su quella pagina morta. Per la conferma della registrazione
+l'account verrebbe comunque confermato (Supabase verifica il token prima di
+reindirizzare), ma l'utente non ha modo di saperlo.
+
+Senza il punto 1 le email arrivano senza codice, e sia la registrazione sia il
+recupero restano bloccati sulla schermata del codice.
+
+> Non serve invece impostare `Site URL` né le *Redirect URLs*: senza link non
+> c'è nessun redirect da autorizzare.
 
 ---
 
