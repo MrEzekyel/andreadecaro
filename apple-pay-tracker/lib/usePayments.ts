@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { describeAge, readCache, writeCache } from "./cache";
 import { firstError } from "./loadError";
 import { supabase } from "./supabase";
 import { Payment } from "./types";
@@ -32,9 +33,21 @@ export function usePayments(month: Date) {
   const [previous, setPrevious] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * Eta' dei dati mostrati quando arrivano dalla cache e non dalla rete.
+   *
+   * `null` = sono freschi. Quando c'e', la schermata lo dice invece di far
+   * credere che siano di adesso: dati vecchi vanno bene, dati vecchi spacciati
+   * per nuovi no.
+   */
+  const [staleAt, setStaleAt] = useState<string | null>(null);
+
+  const cacheKey = `payments:${month.getFullYear()}-${month.getMonth()}`;
 
   const load = useCallback(async () => {
     const { start, end } = monthRange(month);
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth.user?.id ?? null;
     const previousStart = new Date(
       start.getFullYear(),
       start.getMonth() - 1,
@@ -60,17 +73,38 @@ export function usePayments(month: Date) {
     ]);
 
     const failure = firstError(current, earlier);
-    setError(failure);
 
-    // Le righe vecchie restano finche' non arriva una lettura riuscita: chi
-    // guarda vede l'errore al loro posto, e al "Riprova" ritrova i suoi dati
-    // invece di una schermata che nel frattempo si e' svuotata.
     if (!failure) {
-      setPayments((current.data ?? []) as Payment[]);
+      const righe = (current.data ?? []) as Payment[];
+      setPayments(righe);
       setPrevious((earlier.data ?? []) as Payment[]);
+      setError(null);
+      setStaleAt(null);
+      if (userId) writeCache(userId, cacheKey, righe);
+      setLoading(false);
+      return;
+    }
+
+    // Lettura fallita: prima di dichiarare l'errore si guarda se c'e' una
+    // copia locale. Mostrare i dati di stamattina, dicendo che sono di
+    // stamattina, e' meglio sia di una schermata vuota sia di un errore — e
+    // resta vero, che e' la condizione a cui tutto il resto e' tenuto.
+    const cached = userId
+      ? await readCache<Payment[]>(userId, cacheKey)
+      : null;
+
+    if (cached && cached.value.length > 0) {
+      setPayments(cached.value);
+      setError(null);
+      setStaleAt(cached.at);
+    } else {
+      // Le righe vecchie restano finche' non arriva una lettura riuscita: chi
+      // guarda vede l'errore al loro posto, e al "Riprova" ritrova i suoi dati
+      // invece di una schermata che nel frattempo si e' svuotata.
+      setError(failure);
     }
     setLoading(false);
-  }, [month]);
+  }, [month, cacheKey]);
 
   useEffect(() => {
     setLoading(true);
@@ -112,5 +146,14 @@ export function usePayments(month: Date) {
       .reduce((sum, payment) => sum + Number(payment.effective_amount), 0);
   }, [previous, month]);
 
-  return { payments, total, previousTotal, loading, error, reload: load };
+  return {
+    payments,
+    total,
+    previousTotal,
+    loading,
+    error,
+    staleAt,
+    staleLabel: staleAt ? describeAge(staleAt) : null,
+    reload: load,
+  };
 }

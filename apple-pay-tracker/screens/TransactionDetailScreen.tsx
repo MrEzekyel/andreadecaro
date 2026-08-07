@@ -14,7 +14,7 @@ import { LoadError } from "../components/LoadError";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
-import { formatAmount, shortDateTime, splitAmount } from "../lib/format";
+import { formatForeign, formatAmount, shortDateTime, splitAmount } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { categoryColor, radius, space, tint, type } from "../lib/theme";
 import { Payment, PaymentSplit } from "../lib/types";
@@ -182,6 +182,31 @@ export default function TransactionDetailScreen({
             <Text style={[styles.when, { color: palette.ink3 }]}>
               {shortDateTime(payment.occurred_at)}
             </Text>
+
+            {/* L'originale accanto al controvalore, con il cambio: senza, un
+                importo convertito sembra sbagliato a chi si ricorda lo
+                scontrino. Il cambio e' quello del giorno della spesa, salvato
+                una volta per sempre — al cambio di oggi il totale di un mese
+                chiuso si muoverebbe a ogni apertura. */}
+            {payment.original_currency && payment.original_amount !== null && (
+              <Text style={[styles.foreign, { color: palette.ink3 }]}>
+                {formatForeign(
+                  Number(payment.original_amount),
+                  payment.original_currency
+                )}
+                {payment.fx_rate !== null
+                  ? ` · cambio ${Number(payment.fx_rate).toFixed(4).replace(".", ",")}`
+                  : " · cambio non ancora disponibile"}
+              </Text>
+            )}
+
+            {payment.original_currency && payment.fx_rate === null && (
+              <Text style={[styles.foreignWarn, { color: palette.over }]}>
+                Questo importo è in {payment.original_currency} e non è ancora
+                stato convertito: nei totali entra così com'è. Si sistema da
+                solo entro stanotte.
+              </Text>
+            )}
 
             {isSplit && (
               <Text style={[styles.splitNote, { color: palette.ink2 }]}>
@@ -378,6 +403,8 @@ const styles = StyleSheet.create({
   },
   merchant: { ...type.title, textAlign: "center" },
   amount: { ...type.hero, fontVariant: ["tabular-nums"] },
+  foreign: { ...type.small, marginTop: 4 },
+  foreignWarn: { ...type.small, marginTop: 6, lineHeight: 15 },
   cents: { ...type.heroCents },
   when: { ...type.caption, marginTop: -2 },
   splitNote: { ...type.small },

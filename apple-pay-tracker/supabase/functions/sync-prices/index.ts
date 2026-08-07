@@ -6,7 +6,10 @@
 // con dei conteggi. E' l'unico motivo per cui puo' stare senza JWT ed essere
 // chiamata dallo scheduler.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import {
+  createClient,
+  type SupabaseClient,
+} from "jsr:@supabase/supabase-js@2";
 
 const UA =
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36";
@@ -192,8 +195,80 @@ Deno.serve(async () => {
     }
   }
 
+  const valute = await convertiSpeseInSospeso(supabase);
+
   return new Response(
-    JSON.stringify({ eseguita: new Date().toISOString(), esiti }, null, 2),
+    JSON.stringify(
+      { eseguita: new Date().toISOString(), esiti, valute },
+      null,
+      2,
+    ),
     { headers: { "Content-Type": "application/json" } },
   );
 });
+
+/**
+ * Ripesca le spese in valuta rimaste senza cambio.
+ *
+ * `ingest-payment` converte al volo, ma se frankfurter non risponde in quel
+ * momento la spesa entra comunque — perderla sarebbe peggio — con
+ * `original_currency` valorizzato e `fx_rate` nullo. Senza questa ripassata
+ * resterebbe li' per sempre, con un importo che finisce nei totali come se
+ * fosse in euro: esattamente il difetto che la multi-valuta esiste per
+ * chiudere, solo piu' raro e quindi piu' difficile da notare.
+ *
+ * Sta qui e non in una funzione a parte perche' e' l'unico posto che gia' gira
+ * ogni notte e sa parlare con frankfurter.
+ */
+async function convertiSpeseInSospeso(supabase: SupabaseClient) {
+  const { data: sospese, error } = await supabase
+    .from("payments")
+    .select("id, amount, original_amount, original_currency, occurred_at")
+    .not("original_currency", "is", null)
+    .is("fx_rate", null)
+    .limit(200);
+
+  if (error) return { errore: error.message };
+
+  let convertite = 0;
+  // I cambi si chiedono una volta per coppia valuta-giorno: dieci spese fatte
+  // a Londra lo stesso giorno hanno lo stesso cambio.
+  const cache = new Map<string, number | null>();
+
+  for (const spesa of sospese ?? []) {
+    const giorno = String(spesa.occurred_at).slice(0, 10);
+    const chiave = `${spesa.original_currency}|${giorno}`;
+
+    if (!cache.has(chiave)) {
+      try {
+        const res = await fetch(
+          `https://api.frankfurter.app/${giorno}?from=${spesa.original_currency}&to=EUR`,
+        );
+        const rate = res.ok ? (await res.json())?.rates?.EUR : null;
+        cache.set(chiave, typeof rate === "number" && rate > 0 ? rate : null);
+      } catch {
+        cache.set(chiave, null);
+      }
+    }
+
+    const rate = cache.get(chiave);
+    if (!rate) continue;
+
+    // `original_amount` e' la fonte: `amount` contiene il numero grezzo non
+    // convertito, e rileggerlo da li' darebbe una doppia conversione se questa
+    // funzione girasse due volte.
+    const originale = Number(spesa.original_amount ?? spesa.amount);
+    const { error: e } = await supabase
+      .from("payments")
+      .update({
+        amount: Math.round(originale * rate * 100) / 100,
+        original_amount: originale,
+        fx_rate: rate,
+      })
+      .eq("id", spesa.id);
+
+    if (!e) convertite += 1;
+  }
+
+  return { inSospeso: (sospese ?? []).length, convertite };
+}

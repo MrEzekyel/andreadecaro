@@ -87,6 +87,23 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 
 - `payments` = spese. `card_name` = metodo di pagamento (nome carta o
   "Contanti"), non necessariamente collegato a una vera integrazione Wallet.
+- **`payments.amount` è sempre in euro.** È la scelta portante della
+  multi-valuta: `original_amount`/`original_currency`/`fx_rate` sono
+  informazione *in più*, mai un sostituto. Se `amount` diventasse polimorfo
+  ogni somma dell'app — totali, limiti, classifiche, risparmi, export —
+  mescolerebbe valute diverse restituendo numeri plausibili e falsi, la stessa
+  classe di errore già vista su `CBU8.DE`.
+- `ingest-payment` riconosce la valuta dalla stringa formattata che manda la
+  Shortcut (`detectCurrency`) e converte al **cambio del giorno della spesa**,
+  non a quello di adesso: altrimenti una spesa di sei mesi fa cambierebbe
+  valore a ogni apertura e il totale di un mese chiuso non starebbe fermo. Un
+  codice ISO esplicito vince sempre sul simbolo, perché `$` vale per dollaro
+  USA, canadese, australiano e altri — sbagliare paese è comunque molto meno
+  grave che fingere che fossero euro.
+- Se frankfurter non risponde al momento dell'ingestione la spesa **entra
+  lo stesso** con `fx_rate` nullo: perderla sarebbe peggio. `sync-prices` le
+  ripesca ogni notte (`convertiSpeseInSospeso`) leggendo da `original_amount`
+  e non da `amount`, altrimenti una seconda passata convertirebbe due volte.
 - `excluded_from_stats` (su `payments` e `merchants`) esclude dalle
   **classifiche** ("dove spendo di più") ma mai dai **totali** — mutuo e
   rate sono spese vere. Il toggle "escludi costi fissi" in Statistiche
@@ -313,6 +330,19 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   rilancio `getSession()` troverebbe una sessione valida e si entrerebbe con la
   vecchia password credendo di averla cambiata. Il marcatore `RECOVERY_FLAG`
   sopravvive al rilancio e fa chiudere la sessione a metà all'avvio.
+
+### Lettura offline
+
+- `lib/cache.ts` tiene una copia locale dell'ultima lettura riuscita, per
+  utente. Non è una cache di correttezza — i numeri veri restano quelli del
+  database — ma serve al **terzo stato** fra dato fresco ed errore: "questi
+  sono i dati di stamattina" è meglio sia di una schermata bianca sia di un
+  errore, e resta vero.
+- `StaleNote` va scritto piccolo e senza colori d'allarme: un riquadro rosso
+  sopra a dati corretti farebbe dubitare di numeri giusti, mentre non dire
+  niente li spaccerebbe per aggiornati. L'ordine di precedenza è: dato fresco →
+  dato in cache con l'età dichiarata → `LoadError`. La cache si consulta
+  **solo dopo** che la lettura è fallita, mai al posto di una lettura riuscita.
 
 - `DetailTarget.month` (screens/DetailScreen.tsx) porta il mese da cui si
   apre il dettaglio di categoria/esercente, cosi' il grafico si posiziona li'

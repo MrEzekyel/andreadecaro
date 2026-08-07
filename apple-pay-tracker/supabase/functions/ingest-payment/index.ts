@@ -206,6 +206,85 @@ export function parseAmount(input: number | string): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * Valuta dell'importo cosi' com'e' arrivato dalla Shortcut.
+ *
+ * Il trigger Wallet formatta l'importo con la valuta della transazione, non
+ * con quella del telefono: "12,99 €" a Roma ma "£12.99" a Londra. Senza
+ * riconoscerla, quel 12,99 finirebbe nei totali come se fossero euro — un
+ * numero plausibile e sbagliato del 15%.
+ *
+ * Un codice ISO esplicito vince sempre sul simbolo, perche' i simboli sono
+ * ambigui: `$` vale per dollaro USA, canadese, australiano e altri. Quando
+ * c'e' solo il simbolo si sceglie la lettura piu' probabile e la si registra
+ * comunque come valuta dichiarata: sbagliare paese e' molto meno grave che
+ * fingere che fossero euro.
+ */
+export function detectCurrency(input: number | string): string | null {
+  if (typeof input !== "string") return null;
+
+  const iso = input.toUpperCase().match(/\b(?!EUR\b)([A-Z]{3})\b/);
+  if (iso && CURRENCIES.has(iso[1])) return iso[1];
+  if (/\bEUR\b/i.test(input)) return null;
+
+  for (const [symbol, code] of SYMBOLS) {
+    if (input.includes(symbol)) return code;
+  }
+  return null;
+}
+
+/** Valute coperte da frankfurter.app, l'unica fonte di cambi che usiamo. */
+const CURRENCIES = new Set([
+  "AUD", "BGN", "BRL", "CAD", "CHF", "CNY", "CZK", "DKK", "GBP", "HKD",
+  "HUF", "IDR", "ILS", "INR", "ISK", "JPY", "KRW", "MXN", "MYR", "NOK",
+  "NZD", "PHP", "PLN", "RON", "SEK", "SGD", "THB", "TRY", "USD", "ZAR",
+]);
+
+// L'euro non c'e': e' la valuta di riferimento, e riconoscerlo servirebbe solo
+// a scrivere una conversione da 1 a 1.
+const SYMBOLS: [string, string][] = [
+  ["£", "GBP"],
+  ["¥", "JPY"],
+  ["₹", "INR"],
+  ["₺", "TRY"],
+  ["R$", "BRL"],
+  ["kr", "SEK"],
+  ["$", "USD"],
+];
+
+/**
+ * Converte in euro al cambio del giorno della spesa.
+ *
+ * Il cambio **del giorno**, non quello di adesso: una spesa di sei mesi fa
+ * convertita al cambio odierno cambierebbe valore ogni volta che si riapre
+ * l'app, e il totale di un mese chiuso non starebbe fermo.
+ *
+ * `null` quando non si riesce: la spesa si registra lo stesso, marcata come da
+ * convertire, e `sync-prices` la ripesca la notte successiva. Perdere una
+ * spesa sarebbe peggio che registrarla con una valuta da sistemare.
+ */
+export async function toEur(
+  amount: number,
+  currency: string,
+  on: Date
+): Promise<{ eur: number; rate: number } | null> {
+  try {
+    const day = on.toISOString().slice(0, 10);
+    const res = await fetch(
+      `https://api.frankfurter.app/${day}?from=${currency}&to=EUR`
+    );
+    if (!res.ok) return null;
+
+    const rate = (await res.json())?.rates?.EUR;
+    if (typeof rate !== "number" || !Number.isFinite(rate) || rate <= 0) {
+      return null;
+    }
+    return { eur: Math.round(amount * rate * 100) / 100, rate };
+  } catch {
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method !== "POST") {
     return jsonResponse({ error: "method not allowed" }, 405);
@@ -253,6 +332,7 @@ Deno.serve(async (req) => {
   }
 
   const amount = parseAmount(body.amount);
+  const currency = detectCurrency(body.amount);
   const merchantRaw = (body.merchant ?? "").toString().trim();
 
   if (amount === null || amount <= 0) {
@@ -384,11 +464,21 @@ Deno.serve(async (req) => {
     }
   }
 
+  // La conversione avviene qui e non a valle: `amount` deve essere in euro
+  // gia' quando la riga nasce, altrimenti ogni somma dell'app mescolerebbe
+  // valute diverse fino alla notte successiva.
+  const converted = currency ? await toEur(amount, currency, occurredAt) : null;
+
   const { data: inserted, error } = await supabase
     .from("payments")
     .insert({
       user_id: userId,
-      amount,
+      // Senza cambio si tiene il numero grezzo: e' il meglio disponibile, e
+      // `fx_rate` nullo segnala che va ancora sistemato.
+      amount: converted ? converted.eur : amount,
+      original_amount: currency ? amount : null,
+      original_currency: currency,
+      fx_rate: converted ? converted.rate : null,
       merchant_raw: merchantRaw,
       merchant_name: merchantRaw,
       merchant_id: merchantId,

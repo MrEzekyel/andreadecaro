@@ -150,3 +150,22 @@ export function dayKey(iso: string) {
   const d = new Date(iso);
   return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
 }
+
+/**
+ * Importo in una valuta diversa dall'euro, con il suo simbolo.
+ *
+ * Serve solo a mostrare l'originale accanto al controvalore: nei totali entra
+ * sempre e comunque l'euro.
+ */
+export function formatForeign(value: number, currency: string) {
+  try {
+    return new Intl.NumberFormat("it-IT", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+    }).format(value);
+  } catch {
+    // Valuta non riconosciuta da Intl: meglio "12,99 XYZ" che un errore.
+    return `${value.toFixed(2).replace(".", ",")} ${currency}`;
+  }
+}

@@ -12,6 +12,7 @@ import {
 import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
+import { StaleNote } from "../components/StaleNote";
 import { PaymentRow } from "../components/PaymentRow";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
@@ -25,7 +26,7 @@ export default function PaymentsScreen() {
   const { categories, categoryById } = useData();
 
   const [month, setMonth] = useState(() => new Date());
-  const { payments, error, reload } = usePayments(month);
+  const { payments, error, staleLabel, reload } = usePayments(month);
   const [refreshing, setRefreshing] = useState(false);
   const explorer = useExplorer(reload);
 
@@ -112,6 +113,12 @@ export default function PaymentsScreen() {
             </TouchableOpacity>
           </View>
         </View>
+
+        {staleLabel && (
+          <View style={styles.stale}>
+            <StaleNote label={staleLabel} onRetry={reload} />
+          </View>
+        )}
 
         <View style={styles.filters}>
           <View
@@ -258,6 +265,7 @@ const styles = StyleSheet.create({
   title: { ...type.title },
   monthNav: { flexDirection: "row", alignItems: "center", gap: space.sm },
   month: { ...type.caption, fontWeight: "500", textTransform: "capitalize" },
+  stale: { paddingHorizontal: space.lg, paddingBottom: space.sm },
   filters: { paddingHorizontal: space.lg, gap: space.sm, paddingBottom: space.sm },
   searchBox: {
     flexDirection: "row",

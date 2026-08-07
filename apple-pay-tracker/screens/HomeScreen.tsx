@@ -12,6 +12,7 @@ import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { MonthCheck } from "../components/MonthCheck";
+import { StaleNote } from "../components/StaleNote";
 import { LimitCard } from "../components/LimitCard";
 import { MonthYearPicker } from "../components/MonthYearPicker";
 import { PaymentRow } from "../components/PaymentRow";
@@ -46,7 +47,8 @@ export default function HomeScreen() {
 
   const [month, setMonth] = useState(() => new Date());
   const [pickerOpen, setPickerOpen] = useState(false);
-  const { payments, total, previousTotal, error, reload } = usePayments(month);
+  const { payments, total, previousTotal, error, staleLabel, reload } =
+    usePayments(month);
   const { monthlyOverall, alerts, reload: reloadLimits } = useLimits();
   const [refreshing, setRefreshing] = useState(false);
   const explorer = useExplorer(reload);
@@ -295,6 +297,10 @@ export default function HomeScreen() {
             {error && (
               <LoadError message={error} onRetry={onRefresh} variant="inline" />
             )}
+
+            {/* Terzo stato, fra il dato fresco e l'errore: i numeri sotto sono
+                veri, solo non di adesso. */}
+            {staleLabel && <StaleNote label={staleLabel} onRetry={onRefresh} />}
 
         <View>
           <Text style={[styles.label, { color: palette.ink3 }]}>

@@ -29,6 +29,18 @@ export type Payment = {
   my_share: number | null;
   /** coalesce(my_share, amount), calcolato dal database. Usalo nelle somme. */
   effective_amount: number;
+  /**
+   * L'importo come lo ha visto l'utente, quando la spesa non era in euro.
+   *
+   * `amount` resta **sempre** in euro: questi tre campi sono informazione in
+   * piu', non un sostituto. Se `amount` diventasse polimorfo ogni somma
+   * dell'app mescolerebbe valute restituendo numeri plausibili e falsi.
+   */
+  original_amount: number | null;
+  /** Codice ISO 4217. `null` = la spesa era gia' in euro. */
+  original_currency: string | null;
+  /** Cambio verso euro alla data della spesa. `null` = ancora da convertire. */
+  fx_rate: number | null;
   merchant_raw: string;
   merchant_name: string;
   merchant_id: string | null;
