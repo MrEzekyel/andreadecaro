@@ -14,8 +14,8 @@ si riporta nella tabella di stato.
 | Sprint | Punti | Stato | Verifica |
 | --- | --- | --- | --- |
 | 1 · Fiducia | P1, P2, P3 | P2 e P3 chiusi · P1 in attesa di Andrea | 10 rilievi, tutti corretti (`bb2e466`) |
-| 2 · Attrito zero | P5, P6, P12 | **prossimo** | — |
-| 3 · Integrità del dato | P11, P13 | da fare | — |
+| 2 · Attrito zero | P5, P6, P12 | P6 e P12 chiusi · P5 in attesa di Andrea | 7 rilievi, tutti corretti |
+| 3 · Integrità del dato | P11, P13 | **prossimo** | — |
 | 4 · Sicurezza e trasparenza | P14, P4, P18 | da fare | — |
 | 5 · Pricing | P9, P10, P7, P8 | bloccato — decisione di Andrea | — |
 | 6 · Differenziazione | P17, P16 | bloccato — richiede development build | — |
@@ -122,7 +122,14 @@ affidabile.
 
 `P5` richiede di costruire e ospitare un file `.shortcut`: parte del lavoro è
 di Andrea (creare il comando su iPhone ed esportarlo su iCloud), parte è di
-qui (la schermata che genera il token e il link precompilato).
+qui (la schermata che genera il token e il link precompilato). La ricetta, con
+il passo di gestione errore che oggi manca, è in `DA-FARE.md` sezione 5ter.
+
+> **Esito.** Sette rilievi, tutti corretti. Il più grave era di nuovo in
+> scrittura e di nuovo silenzioso: il controllo mensile non registrava niente
+> (`user_id` mancante nell'insert) e chiudeva comunque la scheda, quindi la
+> domanda sarebbe tornata per sempre — il controllo contro le perdite
+> silenziose era diventato lui stesso una perdita silenziosa.
 
 ---
 
