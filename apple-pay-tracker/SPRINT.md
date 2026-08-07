@@ -15,7 +15,7 @@ si riporta nella tabella di stato.
 | --- | --- | --- | --- |
 | 1 · Fiducia | P1, P2, P3 | P2 e P3 chiusi · P1 in attesa di Andrea | 10 rilievi, tutti corretti (`bb2e466`) |
 | 2 · Attrito zero | P5, P6, P12 | P6 e P12 chiusi · P5 in attesa di Andrea | 7 rilievi, tutti corretti |
-| 3 · Integrità del dato | P11, P13 | **prossimo** | — |
+| 3 · Integrità del dato | P11, P13 | codice fatto · **due Edge Function da deployare** | — |
 | 4 · Sicurezza e trasparenza | P14, P4, P18 | da fare | — |
 | 5 · Pricing | P9, P10, P7, P8 | bloccato — decisione di Andrea | — |
 | 6 · Differenziazione | P17, P16 | bloccato — richiede development build | — |
@@ -134,6 +134,14 @@ il passo di gestione errore che oggi manca, è in `DA-FARE.md` sezione 5ter.
 ---
 
 ## Sprint 3 · Integrità del dato
+
+> ⚠️ **In sospeso: il deploy di `ingest-payment` e `sync-prices`.**
+> Il codice è nel repository ma le funzioni girano ancora nella versione
+> precedente, quindi `P11` **oggi non fa niente**: le colonne esistono e l'app
+> le mostra, ma nessuno le scrive. Da fare come prima cosa alla ripresa —
+> passando il contenuto vero dei file, mai ricostruito a pezzi: `ingest-payment`
+> registra ogni pagamento e un deploy corrotto lì non fallisce in modo
+> evidente, smette solo di registrare.
 
 - **P11** multi-valuta: salvare la valuta originale sulla transazione e
   convertire al cambio della data. Migrazione + `ingest-payment` +
