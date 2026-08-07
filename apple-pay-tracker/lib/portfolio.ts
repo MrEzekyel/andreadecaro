@@ -1,3 +1,5 @@
+import { Bucket } from "./aggregate";
+import { monthShort } from "./format";
 import { Asset, AssetGroup, Investment } from "./types";
 
 export const GROUP_LABEL: Record<AssetGroup, string> = {
@@ -332,6 +334,47 @@ export function groupPositions(
       positions: inGroup.sort((a, b) => b.value - a.value),
     };
   }).filter((g) => g.positions.length > 0);
+}
+
+/** Quanto e' entrato ogni mese in un gruppo, pronto per `BarChart`. */
+export function monthlyContributions(
+  investments: Investment[],
+  assets: Asset[],
+  group: AssetGroup,
+  maxMonths = 12
+): Bucket[] {
+  const inGroup = new Set(
+    assets.filter((a) => a.asset_group === group).map((a) => a.id)
+  );
+
+  const perMese = new Map<string, Bucket>();
+  for (const op of investments) {
+    // Solo il denaro che entra: una vendita non e' un versamento negativo, e
+    // un dividendo non e' denaro messo da parte da chi guarda il grafico.
+    if (op.kind !== "buy" || !op.asset_id || !inGroup.has(op.asset_id)) continue;
+    const quando = new Date(op.occurred_at);
+    const start = new Date(quando.getFullYear(), quando.getMonth(), 1);
+    const key = `${start.getFullYear()}-${start.getMonth()}`;
+
+    const esistente = perMese.get(key);
+    if (esistente) {
+      esistente.total += Number(op.amount);
+      esistente.count += 1;
+    } else {
+      perMese.set(key, {
+        key,
+        label: monthShort(start),
+        total: Number(op.amount),
+        count: 1,
+        start,
+      });
+    }
+  }
+
+  const ordinati = [...perMese.values()].sort(
+    (a, b) => a.start.getTime() - b.start.getTime()
+  );
+  return ordinati.slice(-maxMonths);
 }
 
 export type SeriesPoint = { on_date: string; value_eur: number; invested_eur: number };

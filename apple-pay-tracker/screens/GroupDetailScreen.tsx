@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { BarChart } from "../components/BarChart";
 import { DistributionBar } from "../components/DistributionBar";
 import { Icon } from "../components/Icon";
+import { LetterToggle, LetterOption } from "../components/LetterToggle";
 import { ScrubChart } from "../components/ScrubChart";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useTheme } from "../lib/ThemeContext";
@@ -14,6 +16,7 @@ import {
   RangeKey,
   daysSince,
   groupXirr,
+  monthlyContributions,
   periodPriceGain,
   sliceSeries,
 } from "../lib/portfolio";
@@ -31,6 +34,14 @@ const SLICE_COLORS = [
   "#a4574f",
   "#6d7f9c",
   "#94795a",
+];
+
+/** Come ordinare i titoli: per quanto pesano, o per come stanno andando. */
+type Ordine = "valore" | "rendimento";
+
+const ORDINE_OPTIONS: LetterOption<Ordine>[] = [
+  { value: "valore", letter: "V", label: "Ordina per valore" },
+  { value: "rendimento", letter: "R", label: "Ordina per rendimento" },
 ];
 
 type Props = {
@@ -60,6 +71,8 @@ export default function GroupDetailScreen({
 
   const [range, setRange] = useState<RangeKey>("1y");
   const [scrub, setScrub] = useState<number | null>(null);
+  const [ordine, setOrdine] = useState<Ordine>("valore");
+  const [meseScelto, setMeseScelto] = useState<string | null>(null);
 
   const series = usePortfolioSeries({ group: group.group });
   const visible = useMemo(() => sliceSeries(series, range), [series, range]);
@@ -85,6 +98,34 @@ export default function GroupDetailScreen({
     () => groupXirr(investments, assets, group.group, group.value),
     [investments, assets, group.group, group.value]
   );
+
+  const versamenti = useMemo(
+    () => monthlyContributions(investments, assets, group.group),
+    [investments, assets, group.group]
+  );
+
+  // Riferimento sul grafico: la mediana, non la media. Un mese fuori scala
+  // basta a spostare la media sopra ogni mese normale — qui e' successo con
+  // ottobre 2025, quando il disinvestimento del monetario e' rientrato tutto
+  // insieme — e una riga che nessun mese tocca non descrive niente.
+  const versamentoTipico = useMemo(() => {
+    if (versamenti.length === 0) return null;
+    const ordinati = versamenti.map((b) => b.total).sort((a, b) => a - b);
+    return ordinati[Math.floor(ordinati.length / 2)];
+  }, [versamenti]);
+
+  // Il rendimento e' quello che rende confrontabili titoli di taglia diversa:
+  // una posizione da 50 euro che fa +20% dice qualcosa che il suo valore, in
+  // fondo all'elenco ordinato per importo, non farebbe mai vedere.
+  const titoli = useMemo(() => {
+    const copia = [...group.positions];
+    if (ordine === "rendimento") {
+      return copia.sort(
+        (a, b) => (b.priceGainPct ?? -Infinity) - (a.priceGainPct ?? -Infinity)
+      );
+    }
+    return copia.sort((a, b) => b.value - a.value);
+  }, [group.positions, ordine]);
 
   const heroValue = at ? at.value_eur : group.value;
   const amount = splitAmount(heroValue);
@@ -195,6 +236,24 @@ export default function GroupDetailScreen({
           />
         </View>
 
+        {versamenti.length > 1 && (
+          <View>
+            <Text style={[styles.label, { color: palette.ink3 }]}>
+              Versamenti al mese
+            </Text>
+            <BarChart
+              buckets={versamenti}
+              metric="amount"
+              color={palette.accent}
+              average={versamentoTipico}
+              selectedKey={meseScelto}
+              onSelect={(b) =>
+                setMeseScelto((corrente) => (corrente === b.key ? null : b.key))
+              }
+            />
+          </View>
+        )}
+
         <View>
           <Text style={[styles.label, { color: palette.ink3 }]}>Numeri</Text>
           <Fact label="Valore" value={formatAmount(group.value)} />
@@ -264,8 +323,21 @@ export default function GroupDetailScreen({
         )}
 
         <View>
-          <Text style={[styles.label, { color: palette.ink3 }]}>Titoli</Text>
-          {group.positions.map((position) => {
+          <View style={styles.listHead}>
+            <Text
+              style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}
+            >
+              Titoli
+            </Text>
+            {group.positions.length > 1 && (
+              <LetterToggle
+                options={ORDINE_OPTIONS}
+                value={ordine}
+                onChange={setOrdine}
+              />
+            )}
+          </View>
+          {titoli.map((position) => {
             const pos = position.priceGain >= 0;
             return (
               <TouchableOpacity
@@ -348,6 +420,12 @@ const styles = StyleSheet.create({
   },
   rangeLabel: { ...type.small, fontWeight: "500" },
   label: { ...type.label, marginBottom: space.sm },
+  listHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: space.sm,
+  },
   fact: {
     flexDirection: "row",
     justifyContent: "space-between",

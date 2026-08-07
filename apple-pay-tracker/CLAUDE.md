@@ -165,11 +165,29 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   percentuale in testa il periodo scelto nel grafico (1M/6M/1A/Tutto, e lo
   scrub) invece di mostrare sempre il totale, che senza il grafico sotto non
   avrebbe più senso.
-- La sezione ha tre schermate figlie: `AnalysisScreen` (ripartizione, anello
-  grande e lista sotto), `PacScreen` (piani di accumulo) e
-  `AssetDetailScreen`. Le sezioni per gruppo sono **chiuse di default**: con
-  quattro gruppi aperti la schermata diventa un muro da scorrere, e il saldo
-  di ciascuno è già nell'intestazione.
+- La sezione ha quattro schermate figlie: `AnalysisScreen` (ripartizione del
+  portafoglio, anello grande e lista sotto), `GroupDetailScreen` (una per
+  gruppo), `PacScreen` (piani di accumulo) e `AssetDetailScreen`. Le sezioni
+  per gruppo nell'elenco sono **chiuse di default** e, aperte, mostrano
+  **solo i titoli**: grafico, ripartizione, versamenti e rendimento vivono in
+  `GroupDetailScreen`, dove hanno spazio per essere letti invece di stare
+  compressi dentro a un elenco.
+- `DistributionBar` è un **fratello** di `ShareBar`, non una sua variante:
+  `ShareBar` risponde a "quanto pesa QUESTO" e tiene apposta gli altri in
+  grigio, `DistributionBar` colora tutte le fette perché contano tutte. Un
+  parametro che ne ribaltasse il senso avrebbe reso illeggibili entrambe. Su
+  pochi elementi si preferisce alla ciambella: le fette si confrontano lungo
+  una retta invece che per angoli.
+- Sul grafico dei versamenti mensili la linea di riferimento è la **mediana**,
+  non la media: un mese fuori scala (ottobre 2025, quando è rientrato tutto
+  insieme il disinvestimento del monetario) sposta la media sopra ogni mese
+  normale, e una riga che nessun mese tocca non descrive niente.
+- I nomi delle icone Lucide vanno **verificati sui file** in
+  `node_modules/lucide-react-native/dist/cjs/icons/` prima di usarli:
+  `components/Icon.tsx` ripiega in silenzio su `CircleHelp` quando il nome non
+  esiste, quindi un nome sbagliato non rompe la build né dà errori — si vede
+  solo guardando l'app. Già successo con `alert-circle`, che in questa
+  versione si chiama `circle-alert`.
 - Lo storico viene dall'**esportazione operazioni di Trade Republic** (CSV con
   data, ISIN, quote, prezzo). `investments.external_id` tiene l'id operazione
   del broker, così si può riesportare e reimportare senza duplicare.
