@@ -1,14 +1,22 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useCallback, useEffect, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Icon } from "./Icon";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
 
-/** Spegne il controllo per sempre, su questo dispositivo. */
-const OPT_OUT = "controllo-mensile-disattivato";
+/**
+ * Chiavi locali, sempre legate all'utente.
+ *
+ * Senza il suffisso, cambiando account sullo stesso telefono il nuovo utente
+ * erediterebbe le scelte del precedente: la domanda spenta da uno non
+ * arriverebbe mai all'altro.
+ */
+const optOutKey = (userId: string) => `controllo-mensile-off:${userId}`;
+const rivistoKey = (userId: string, iso: string) =>
+  `controllo-mensile-rivisto:${userId}:${iso}`;
 
 const MESI = [
   "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno",
@@ -36,14 +44,25 @@ export function MonthCheck({ onReview }: { onReview: (month: Date) => void }) {
   const [total, setTotal] = useState(0);
   const [count, setCount] = useState(0);
   const [hidden, setHidden] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const load = useCallback(async () => {
-    if (await AsyncStorage.getItem(OPT_OUT)) return;
+    const { data: auth } = await supabase.auth.getUser();
+    const userId = auth.user?.id;
+    if (!userId) return;
+
+    if (await AsyncStorage.getItem(optOutKey(userId))) return;
 
     const now = new Date();
     const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const end = new Date(now.getFullYear(), now.getMonth(), 1);
     const iso = `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}-01`;
+
+    // Chiave locale del "l'ho gia' guardato": HomeScreen viene smontata a ogni
+    // cambio di scheda, quindi uno stato in memoria farebbe ricomparire la
+    // domanda a ogni ritorno in Home. Un promemoria che non si chiude e' il
+    // contrario di quello che questa scheda deve essere.
+    if (await AsyncStorage.getItem(rivistoKey(userId, iso))) return;
 
     const [già, spese] = await Promise.all([
       supabase.from("month_checks").select("id").eq("month", iso).maybeSingle(),
@@ -77,15 +96,45 @@ export function MonthCheck({ onReview }: { onReview: (month: Date) => void }) {
   async function conferma() {
     if (!month) return;
     const iso = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}-01`;
+
+    setSaving(true);
+    const { data: auth } = await supabase.auth.getUser();
+    // `user_id` e' `not null` e senza default: come ogni altro insert dell'app
+    // va passato esplicitamente, altrimenti la riga viene rifiutata.
+    const { error } = await supabase.from("month_checks").insert({
+      user_id: auth.user?.id,
+      month: iso,
+      confirmed_total: total,
+    });
+    setSaving(false);
+
+    // La scheda si chiude solo se la risposta e' stata registrata davvero.
+    // Chiuderla comunque lascerebbe l'utente convinto di aver risposto mentre
+    // la domanda tornera' per sempre — la stessa perdita silenziosa che questo
+    // controllo esiste per scoprire, spostata di un livello.
+    if (error) {
+      Alert.alert(
+        "Risposta non salvata",
+        "Non è stato possibile registrare il controllo. Riprova fra poco."
+      );
+      return;
+    }
     setHidden(true);
-    await supabase
-      .from("month_checks")
-      .insert({ month: iso, confirmed_total: total });
+  }
+
+  async function rivedi() {
+    if (!month) return;
+    const iso = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}-01`;
+    const { data: auth } = await supabase.auth.getUser();
+    if (auth.user) await AsyncStorage.setItem(rivistoKey(auth.user.id, iso), "1");
+    setHidden(true);
+    onReview(month);
   }
 
   async function nonChiedere() {
+    const { data: auth } = await supabase.auth.getUser();
+    if (auth.user) await AsyncStorage.setItem(optOutKey(auth.user.id), "1");
     setHidden(true);
-    await AsyncStorage.setItem(OPT_OUT, "1");
   }
 
   if (hidden || !month) return null;
@@ -114,19 +163,20 @@ export function MonthCheck({ onReview }: { onReview: (month: Date) => void }) {
         <TouchableOpacity
           style={[styles.primary, { backgroundColor: palette.accent }]}
           onPress={conferma}
+          disabled={saving}
           accessibilityRole="button"
         >
+          {/* Non "Torna": in un riquadro che si puo' congedare si leggerebbe
+              come "chiudi", mentre questo tocco registra un'affermazione sui
+              soldi che verra' usata come riferimento. */}
           <Text style={[styles.primaryText, { color: palette.onAccent }]}>
-            Torna
+            {saving ? "Salvo…" : "Sì, corrisponde"}
           </Text>
         </TouchableOpacity>
 
         <TouchableOpacity
           style={[styles.secondary, { borderColor: palette.hairline }]}
-          onPress={() => {
-            setHidden(true);
-            onReview(month);
-          }}
+          onPress={rivedi}
           accessibilityRole="button"
         >
           <Text style={[styles.secondaryText, { color: palette.ink2 }]}>

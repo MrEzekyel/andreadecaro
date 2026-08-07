@@ -86,7 +86,25 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
         password,
       });
       setLoading(false);
-      if (error) Alert.alert("Errore", error.message);
+      if (!error) return;
+
+      // Chi ha annullato sulla schermata del codice (o ha chiuso l'app: e'
+      // stato in memoria) ha un account che esiste ma non e' confermato.
+      // Riprovando ad accedere si prenderebbe "Email not confirmed" — in
+      // inglese, dentro un'app in italiano, senza nessuna strada visibile per
+      // tornare al codice. E' il momento di massimo abbandono: un utente nuovo
+      // che non ha ancora niente dentro. Lo si riporta dov'era.
+      if (/not confirmed|email_not_confirmed/i.test(error.message)) {
+        setPendingCode("signup");
+        await supabase.auth.resend({ type: "signup", email });
+        Alert.alert(
+          "Manca la conferma dell'indirizzo",
+          `Ti abbiamo rimandato un codice a ${email}. Inseriscilo per completare la registrazione.`
+        );
+        return;
+      }
+
+      Alert.alert("Errore", error.message);
       return;
     }
 
@@ -106,9 +124,13 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
     if (data.session) return;
 
     setPendingCode("signup");
+    // Con la protezione contro l'enumerazione degli indirizzi, `signUp` su una
+    // email gia' registrata e confermata risponde esattamente come su una
+    // nuova. Affermare "ti abbiamo mandato un codice" farebbe aspettare un
+    // codice che non arrivera' mai: si usa la stessa cautela di `sendCode`.
     Alert.alert(
       "Controlla la posta",
-      `Ti abbiamo mandato un codice a sei cifre a ${email}. Serve a confermare che l'indirizzo è tuo: senza, un domani non potresti recuperare la password.`
+      `Se ${email} non è già registrata, riceverai un codice a sei cifre. Serve a confermare che l'indirizzo è tuo: senza, un domani non potresti recuperare la password.`
     );
   }
 
