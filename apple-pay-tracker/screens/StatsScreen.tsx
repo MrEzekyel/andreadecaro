@@ -266,8 +266,12 @@ export default function StatsScreen() {
     const points: TrendPoint[] = [];
     let running = 0;
 
-    for (let i = 0; i < elapsed; i++) {
-      running += slots[i];
+    // Come in Home: si emette tutto il periodo, con `null` da qui in avanti.
+    // Sono i punti futuri a dare al grafico la larghezza vera del mese (o
+    // dell'anno), cosi' la linea si interrompe dove siamo invece di arrivare
+    // sempre al bordo destro.
+    for (let i = 0; i < slots.length; i++) {
+      if (i < elapsed) running += slots[i];
       const label =
         period.kind === "year"
           ? MONTHS_SHORT[i]
@@ -280,7 +284,7 @@ export default function StatsScreen() {
                 ).getDate()
               )
             : String(i + 1);
-      points.push({ label, value: running });
+      points.push({ label, value: i < elapsed ? running : null });
     }
     return points;
   }, [payments, period]);

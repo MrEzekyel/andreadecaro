@@ -42,6 +42,18 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   Impostazioni.
 - I grafici mostrano sempre valori di riferimento sugli assi, non solo le
   barre/linee nude.
+- I **grafici su un periodo in corso** (andamento mensile in Home e in
+  Statistiche) disegnano l'asse su **tutto** il periodo — 28/30/31 giorni
+  secondo il mese — e la linea si interrompe dov'è oggi. `TrendPoint.value`
+  vale `null` per i periodi non ancora arrivati, e vanno passati lo stesso:
+  sono loro a dare al grafico la larghezza vera. Senza, i giorni trascorsi si
+  stiracchiano su tutta la larghezza e il 7 del mese sembra già la fine.
+- Quando più numeri sono legati fra loro, mostrare la **relazione** invece
+  dell'elenco: `ValueSplit` disegna valore = capitale + guadagno come una
+  barra composta, perché tre righe di testo lasciano al lettore il lavoro di
+  capire che il primo è la somma degli altri due. `StatTiles` affianca i
+  numeri secondari in riquadri: un elenco verticale di coppie
+  etichetta-valore si legge tutto o niente e nessun numero emerge.
 
 ## Concetti chiave del dominio
 

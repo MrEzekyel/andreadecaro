@@ -25,8 +25,15 @@ const HEIGHT = BASE + AXIS_H;
 export type TrendPoint = {
   /** Etichetta sull'asse x: giorno del mese, mese, quello che serve. */
   label: string;
-  /** Valore cumulato a quel punto. */
-  value: number;
+  /**
+   * Valore cumulato a quel punto, `null` per i periodi non ancora arrivati.
+   *
+   * I punti futuri vanno passati lo stesso: sono loro a dare al grafico la
+   * larghezza del mese intero. Senza, i giorni trascorsi si stiracchiano su
+   * tutta la larghezza e il 7 del mese sembra gia' la fine — la linea deve
+   * fermarsi dov'e' oggi e toccare il bordo destro solo all'ultimo giorno.
+   */
+  value: number | null;
 };
 
 type Props = {
@@ -82,11 +89,17 @@ export function TrendChart({
 }: Props) {
   const { palette } = useTheme();
 
-  if (points.length < 2) {
+  // Indice originale conservato: e' quello che posiziona il punto sull'asse
+  // del mese intero, non la sua posizione fra i soli giorni gia' trascorsi.
+  const noti = points
+    .map((point, index) => ({ index, value: point.value }))
+    .filter((p): p is { index: number; value: number } => p.value !== null);
+
+  if (noti.length < 2) {
     return <Text style={[styles.empty, { color: palette.ink3 }]}>{empty}</Text>;
   }
 
-  const peak = Math.max(...points.map((p) => p.value), limit ?? 0);
+  const peak = Math.max(...noti.map((p) => p.value), limit ?? 0);
   const step = niceStep(Math.max(peak, 1) / 3);
   const chartMax = peak > 0 ? Math.ceil(peak / step) * step : step;
 
@@ -100,10 +113,7 @@ export function TrendChart({
     GUTTER + (index / Math.max(points.length - 1, 1)) * plotWidth;
   const yOf = (value: number) => BASE - (value / chartMax) * PLOT_H;
 
-  const coords = points.map((point, index) => ({
-    x: xOf(index),
-    y: yOf(point.value),
-  }));
+  const coords = noti.map((p) => ({ x: xOf(p.index), y: yOf(p.value) }));
 
   const line = smoothPath(coords);
   const area = `${line} L ${coords[coords.length - 1].x},${BASE} L ${GUTTER},${BASE} Z`;

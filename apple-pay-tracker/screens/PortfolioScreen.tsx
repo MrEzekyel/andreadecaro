@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Icon } from "../components/Icon";
 import { ScrubChart } from "../components/ScrubChart";
+import { StatTiles } from "../components/StatTiles";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, formatDate, splitAmount } from "../lib/format";
 import {
@@ -256,22 +257,36 @@ export default function PortfolioScreen() {
         />
       </View>
 
-      {xirr !== null && (
-        <View>
-          <Text style={[styles.label, { color: palette.ink3 }]}>Rendimento</Text>
-          <View style={styles.metricRow}>
-            <Text style={[styles.metricValue, { color: palette.ink }]}>
-              {(xirr * 100).toFixed(2)}%
-            </Text>
-            <Text style={[styles.metricUnit, { color: palette.ink3 }]}>annuo</Text>
-          </View>
-          <Text style={[styles.note, { color: palette.ink3 }]}>
-            Tiene conto di quando sono entrati i soldi: le rate vecchie hanno
-            lavorato piu' a lungo delle ultime, e un rendimento semplice le
-            tratterebbe uguali.
-          </Text>
-        </View>
-      )}
+      <StatTiles
+        tiles={[
+          ...(xirr !== null
+            ? [{
+                label: "Rendimento annuo",
+                value: `${(xirr * 100).toFixed(2)}%`,
+                hint: "tiene conto di quando sono entrati i soldi",
+                tone: (xirr >= 0 ? "good" : "bad") as "good" | "bad",
+              }]
+            : []),
+          {
+            label: "Capitale versato",
+            value: formatAmount(totals.investedBasis),
+            hint: monthlyPac > 0 ? `${formatAmount(monthlyPac)} al mese` : undefined,
+          },
+          ...(totals.dividends > 0
+            ? [{
+                label: "Dividendi incassati",
+                value: formatAmount(totals.dividends),
+                hint: "fuori dal prezzo, gia' sul conto",
+                tone: "good" as const,
+              }]
+            : []),
+          {
+            label: "Titoli",
+            value: String(open.length),
+            hint: `in ${groups.length} sezion${groups.length === 1 ? "e" : "i"}`,
+          },
+        ]}
+      />
 
       {totals.pending > 0 && (
         <View style={styles.pendingRow}>
@@ -520,9 +535,6 @@ const styles = StyleSheet.create({
   },
   rangeLabel: { ...type.small, fontWeight: "500" },
   label: { ...type.label, marginBottom: space.sm },
-  metricRow: { flexDirection: "row", alignItems: "baseline", gap: 6 },
-  metricValue: { fontSize: 27, fontWeight: "400", letterSpacing: -0.3 },
-  metricUnit: { ...type.caption },
   note: { ...type.caption, lineHeight: 18, marginTop: space.xs },
   pendingRow: { flexDirection: "row", gap: space.sm, alignItems: "flex-start" },
   pendingText: { ...type.caption, lineHeight: 18, flex: 1 },

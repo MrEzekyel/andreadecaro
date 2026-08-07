@@ -5,7 +5,9 @@ import { DistributionBar } from "../components/DistributionBar";
 import { Icon } from "../components/Icon";
 import { LetterToggle, LetterOption } from "../components/LetterToggle";
 import { ScrubChart } from "../components/ScrubChart";
+import { StatTiles } from "../components/StatTiles";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { ValueSplit } from "../components/ValueSplit";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, formatDate, splitAmount } from "../lib/format";
 import {
@@ -258,34 +260,52 @@ export default function GroupDetailScreen({
         )}
 
         <View>
-          <Text style={[styles.label, { color: palette.ink3 }]}>Numeri</Text>
-          <Fact label="Valore" value={formatAmount(group.value)} />
-          <Fact label="Capitale versato" value={formatAmount(group.investedBasis)} />
-          <Fact
-            label="Guadagno"
-            value={`${group.priceGain >= 0 ? "+" : "−"}${formatAmount(Math.abs(group.priceGain))}`}
+          <Text style={[styles.label, { color: palette.ink3 }]}>
+            Capitale e guadagno
+          </Text>
+          <ValueSplit
+            invested={group.investedBasis}
+            gain={group.priceGain}
+            gainPct={group.priceGainPct}
+            color={palette.accent}
           />
-          {group.gain !== group.priceGain && (
-            <Fact
-              label="Guadagno con dividendi"
-              value={`${group.gain >= 0 ? "+" : "−"}${formatAmount(Math.abs(group.gain))}`}
-            />
-          )}
-          {rendimento !== null && (
-            <Fact label="Rendimento annuo" value={`${(rendimento * 100).toFixed(2)}%`} />
-          )}
-          {group.pending > 0 && (
-            <Fact label="In esecuzione" value={formatAmount(group.pending)} />
-          )}
         </View>
 
-        {rendimento !== null && (
-          <Text style={[styles.note, { color: palette.ink3 }]}>
-            Il rendimento annuo tiene conto di quando sono entrati i soldi in
-            questa sezione: senza, una fetta entrata sei mesi fa e una entrata
-            due anni fa sembrerebbero andare uguale.
-          </Text>
-        )}
+        <StatTiles
+          tiles={[
+            ...(rendimento !== null
+              ? [{
+                  label: "Rendimento annuo",
+                  value: `${(rendimento * 100).toFixed(2)}%`,
+                  hint: "tiene conto di quando sono entrati i soldi",
+                  tone: (rendimento >= 0 ? "good" : "bad") as "good" | "bad",
+                }]
+              : []),
+            {
+              label: "Titoli",
+              value: String(group.positions.length),
+              hint: versamentoTipico
+                ? `${formatAmount(versamentoTipico)} al mese`
+                : undefined,
+            },
+            ...(group.gain !== group.priceGain
+              ? [{
+                  label: "Dividendi incassati",
+                  value: formatAmount(group.gain - group.priceGain),
+                  hint: "fuori dal prezzo, gia' sul conto",
+                  tone: "good" as const,
+                }]
+              : []),
+            ...(group.pending > 0
+              ? [{
+                  label: "In esecuzione",
+                  value: formatAmount(group.pending),
+                  hint: "non ancora convertiti in quote",
+                }]
+              : []),
+          ]}
+        />
+
 
         {manuali.length > 0 && (
           <View>
@@ -388,16 +408,6 @@ export default function GroupDetailScreen({
   );
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
-  const { palette } = useTheme();
-  return (
-    <View style={styles.fact}>
-      <Text style={[styles.factLabel, { color: palette.ink3 }]}>{label}</Text>
-      <Text style={[styles.factValue, { color: palette.ink }]}>{value}</Text>
-    </View>
-  );
-}
-
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.xl },
   back: { flexDirection: "row", alignItems: "center", gap: 3 },
@@ -429,15 +439,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     marginBottom: space.sm,
   },
-  fact: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingVertical: 7,
-    gap: space.md,
-  },
-  factLabel: { ...type.caption, flex: 1 },
-  factValue: { ...type.amount },
   note: { ...type.caption, lineHeight: 18 },
   navRow: {
     flexDirection: "row",

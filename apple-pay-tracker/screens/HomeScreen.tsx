@@ -155,11 +155,15 @@ export default function HomeScreen() {
       perDay[day - 1] += Number(payment.effective_amount);
     }
 
+    // Si emettono tutti i giorni del mese, non solo quelli passati: i giorni
+    // futuri valgono `null` e danno al grafico la larghezza del mese intero,
+    // cosi' la linea si ferma dov'e' oggi invece di stiracchiarsi fino al
+    // bordo destro facendo sembrare finito un mese appena cominciato.
     const points: TrendPoint[] = [];
     let running = 0;
-    for (let i = 0; i < elapsed; i++) {
-      running += perDay[i];
-      points.push({ label: String(i + 1), value: running });
+    for (let i = 0; i < days; i++) {
+      if (i < elapsed) running += perDay[i];
+      points.push({ label: String(i + 1), value: i < elapsed ? running : null });
     }
     return points;
   }, [payments, month, viewingCurrentMonth]);
