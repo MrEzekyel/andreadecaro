@@ -13,8 +13,8 @@ si riporta nella tabella di stato.
 
 | Sprint | Punti | Stato | Verifica |
 | --- | --- | --- | --- |
-| 1 · Fiducia | P1, P2, P3 | **in corso** | — |
-| 2 · Attrito zero | P5, P6, P12 | da fare | — |
+| 1 · Fiducia | P1, P2, P3 | P2 e P3 chiusi · P1 in attesa di Andrea | 10 rilievi, tutti corretti (`bb2e466`) |
+| 2 · Attrito zero | P5, P6, P12 | **prossimo** | — |
 | 3 · Integrità del dato | P11, P13 | da fare | — |
 | 4 · Sicurezza e trasparenza | P14, P4, P18 | da fare | — |
 | 5 · Pricing | P9, P10, P7, P8 | bloccato — decisione di Andrea | — |
@@ -44,6 +44,15 @@ Tre regole hanno deciso l'ordine, in questa priorità:
 **Perché per primo**: sono le tre cose che oggi impediscono a uno sconosciuto
 di affidare due anni di storico finanziario. Nessuna delle tre dipende da terzi,
 tutte e tre stanno dentro Expo Go.
+
+> **Esito.** La revisione ha prodotto dieci rilievi, tutti corretti in
+> `bb2e466`. Il più grave non era in lettura ma in **scrittura**: una lettura
+> fallita delle quote diventava una cancellazione, e il difetto *aumentava* le
+> spese del mese in silenzio. Da lì la regola aggiunta a `CLAUDE.md`: una
+> lettura fallita non deve mai poter diventare la base di un `update`/`delete`.
+>
+> `P1` resta aperto per una configurazione, non per il codice: finché il
+> template Supabase non contiene `{{ .Token }}` l'email arriva senza codice.
 
 ### P1 · Recupero password
 
