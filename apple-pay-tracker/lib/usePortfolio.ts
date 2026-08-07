@@ -100,10 +100,53 @@ export function usePortfolio() {
   }, []);
 
   useEffect(() => {
-    load();
+    let vivo = true;
+
+    // Prima si mostra quello che c'e' gia' — la schermata deve aprirsi subito —
+    // poi si chiede la quotazione del momento e si ridisegna se e' cambiata.
+    // Il contrario (aspettare i prezzi per poi disegnare) farebbe pagare a ogni
+    // apertura il tempo di una chiamata di rete per uno scarto di frazioni di
+    // punto percentuale.
+    load().then(() => {
+      if (!vivo) return;
+      refreshQuotes().then((cambiati) => {
+        if (vivo && cambiati) load();
+      });
+    });
+
+    return () => {
+      vivo = false;
+    };
   }, [load]);
 
-  return { ...state, reload: load };
+  /** Ricarica chiedendo prima le quotazioni aggiornate (tira-per-aggiornare). */
+  const reload = useCallback(async () => {
+    await refreshQuotes();
+    return load();
+  }, [load]);
+
+  return { ...state, reload };
+}
+
+/**
+ * Chiede i prezzi del momento e dice se ne ha scritto qualcuno.
+ *
+ * Il broker mostra la quotazione di adesso: leggere un valore fermo alla
+ * chiusura precedente fa apparire scarti che sembrano errori di calcolo
+ * mentre sono solo due istantanee prese in momenti diversi.
+ *
+ * Un errore qui non deve impedire di vedere il portafoglio: senza rete si
+ * continua a leggere l'ultimo prezzo salvato, che e' esattamente cio' che
+ * serve in quel momento.
+ */
+async function refreshQuotes(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke("refresh-quotes");
+    if (error) return false;
+    return Number((data as { aggiornati?: number })?.aggiornati ?? 0) > 0;
+  } catch {
+    return false;
+  }
 }
 
 /**

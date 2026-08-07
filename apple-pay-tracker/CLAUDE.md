@@ -146,6 +146,17 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   prezzo a cui il fondo esegue l'ordine mensile è il suo valore di quel giorno
   (`asset_prices.source='fill'`). Fra un'esecuzione e l'altra il grafico resta
   fermo invece di interpolare.
+- **I prezzi si aggiornano a ogni apertura**, non solo col cron serale: la
+  Edge Function `refresh-quotes` chiede la quotazione del momento e riscrive
+  la riga di oggi in `asset_prices`. Serve perché il broker mostra il prezzo
+  live e un valore fermo alla chiusura precedente produce scarti che sembrano
+  errori di calcolo — verificato: su AI Semiconductor l'app diceva +7,99% e TR
+  +7,16%, stessa formula (`53,99/50 − 1` contro `53,58/50 − 1`), prezzi presi
+  in momenti diversi. `usePortfolio` disegna prima con i prezzi in cache e
+  ridisegna dopo il refresh: aspettare la rete per aprire la schermata
+  costerebbe un secondo a ogni apertura per frazioni di punto percentuale.
+  `refresh-quotes` non tocca mai una riga di oggi che venga da `fill` o
+  `manual` — un'esecuzione reale vale più di una quotazione di mercato.
 - `portfolio_daily(p_asset, p_group)` e `latest_asset_prices()` sono RPC: la
   serie giornaliera si calcola nel database perché ricostruirla sul telefono
   vorrebbe dire scaricare ~1700 righe di prezzi a ogni apertura. Il filtro per
