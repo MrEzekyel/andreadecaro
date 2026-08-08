@@ -200,6 +200,30 @@ condivisibile**, e l'automazione lo chiama in due azioni. Così il pezzo
 complicato si distribuisce con un link iCloud e a chi lo installa restano due
 tocchi invece di dieci.
 
+#### Un dettaglio scoperto costruendola: la Transazione non attraversa il confine
+
+**Esegui comando rapido** non porta con sé il tipo ricco "Transazione":
+dall'altra parte arriva appiattito a un Dizionario generico, e le chiavi che
+usa non sono documentate né affidabili. Non ci si può costruire sopra un JSON.
+
+La soluzione è non fidarsi di quella conversione automatica: si costruisce un
+dizionario **con chiavi scelte da noi**, dentro l'automazione dove il tipo
+Transazione è ancora disponibile per intero, e si passa quello.
+
+#### L'automazione, tre azioni invece di due
+
+Comandi Rapidi → Automazione → **Transazione** (o Wallet):
+
+1. **Ricevi transazione come input** (c'è già)
+2. **Dizionario**, due voci:
+   - chiave `merchant` → valore: variabile **Transazione** → **Esercente**
+   - chiave `amount` → valore: variabile **Transazione** → **Importo**
+3. **Esegui comando rapido** → «Registra spesa», Input = il **Dizionario** del passo 2
+
+Attiva **Esegui immediatamente**. Lascia *Notifica in caso di esecuzione*
+disattivata: le notifiche che servono le manda già il comando rapido, e solo
+quando c'è qualcosa da dire.
+
 #### Il comando rapido «Registra spesa»
 
 Comandi Rapidi → **+** → nelle impostazioni del comando attiva
@@ -207,36 +231,27 @@ Comandi Rapidi → **+** → nelle impostazioni del comando attiva
 
 | # | Azione | Configurazione |
 | --- | --- | --- |
-| 1 | **Ottieni contenuti di URL** | URL: quello in Impostazioni → Automazioni · Metodo `POST` · Intestazione `x-ingest-token` = il token · Corpo **JSON** con `merchant` = *Esercente*, `amount` = *Importo*, `source` = `shortcut` |
-| 2 | **Se** | `Contenuti URL` **contiene** `"ok":true` |
-| 3 | *(dentro Se)* **Mostra notifica** | opzionale — se la tieni, ogni pagamento ti notifica |
-| 4 | **Altrimenti** | |
-| 5 | *(dentro Altrimenti)* **Testo** | `{"merchant":"«Esercente»","amount":"«Importo»","occurred_at":"«Data corrente formattata ISO 8601»"}` |
-| 6 | *(dentro Altrimenti)* **Aggiungi a file** | File: `spese-non-inviate.txt` in iCloud Drive → Comandi Rapidi · **Attiva "Aggiungi nuova riga"** |
-| 7 | *(dentro Altrimenti)* **Mostra notifica** | `Spesa non registrata: «Esercente» «Importo» — recuperala dall'app` |
-| 8 | **Fine del blocco Se** | |
+| 1 | **Ottieni valore dizionario** | Dizionario: *Input Comando rapido* · chiave: `merchant` |
+| 2 | **Ottieni valore dizionario** | Dizionario: *Input Comando rapido* · chiave: `amount` |
+| 3 | **Ottieni contenuti di URL** | URL: quello in Impostazioni → Automazioni · Metodo `POST` · Intestazione `x-ingest-token` = il token · Corpo **JSON** con `merchant` = risultato passo 1, `amount` = risultato passo 2, `source` = `shortcut` |
+| 4 | **Se** | `Contenuti URL` **contiene** `"ok":true` |
+| 5 | *(dentro Se)* **Mostra notifica** | opzionale — se la tieni, ogni pagamento ti notifica |
+| 6 | **Altrimenti** | |
+| 7 | *(dentro Altrimenti)* **Testo** | `{"merchant":"«risultato passo 1»","amount":"«risultato passo 2»","occurred_at":"«Data corrente formattata ISO 8601»"}` |
+| 8 | *(dentro Altrimenti)* **Aggiungi a file** | File: `spese-non-inviate.txt` in iCloud Drive → Comandi Rapidi · **Attiva "Aggiungi nuova riga"** |
+| 9 | *(dentro Altrimenti)* **Mostra notifica** | `Spesa non registrata: «risultato passo 1» «risultato passo 2» — recuperala dall'app` |
+| 10 | **Fine del blocco Se** | |
 
-I passi **5–6 sono quelli che oggi mancano** e sono il motivo per cui una
+I passi **7–8 sono quelli che oggi mancano** e sono il motivo per cui una
 spesa fatta offline si perde per sempre. Con loro finisce in un file, e
 dall'app la reimporti da **Impostazioni → Automazioni → Recupera spese non
 inviate**. I doppioni vengono riconosciuti, quindi puoi reimportare lo stesso
 file quante volte vuoi senza fare danni.
 
-> ⚠️ Nel passo 5 l'importo va inserito come **variabile**, non riscritto a
+> ⚠️ Nel passo 7 l'importo va inserito come **variabile**, non riscritto a
 > mano: dentro quella stringa c'è anche la valuta ("12,99 €", "£12.99"), ed è
 > da lì che l'app capisce che una spesa era in sterline. Perderla riporterebbe
 > il difetto che la multi-valuta ha appena chiuso.
-
-#### L'automazione, ridotta a due azioni
-
-Comandi Rapidi → Automazione → **Transazione** (o Wallet):
-
-1. **Ricevi transazione come input** (c'è già)
-2. **Esegui comando rapido** → «Registra spesa», con input la transazione
-
-Attiva **Esegui immediatamente**. Lascia *Notifica in caso di esecuzione*
-disattivata: le notifiche che servono le manda già il comando rapido, e solo
-quando c'è qualcosa da dire.
 
 #### Da mandarmi
 
