@@ -26,7 +26,7 @@ export default function PaymentsScreen() {
   const { categories, categoryById } = useData();
 
   const [month, setMonth] = useState(() => new Date());
-  const { payments, error, staleLabel, reload } = usePayments(month);
+  const { payments, error, staleLabel, staleReason, reload } = usePayments(month);
   const [refreshing, setRefreshing] = useState(false);
   const explorer = useExplorer(reload);
 
@@ -116,7 +116,7 @@ export default function PaymentsScreen() {
 
         {staleLabel && (
           <View style={styles.stale}>
-            <StaleNote label={staleLabel} onRetry={reload} />
+            <StaleNote label={staleLabel} reason={staleReason} onRetry={reload} />
           </View>
         )}
 

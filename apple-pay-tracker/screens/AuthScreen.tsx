@@ -96,10 +96,20 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
       // che non ha ancora niente dentro. Lo si riporta dov'era.
       if (/not confirmed|email_not_confirmed/i.test(error.message)) {
         setPendingCode("signup");
-        await supabase.auth.resend({ type: "signup", email });
+        // L'esito del reinvio va guardato: GoTrue limita la frequenza, e dopo
+        // due tentativi di accesso ravvicinati risponde "you can only request
+        // this after N seconds". Affermare di aver mandato un codice che non
+        // partira' lascerebbe ad aspettare una mail che non arriva, proprio
+        // nel momento di massimo abbandono.
+        const { error: resendError } = await supabase.auth.resend({
+          type: "signup",
+          email,
+        });
         Alert.alert(
           "Manca la conferma dell'indirizzo",
-          `Ti abbiamo rimandato un codice a ${email}. Inseriscilo per completare la registrazione.`
+          resendError
+            ? `Il tuo indirizzo non è ancora confermato. Non è stato possibile rimandarti il codice adesso (${resendError.message}): usa "Invia un altro codice" fra qualche istante.`
+            : `Ti abbiamo rimandato un codice a ${email}. Inseriscilo per completare la registrazione.`
         );
         return;
       }

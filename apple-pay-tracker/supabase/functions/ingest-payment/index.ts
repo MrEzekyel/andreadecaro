@@ -223,7 +223,9 @@ export function parseAmount(input: number | string): number | null {
 export function detectCurrency(input: number | string): string | null {
   if (typeof input !== "string") return null;
 
-  const iso = input.toUpperCase().match(/\b(?!EUR\b)([A-Z]{3})\b/);
+  // Niente `\b`: fra "CHF" e "12" non c'e' confine di parola, e "CHF12.99"
+  // — formato che Wallet usa senza spazio — sarebbe passato per euro.
+  const iso = input.toUpperCase().match(/(?<![A-Z])(?!EUR)([A-Z]{3})(?![A-Z])/);
   if (iso && CURRENCIES.has(iso[1])) return iso[1];
   if (/\bEUR\b/i.test(input)) return null;
 
@@ -372,12 +374,22 @@ Deno.serve(async (req) => {
       occurredAt.getTime() - DEDUP_WINDOW_MINUTES * 60_000
     ).toISOString();
 
+    // Si cercano **entrambi** gli importi. `amountEur` vale il convertito
+    // oppure il numero grezzo quando frankfurter non ha risposto: se il primo
+    // scatto ha convertito (15,02 in tabella) e il secondo no (12,99), un
+    // confronto su un valore solo non riconoscerebbe il doppione, e una spesa
+    // all'estero verrebbe registrata due volte — proprio dove l'utente e' meno
+    // in grado di accorgersene a mente.
+    const importi = amountEur === amount ? [amount] : [amountEur, amount];
+
     const { data: recent } = await supabase
       .from("payments")
       .select("id")
       .eq("user_id", userId)
-      .eq("amount", amountEur)
-      .ilike("merchant_raw", merchantRaw)
+      .in("amount", importi)
+      // `%` e `_` sono i jolly di LIKE: un esercente "Sconto 100% Store"
+      // passato grezzo diventa un pattern e scarterebbe spese vere.
+      .ilike("merchant_raw", merchantRaw.replace(/[\\%_]/g, (c) => `\\${c}`))
       .gte("occurred_at", since)
       .limit(1);
 

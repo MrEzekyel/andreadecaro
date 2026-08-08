@@ -41,13 +41,27 @@ export function usePayments(month: Date) {
    * per nuovi no.
    */
   const [staleAt, setStaleAt] = useState<string | null>(null);
+  /**
+   * Perche' stiamo mostrando dati vecchi.
+   *
+   * Non e' sempre "manca la rete": il progetto in pausa, un errore RLS o la
+   * cache dello schema di PostgREST falliscono a rete perfettamente
+   * funzionante. Dirlo come "senza connessione" manderebbe l'utente a
+   * controllare il proprio telefono per un problema che non e' suo.
+   */
+  const [staleReason, setStaleReason] = useState<string | null>(null);
 
   const cacheKey = `payments:${month.getFullYear()}-${month.getMonth()}`;
 
   const load = useCallback(async () => {
     const { start, end } = monthRange(month);
-    const { data: auth } = await supabase.auth.getUser();
-    const userId = auth.user?.id ?? null;
+    // `getSession` legge da AsyncStorage; `getUser` interroga il server per
+    // validare il JWT. Con `getUser` la cache non veniva mai consultata proprio
+    // quando serve — offline quella chiamata fallisce, `userId` restava nullo,
+    // e si finiva sull'errore a tutta schermata con la copia locale intatta a
+    // due centimetri. La lettura offline non funzionava offline.
+    const { data: auth } = await supabase.auth.getSession();
+    const userId = auth.session?.user.id ?? null;
     const previousStart = new Date(
       start.getFullYear(),
       start.getMonth() - 1,
@@ -80,6 +94,7 @@ export function usePayments(month: Date) {
       setPrevious((earlier.data ?? []) as Payment[]);
       setError(null);
       setStaleAt(null);
+      setStaleReason(null);
       if (userId) writeCache(userId, cacheKey, righe);
       setLoading(false);
       return;
@@ -95,9 +110,22 @@ export function usePayments(month: Date) {
 
     if (cached && cached.value.length > 0) {
       setPayments(cached.value);
+      // Il confronto col mese precedente **non** e' in cache: tenere le righe
+      // caricate per il mese visitato prima farebbe calcolare il delta di
+      // settembre sui dati di luglio, sotto l'etichetta "su agosto". Un numero
+      // vero riferito a un altro periodo, che e' cio' che si e' gia' deciso di
+      // non fare mai.
+      setPrevious([]);
       setError(null);
       setStaleAt(cached.at);
+      setStaleReason(failure);
     } else {
+      // Senza copia locale per QUESTO mese non si tiene niente di quello prima:
+      // la Home stamperebbe "Settembre" sopra il totale di agosto. La regola
+      // "sono vecchi, non falsi" regge finche' l'etichetta del periodo non
+      // cambia; appena cambia, quei numeri diventano falsi.
+      setPayments([]);
+      setPrevious([]);
       // Le righe vecchie restano finche' non arriva una lettura riuscita: chi
       // guarda vede l'errore al loro posto, e al "Riprova" ritrova i suoi dati
       // invece di una schermata che nel frattempo si e' svuotata.
@@ -154,6 +182,7 @@ export function usePayments(month: Date) {
     error,
     staleAt,
     staleLabel: staleAt ? describeAge(staleAt) : null,
+    staleReason,
     reload: load,
   };
 }

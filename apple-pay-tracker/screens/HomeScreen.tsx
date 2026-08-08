@@ -47,7 +47,7 @@ export default function HomeScreen() {
 
   const [month, setMonth] = useState(() => new Date());
   const [pickerOpen, setPickerOpen] = useState(false);
-  const { payments, total, previousTotal, error, staleLabel, reload } =
+  const { payments, total, previousTotal, error, staleLabel, staleReason, reload } =
     usePayments(month);
   const { monthlyOverall, alerts, reload: reloadLimits } = useLimits();
   const [refreshing, setRefreshing] = useState(false);
@@ -300,7 +300,7 @@ export default function HomeScreen() {
 
             {/* Terzo stato, fra il dato fresco e l'errore: i numeri sotto sono
                 veri, solo non di adesso. */}
-            {staleLabel && <StaleNote label={staleLabel} onRetry={onRefresh} />}
+            {staleLabel && <StaleNote label={staleLabel} reason={staleReason} onRetry={onRefresh} />}
 
         <View>
           <Text style={[styles.label, { color: palette.ink3 }]}>

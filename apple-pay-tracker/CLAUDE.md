@@ -333,6 +333,19 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 
 ### Lettura offline
 
+- **Per l'identità dell'utente si usa `getSession()`, mai `getUser()`**:
+  il secondo interroga il server per validare il JWT, quindi offline fallisce.
+  Con `getUser` la cache non veniva consultata proprio quando serve — la
+  lettura offline non funzionava offline.
+- Al cambio mese `payments` e `previous` si azzerano se non c'è una copia
+  locale di *quel* mese, e `previous` si azzera comunque quando si serve dalla
+  cache: non è cachato, e tenerlo farebbe calcolare il delta di settembre sui
+  dati di luglio sotto l'etichetta "su agosto". La regola "sono vecchi, non
+  falsi" regge finché l'etichetta del periodo non cambia.
+- `StaleNote` riceve anche il motivo tecnico: progetto in pausa o errore RLS
+  falliscono a rete perfettamente funzionante, e dire "senza connessione"
+  manderebbe l'utente a controllare il proprio telefono per un problema che
+  non è suo.
 - `lib/cache.ts` tiene una copia locale dell'ultima lettura riuscita, per
   utente. Non è una cache di correttezza — i numeri veri restano quelli del
   database — ma serve al **terzo stato** fra dato fresco ed errore: "questi
@@ -380,9 +393,24 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   Wallet e non un numero: è lì dentro che c'è la valuta, e normalizzarla
   troppo presto riaprirebbe il difetto che la multi-valuta ha chiuso.
 - Il recupero riapplica la stessa finestra anti-doppione di cinque minuti
-  della Edge Function, perché la Shortcut non sa se il timeout sia scattato
-  prima o dopo che la spesa fosse registrata: lo stesso file si può reimportare
-  quante volte si vuole.
+  della Edge Function — **solo all'indietro**, come lì: lo stesso file si può
+  reimportare quante volte si vuole. Le righe inserite nel giro corrente sono
+  escluse dal confronto (`inseriteOra`), altrimenti due caffè uguali nello
+  stesso bar a due minuti di distanza diventerebbero uno solo: un doppione
+  *dentro* al file richiede che l'automazione sia scattata due volte e fallita
+  due volte, mentre due acquisti identici ravvicinati sono normali.
+- Il recupero conserva `original_currency`/`original_amount` e lascia `fx_rate`
+  nullo, così il recupero cambi notturno la ripesca. Normalizzare l'importo a
+  numero e basta scriverebbe 12,99 sterline come 12,99 € — e senza
+  `original_currency` quella riga non verrebbe **mai** ripescata: l'errore
+  diventerebbe permanente invece che transitorio.
+- Ogni riga del file deve finire in **uno** dei contatori (`importate`,
+  `duplicate`, `illeggibili`, `fallite`) e il foglio mostra anche `lette`: il
+  conto che torna è l'unico modo perché l'utente veda cosa si è perso. Senza
+  denominatore, "7 importate" su un file di 9 righe sembra un successo.
+- **`%` e `_` vanno sempre sottratti a `ilike`**: un esercente "Sconto 100%
+  Store" passato grezzo diventa un pattern che combacia con qualunque nome
+  inizi per "Sconto 100", e scarta spese vere come doppioni.
 - **`Se Contenuti URL presenta qualsiasi valore` non è un test di successo**:
   `ingest-payment` risponde con un JSON anche sugli errori, quindi quella
   condizione è sempre vera e il ramo di fallimento non scatta mai. Va usato

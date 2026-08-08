@@ -38,27 +38,33 @@ export function RecoverSheet({ onDone }: { onDone: () => void }) {
 
     setRunning(true);
     try {
-      const { importate, duplicate, illeggibili } = await recoverFromFile(
-        file.uri
-      );
+      const esito = await recoverFromFile(file.uri);
+      const { lette, importate, duplicate, illeggibili, fallite } = esito;
 
+      // Si parte dal totale letto e si rende conto di ogni riga. Senza il
+      // denominatore, "7 importate" su un file di 9 righe sembra un successo:
+      // e' il conto che deve tornare a rendere visibile cio' che si e' perso.
       const righe = [
-        `${importate} ${importate === 1 ? "spesa importata" : "spese importate"}.`,
+        `${lette} ${lette === 1 ? "riga letta" : "righe lette"} dal file.`,
+        `${importate} ${importate === 1 ? "importata" : "importate"}.`,
       ];
       // I doppioni si dicono perche' altrimenti "0 importate" sembrerebbe un
       // guasto quando invece vuol dire che erano gia' tutte arrivate.
       if (duplicate > 0) {
-        righe.push(
-          `${duplicate} erano già registrate e sono state saltate.`
-        );
+        righe.push(`${duplicate} erano già registrate e sono state saltate.`);
       }
       if (illeggibili > 0) {
         righe.push(
-          `${illeggibili} ${illeggibili === 1 ? "riga non era leggibile" : "righe non erano leggibili"} e ${illeggibili === 1 ? "è stata saltata" : "sono state saltate"}: controllale nel file.`
+          `${illeggibili} senza un importo o una data leggibile: restano nel file, controllale.`
+        );
+      }
+      if (fallite > 0) {
+        righe.push(
+          `⚠️ ${fallite} ${fallite === 1 ? "non è stata salvata" : "non sono state salvate"} dal database. Riprova l'import fra poco: i doppioni vengono riconosciuti.`
         );
       }
 
-      Alert.alert("Recupero completato", righe.join("\n\n"));
+      Alert.alert("Recupero completato", righe.join("\n"));
       onDone();
     } catch (error) {
       Alert.alert(

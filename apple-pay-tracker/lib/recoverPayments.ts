@@ -28,10 +28,53 @@ export type RecoveredRow = {
 };
 
 export type RecoverOutcome = {
+  /** Righe lette dal file, il denominatore che rende verificabili le altre. */
+  lette: number;
   importate: number;
   duplicate: number;
   illeggibili: number;
+  /** Righe valide che il database ha rifiutato. Senza, sparirebbero. */
+  fallite: number;
 };
+
+/**
+ * Valuta della stringa formattata, come in `ingest-payment`.
+ *
+ * Duplicata e non condivisa perche' la Edge Function gira su Deno e questa
+ * sull'app: le due copie devono restare allineate a mano, ed e' il motivo per
+ * cui l'elenco delle valute e' scritto qui accanto invece che altrove.
+ */
+const CURRENCIES = new Set([
+  "AUD", "BGN", "BRL", "CAD", "CHF", "CNY", "CZK", "DKK", "GBP", "HKD",
+  "HUF", "IDR", "ILS", "INR", "ISK", "JPY", "KRW", "MXN", "MYR", "NOK",
+  "NZD", "PHP", "PLN", "RON", "SEK", "SGD", "THB", "TRY", "USD", "ZAR",
+]);
+
+const SYMBOLS: [string, string][] = [
+  ["£", "GBP"], ["¥", "JPY"], ["₹", "INR"], ["₺", "TRY"],
+  ["R$", "BRL"], ["kr", "SEK"], ["$", "USD"],
+];
+
+export function detectCurrency(input: string): string | null {
+  const iso = input.toUpperCase().match(/(?<![A-Z])(?!EUR)([A-Z]{3})(?![A-Z])/);
+  if (iso && CURRENCIES.has(iso[1])) return iso[1];
+  if (/EUR/i.test(input)) return null;
+  for (const [symbol, code] of SYMBOLS) {
+    if (input.includes(symbol)) return code;
+  }
+  return null;
+}
+
+/**
+ * `%` e `_` sono i jolly di LIKE.
+ *
+ * Un esercente che si chiama "Sconto 100% Store" passato grezzo a `ilike`
+ * diventa un pattern che combacia con qualunque nome inizi per "Sconto 100":
+ * una spesa vera verrebbe scambiata per doppione e scartata in silenzio.
+ */
+function escapeLike(value: string) {
+  return value.replace(/[\\%_]/g, (c) => `\\${c}`);
+}
 
 /** Le righe leggibili del file, saltando quelle rotte invece di fermarsi. */
 export function parseRecoveryFile(text: string): {
@@ -118,31 +161,50 @@ const normalize = (value: string) =>
 export async function recoverFromFile(uri: string): Promise<RecoverOutcome> {
   const text = await new File(uri).text();
   const { rows, illeggibili } = parseRecoveryFile(text);
+  const lette = rows.length + illeggibili;
 
   if (rows.length === 0) {
-    return { importate: 0, duplicate: 0, illeggibili };
+    return { lette, importate: 0, duplicate: 0, illeggibili, fallite: 0 };
   }
 
-  const { data: auth } = await supabase.auth.getUser();
-  const userId = auth.user?.id;
+  // `getSession` e non `getUser`: il secondo interroga il server per validare
+  // il JWT, e qui la sessione locale basta — l'utente sta importando, non
+  // autenticandosi.
+  const { data: auth } = await supabase.auth.getSession();
+  const userId = auth.session?.user.id;
   if (!userId) throw new Error("Sessione scaduta: esci e rientra.");
 
-  const { data: merchantRows, error: merchantError } = await supabase
-    .from("merchants")
-    .select("*");
-  if (merchantError) throw new Error(merchantError.message);
-
+  // Paginata come l'export: PostgREST tronca a 1000 righe **senza errore**, e
+  // oltre quella soglia gli esercenti oltre il millesimo risulterebbero
+  // sconosciuti — la spesa entrerebbe senza esercente ne' categoria.
   const perNome = new Map<string, Merchant>();
-  for (const m of (merchantRows ?? []) as Merchant[]) {
-    perNome.set(m.normalized_name, m);
+  for (let from = 0; ; from += 1000) {
+    const { data, error: merchantError } = await supabase
+      .from("merchants")
+      .select("*")
+      .order("id", { ascending: true })
+      .range(from, from + 999);
+    if (merchantError) throw new Error(merchantError.message);
+
+    const pagina = (data ?? []) as Merchant[];
+    for (const m of pagina) perNome.set(m.normalized_name, m);
+    if (pagina.length < 1000) break;
   }
 
   let importate = 0;
   let duplicate = 0;
+  let fallite = 0;
   // Le righe con un importo illeggibile si sommano a quelle gia' scartate dal
-  // parser: un totale che non torna e' l'unico segnale che qualcosa e' andato
-  // perso, e nasconderlo qui vanificherebbe tutto il recupero.
+  // parser. Insieme a `lette` e a `fallite` formano un conto che deve tornare:
+  // e' l'unico modo perche' l'utente si accorga se qualcosa e' andato perso.
   let scartate = illeggibili;
+
+  // Le righe inserite in questo giro non devono valere come "gia' presenti"
+  // per le righe successive: due caffe' uguali nello stesso bar a due minuti
+  // di distanza sono ordinaria amministrazione, mentre un doppione dentro allo
+  // stesso file richiede che l'automazione sia scattata due volte *e* fallita
+  // due volte. Senza questo insieme, il secondo caffe' verrebbe scartato.
+  const inseriteOra = new Set<string>();
 
   for (const row of rows) {
     const amount = parseAmountText(row.amount);
@@ -151,26 +213,36 @@ export async function recoverFromFile(uri: string): Promise<RecoverOutcome> {
       continue;
     }
 
-    const occurredAt = row.occurred_at ? new Date(row.occurred_at) : new Date();
-    const when = Number.isNaN(occurredAt.getTime()) ? new Date() : occurredAt;
+    // Una data illeggibile non diventa "adesso": sposterebbe una spesa da un
+    // mese chiuso a uno aperto falsandone due, e in silenzio. Meglio dichiarare
+    // la riga come non importata e lasciarla nel file.
+    if (!row.occurred_at) {
+      scartate += 1;
+      continue;
+    }
+    const when = new Date(row.occurred_at);
+    if (Number.isNaN(when.getTime())) {
+      scartate += 1;
+      continue;
+    }
 
-    // Stessa finestra della Edge Function: stesso importo e stesso esercente
-    // entro cinque minuti e' un doppio invio, non due spese. Serve perche' il
-    // file puo' contenere una spesa che nel frattempo e' arrivata lo stesso —
-    // la Shortcut non sa se il timeout sia scattato prima o dopo la scrittura.
+    // Stessa finestra della Edge Function, e come li' guarda solo **indietro**:
+    // serve a riconoscere una spesa che nel frattempo era arrivata lo stesso,
+    // perche' la Shortcut non sa se il timeout sia scattato prima o dopo la
+    // registrazione. Guardare anche avanti scarterebbe il doppio.
     const since = new Date(when.getTime() - 5 * 60_000).toISOString();
-    const until = new Date(when.getTime() + 5 * 60_000).toISOString();
 
     const { data: esistenti } = await supabase
       .from("payments")
       .select("id")
       .eq("amount", amount)
-      .ilike("merchant_raw", row.merchant)
+      .ilike("merchant_raw", escapeLike(row.merchant))
       .gte("occurred_at", since)
-      .lte("occurred_at", until)
-      .limit(1);
+      .lte("occurred_at", when.toISOString())
+      .limit(5);
 
-    if (esistenti && esistenti.length > 0) {
+    const precedente = (esistenti ?? []).find((r) => !inseriteOra.has(r.id));
+    if (precedente) {
       duplicate += 1;
       continue;
     }
@@ -192,19 +264,45 @@ export async function recoverFromFile(uri: string): Promise<RecoverOutcome> {
       }
     }
 
-    const { error } = await supabase.from("payments").insert({
-      user_id: userId,
-      amount,
-      merchant_raw: row.merchant,
-      merchant_name: merchant?.display_name ?? row.merchant,
-      merchant_id: merchant?.id ?? null,
-      category_id: merchant?.category_id ?? null,
-      occurred_at: when.toISOString(),
-      source: "shortcut",
-    });
+    // La valuta si conserva. `parseAmountText` restituisce il numero grezzo,
+    // che per una spesa in sterline **non e' euro**: scriverlo in `amount` come
+    // se lo fosse riaprirebbe esattamente il difetto che la multi-valuta ha
+    // chiuso, e per giunta in modo permanente — senza `original_currency` la
+    // riga non verrebbe mai ripescata dal recupero cambi notturno.
+    //
+    // La conversione non si fa qui: `fx_rate` resta nullo e ci pensa
+    // `sync-prices`, che e' gia' il posto dove quella logica vive.
+    const currency = detectCurrency(row.amount);
 
-    if (!error) importate += 1;
+    const { data: creata, error } = await supabase
+      .from("payments")
+      .insert({
+        user_id: userId,
+        amount,
+        original_amount: currency ? amount : null,
+        original_currency: currency,
+        fx_rate: null,
+        merchant_raw: row.merchant,
+        merchant_name: merchant?.display_name ?? row.merchant,
+        merchant_id: merchant?.id ?? null,
+        category_id: merchant?.category_id ?? null,
+        occurred_at: when.toISOString(),
+        source: "shortcut",
+      })
+      .select("id")
+      .single();
+
+    if (error || !creata) {
+      // Una riga rifiutata dal database non deve evaporare fra i conteggi: la
+      // funzione che esiste per recuperare spese perse non puo' perderne a sua
+      // volta dichiarando di aver finito.
+      fallite += 1;
+      continue;
+    }
+
+    inseriteOra.add(creata.id);
+    importate += 1;
   }
 
-  return { importate, duplicate, illeggibili: scartate };
+  return { lette, importate, duplicate, illeggibili: scartate, fallite };
 }
