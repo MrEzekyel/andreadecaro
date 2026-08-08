@@ -277,6 +277,25 @@ export default function StatsScreen() {
       : null;
 
   /**
+   * Il tetto disegnato nel grafico, coerente con cosa mostra la linea.
+   *
+   * Col toggle acceso la linea non include piu' i costi fissi e parte da
+   * zero: se il tetto restasse il limite pieno (es. 1200), il grafico
+   * mostrerebbe un margine che non esiste davvero — con 400 di costi fissi
+   * gia' impegnati, per la spesa variabile restano 800, non 1200. Sottrarli
+   * tiene il significato "quanto manca al limite" vero in entrambi i casi:
+   * spento, il margine e' sull'intera spesa; acceso, sulla sola variabile.
+   * Sotto zero (costi fissi che da soli superano il limite) non c'e' un
+   * margine sensato da disegnare, e `TrendChart` gia' nasconde una riga a 0.
+   */
+  const effectiveLimit =
+    limitAmount === null
+      ? null
+      : excludeMarked
+        ? Math.max(limitAmount - fixedCostsTotal, 0)
+        : limitAmount;
+
+  /**
    * Spesa cumulata lungo il periodo, un punto per intervallo trascorso.
    *
    * Accumula solo `variablePayments`: mutuo e rate non vanno spalmati sul
@@ -899,10 +918,16 @@ export default function StatsScreen() {
         </Text>
         <TrendChart
           points={trend}
-          limit={limitAmount}
+          limit={effectiveLimit}
           color={palette.accent}
           empty="Servono almeno due giorni di spese per disegnare l'andamento."
         />
+        {excludeMarked && fixedCostsTotal > 0 && effectiveLimit !== null && (
+          <Text style={[styles.chartNote, { color: palette.ink3 }]}>
+            Il limite qui sopra è già al netto di {formatAmount(fixedCostsTotal)}{" "}
+            di costi fissi.
+          </Text>
+        )}
       </View>
 
       <View>

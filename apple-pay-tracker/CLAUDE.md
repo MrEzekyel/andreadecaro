@@ -113,7 +113,15 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   sono un impegno certo fin dall'inizio del periodo, quindi la linea parte
   già dal loro totale (`fixedCostsTotal`) e accumula solo la parte
   variabile giorno per giorno. Home non ha il toggle e li include sempre;
-  in Statistiche la baseline sparisce quando il toggle è acceso.
+  in Statistiche la baseline sparisce quando il toggle è acceso — e con lei
+  deve restringersi anche il **tetto** disegnato: `effectiveLimit` sottrae
+  `fixedCostsTotal` dal limite quando il toggle è acceso, altrimenti il
+  grafico mostrerebbe un margine per la spesa variabile che in realtà è già
+  stato impegnato dai costi fissi (1200 di limite e 400 di mutuo non lasciano
+  1200 di margine, ne lasciano 800). Vale solo per il limite mensile
+  complessivo disegnato su questo grafico, l'unico presente: se in futuro se
+  ne disegnasse più di uno sulla stessa linea, servirebbe una regola unica
+  invece di decidere caso per caso.
 - `recurring_rules` → `materialize_recurring()` genera le spese ricorrenti
   ogni notte via pg_cron (mutuo, abbonamenti).
 - `investment_rules` = i **piani di accumulo** (schermata PAC). Il ciclo è
