@@ -404,6 +404,7 @@ export default function HomeScreen() {
             <TrendChart
               points={trend}
               limit={limitAmount}
+              baseline={fixedCostsTotal}
               color={palette.accent}
             />
             {merchantsUnknown && (

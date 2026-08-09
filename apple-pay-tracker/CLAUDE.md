@@ -73,9 +73,14 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   sono loro a dare al grafico la larghezza vera. Senza, i giorni trascorsi si
   stiracchiano su tutta la larghezza e il 7 del mese sembra già la fine.
   Quando c'è un limite, `TrendChart` disegna anche una **retta di ritmo**
-  (punteggiata, dal primo giorno a valore 0 all'ultimo giorno al limite):
-  è il riferimento "spendendo lo stesso ogni giorno arriveresti qui", fisso
-  su tutto il periodo e non solo sui giorni già trascorsi.
+  (punteggiata, dal primo giorno all'ultimo al limite): è il riferimento
+  "spendendo lo stesso ogni giorno arriveresti qui", fisso su tutto il
+  periodo e non solo sui giorni già trascorsi. Parte da `baseline` e non
+  sempre da zero: quando la linea vera include i costi fissi fin dal primo
+  giorno (Home sempre, Statistiche col toggle spento), anche il ritmo deve
+  partire da lì — confrontare un ritmo che parte da zero con una linea che
+  parte già più in alto farebbe sembrare l'utente sempre indietro rispetto a
+  un riferimento che non descrive la sua situazione vera.
 - Quando più numeri sono legati fra loro, mostrare la **relazione** invece
   dell'elenco: `ValueSplit` disegna valore = capitale + guadagno come una
   barra composta, perché tre righe di testo lasciano al lettore il lavoro di

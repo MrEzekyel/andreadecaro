@@ -919,6 +919,7 @@ export default function StatsScreen() {
         <TrendChart
           points={trend}
           limit={effectiveLimit}
+          baseline={excludeMarked ? 0 : fixedCostsTotal}
           color={palette.accent}
           empty="Servono almeno due giorni di spese per disegnare l'andamento."
         />

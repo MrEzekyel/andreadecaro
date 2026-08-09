@@ -40,6 +40,17 @@ type Props = {
   points: TrendPoint[];
   /** Limite di spesa da tracciare come riferimento, se ce n'e' uno. */
   limit?: number | null;
+  /**
+   * Valore da cui parte davvero la linea il primo giorno, se non e' zero.
+   *
+   * Quando i costi fissi restano nella linea, questa non parte da zero ma
+   * gia' dal loro totale (mutuo e rate sono un impegno certo fin dall'inizio
+   * del periodo). La retta di ritmo deve saperlo: confrontare un ritmo che
+   * parte da zero con una linea che parte piu' in alto farebbe sembrare
+   * l'utente sempre indietro, quando in realta' sta solo partendo da dove
+   * i costi fissi lo hanno gia' messo.
+   */
+  baseline?: number;
   color: string;
   /** Quante etichette mostrare sull'asse x, estremi compresi. */
   xTicks?: number;
@@ -83,6 +94,7 @@ function smoothPath(points: { x: number; y: number }[]) {
 export function TrendChart({
   points,
   limit,
+  baseline = 0,
   color,
   xTicks = 5,
   empty = "Servono almeno due giorni di spese per disegnare l'andamento.",
@@ -129,14 +141,17 @@ export function TrendChart({
   const limitY =
     limit != null && limit > 0 && limit <= chartMax ? yOf(limit) : null;
 
-  // Ritmo lineare: se si spendesse lo stesso importo ogni giorno del
-  // periodo, si arriverebbe al limite esattamente l'ultimo giorno. E' una
-  // retta dal primo giorno (0) all'ultimo (il limite), sopra tutto il
-  // periodo intero e non solo i giorni gia' trascorsi — altrimenti non
-  // sarebbe un riferimento fisso ma si sposterebbe ogni giorno.
+  // Ritmo lineare: se da qui in poi si spendesse lo stesso importo ogni
+  // giorno, si arriverebbe al limite esattamente l'ultimo giorno. Parte da
+  // `baseline` e non da zero: se la linea gia' parte piu' in alto (i costi
+  // fissi contati dal primo giorno), un ritmo che partisse da zero
+  // farebbe sembrare l'utente sempre indietro rispetto a un riferimento che
+  // non descrive la sua situazione vera. E' una retta sopra tutto il periodo
+  // intero e non solo i giorni gia' trascorsi, altrimenti non sarebbe un
+  // riferimento fisso ma si sposterebbe ogni giorno.
   const paceLine =
     limitY !== null
-      ? { x1: xOf(0), y1: BASE, x2: xOf(points.length - 1), y2: limitY }
+      ? { x1: xOf(0), y1: yOf(baseline), x2: xOf(points.length - 1), y2: limitY }
       : null;
 
   return (
