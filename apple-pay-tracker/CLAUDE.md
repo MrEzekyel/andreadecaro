@@ -486,6 +486,13 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 - Protegge da chi ha in mano il telefono già sbloccato, non i dati sul
   server: quelli stanno dietro alla RLS di Postgres e non cambiano di una
   virgola con questo interruttore.
+- **L'autenticazione non va chiesta prima che l'app sia `active`.** All'avvio
+  a freddo iOS passa da `inactive`, e in quella finestra il riconoscimento
+  non si può presentare: il sistema ripiega sul codice del telefono e
+  `authenticateAsync` risponde comunque "riuscito", quindi dal codice non si
+  distingue da un Face ID andato a buon fine. `LockScreen` aspetta `active` e
+  un istante in più prima di provare — senza, il blocco all'avvio chiede
+  sempre il codice anche con Face ID perfettamente configurato.
 - **Dentro Expo Go il permesso Face ID è di Expo Go, non nostro.** Se è stato
   negato, iOS passa al codice del telefono senza restituire niente di
   distinguibile: `authenticateAsync` risponde `success: true` come se il

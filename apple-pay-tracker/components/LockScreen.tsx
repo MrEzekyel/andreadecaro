@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { AppState, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Icon } from "./Icon";
 import { useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
@@ -33,10 +33,43 @@ export function LockScreen({ onUnlock }: Props) {
 
   // Face ID parte da solo all'apertura: chiedere un tocco prima di provare
   // aggiungerebbe un gesto a ogni singolo avvio dell'app.
+  //
+  // Ma **non prima che l'app sia davvero attiva**. All'avvio a freddo iOS
+  // passa da `inactive` prima di arrivare a `active`, e in quella finestra il
+  // riconoscimento non si puo' presentare: il sistema ripiega sul codice del
+  // telefono senza dire niente — `authenticateAsync` risponde comunque
+  // "riuscito", quindi dal codice non si distingue da un Face ID andato bene.
+  // E' il motivo per cui il blocco all'avvio chiedeva sempre il codice.
   useEffect(() => {
     if (tried.current) return;
-    tried.current = true;
-    attempt();
+    let timer: ReturnType<typeof setTimeout> | null = null;
+
+    const start = () => {
+      if (tried.current) return;
+      tried.current = true;
+      // Un istante dopo `active`: la transizione di stato arriva prima che la
+      // finestra sia pronta a presentare la richiesta.
+      timer = setTimeout(attempt, 350);
+    };
+
+    if (AppState.currentState === "active") {
+      start();
+    } else {
+      const subscription = AppState.addEventListener("change", (next) => {
+        if (next === "active") {
+          subscription.remove();
+          start();
+        }
+      });
+      return () => {
+        subscription.remove();
+        if (timer) clearTimeout(timer);
+      };
+    }
+
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
