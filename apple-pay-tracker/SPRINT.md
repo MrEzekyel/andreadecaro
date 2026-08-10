@@ -16,7 +16,7 @@ si riporta nella tabella di stato.
 | 1 · Fiducia | P1, P2, P3 | P2 e P3 chiusi · P1 in attesa di Andrea | 10 rilievi, tutti corretti (`bb2e466`) |
 | 2 · Attrito zero | P5, P6, P12 | P6 e P12 chiusi · P5 in attesa di Andrea | 7 rilievi, tutti corretti |
 | 3 · Integrità del dato | P11, P13 | chiuso | — |
-| 4 · Sicurezza e trasparenza | P14, P4, P18 | P14 chiuso · P4 e P18 da fare | — |
+| 4 · Sicurezza e trasparenza | P14, P4, P18 | P14 e P18 chiusi · P4 in attesa del dominio | — |
 | 5 · Pricing | P9, P10, P7, P8, P20 | decisione presa · schema e `ingest-payment` in produzione · manca RevenueCat/IAP (richiede uscire da Expo Go) | — |
 | 6 · Differenziazione | P17, P16 | bloccato — richiede development build | — |
 | Fuori sprint | P15, P19 | decisioni, non implementazioni | — |
@@ -169,7 +169,9 @@ schermata bianca sia di un errore.
   Ha senso solo dopo `P2`: prometterlo senza export è una bugia.
   **In attesa del dominio** che Andrea prenderà per l'SMTP: serve un URL
   pubblico dove ospitarla, ed è lo stesso acquisto che sblocca `P1`.
-- **P18** changelog in-app
+- **P18** changelog in-app. **Chiuso**: Impostazioni → Novità, con il pallino
+  sull'icona in Home quando c'è qualcosa di non letto — senza quello sarebbe
+  una schermata che nessuno apre.
 
 ---
 
@@ -209,5 +211,6 @@ vedi `DA-FARE.md` per la sequenza. Fino ad allora il pulsante "Abbonati" in
 ## Fuori sprint
 
 - **P15** repository privato — decisione di Andrea, cinque minuti
-- **P19** condivisione familiare — va dichiarata come non-obiettivo in
-  `README.md`, non implementata
+- **P19** condivisione familiare. **Chiuso**: `README.md` ha una sezione
+  "Cosa non fa, per scelta", tenuta separata dai limiti noti — quelli sono
+  cose non ancora arrivate, questa è una cosa che non è in programma.

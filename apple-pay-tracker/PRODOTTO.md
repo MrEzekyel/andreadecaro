@@ -289,17 +289,33 @@ perché non sa quanto vale il tuo ETF.
 
 È il miglior candidato a feature premium dopo l'inversione del paywall (`P9`).
 
-### P18 · Changelog in-app · **il ritmo di sviluppo è un punto di forza sprecato**
+### P18 · Changelog in-app · **fatto**
 
-Gli aggiornamenti sono frequenti e sostanziosi: è il miglior segnale di
-affidabilità che l'app abbia. Oggi è visibile solo su GitHub. Una schermata
-"cosa è cambiato" comunica "questa cosa è viva" meglio di qualunque claim.
+Impostazioni → Novità (`lib/changelog.ts`, `screens/ChangelogScreen.tsx`).
+Le voci stanno in un file del bundle e non su Supabase: cambiano esattamente
+quando cambia il codice, quindi arrivano con lo stesso aggiornamento che
+porta le novità che descrivono.
 
-### P19 · Condivisione familiare · **assente — dichiararlo, non subirlo**
+Il pezzo che lo rende utile non è la schermata ma il **pallino**: sull'icona
+delle impostazioni in Home quando c'è qualcosa di non letto. Un changelog
+raggiungibile solo entrando in Impostazioni non lo apre nessuno, ed è
+esattamente il punto di avere aggiornamenti frequenti e non farlo sapere.
+Chi apre l'app per la prima volta non ha "novità" — ha l'app: il primo avvio
+segna tutto come già visto invece di accogliere con un pallino da smaltire.
 
-Le divisioni esistono ma le persone non sono utenti: due conviventi non possono
-tenere un budget comune. Probabilmente giusto tenerla fuori adesso, ma va
-dichiarata come scelta esplicita e non lasciata come buco.
+### P19 · Condivisione familiare · **dichiarata come non-obiettivo**
+
+`README.md` ha ora una sezione **"Cosa non fa, per scelta"**, separata dai
+limiti noti: quelli sono cose non ancora arrivate, questa è una cosa che non
+è in programma, e la differenza conta per chi sta decidendo se adottare
+l'app.
+
+Il motivo scritto lì è che il modello dati è costruito attorno a un utente
+singolo — ogni tabella si aggancia a `auth.users`, la RLS taglia su
+`auth.uid()` — e cambiarlo non sarebbe una feature ma un'app diversa, con
+inviti, permessi e la domanda "chi può vedere cosa" su ogni riga. Chi deve
+dividere una spesa ha **Mi devono**, che non richiede che l'altra persona
+abbia l'app.
 
 ---
 

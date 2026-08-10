@@ -457,6 +457,22 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   va aggiunto in tre punti: `ALLOWED_SOURCES` nella function, e i
   `SOURCE_LABEL`/`SOURCE_ICON` di StatsScreen e TransactionDetailScreen.
 
+### Novità in-app
+
+- `lib/changelog.ts` tiene le voci in un **file del bundle**, non su Supabase:
+  cambiano esattamente quando cambia il codice, quindi arrivano con lo stesso
+  `eas update` che porta le novità che descrivono. Leggerle dalla rete
+  vorrebbe dire poter annunciare cose non ancora installate.
+- **Ogni voce nuova va aggiunta in cima con un `id` nuovo** (la data basta):
+  è l'`id` della prima voce che decide se il pallino compare. Scritte per chi
+  usa l'app, non per chi la scrive — "la retta di ritmo parte dalla base
+  vera" è un messaggio di commit, non una novità.
+- Il pallino sull'icona delle impostazioni in Home è la parte che conta: una
+  schermata raggiungibile solo entrando in Impostazioni non la apre nessuno,
+  ed è proprio il punto di avere aggiornamenti frequenti e non farlo sapere.
+  Chi apre l'app per la prima volta non ha "novità" (`seen === null` →
+  si segna letto), altrimenti si verrebbe accolti da un pallino da smaltire.
+
 ### Blocco dell'app
 
 - `lib/AppLockContext.tsx` + `components/LockScreen.tsx`: Face ID / Touch ID

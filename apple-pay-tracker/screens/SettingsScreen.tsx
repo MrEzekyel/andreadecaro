@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Icon } from "../components/Icon";
 import { biometricsAvailable, useAppLock } from "../lib/AppLockContext";
+import { useChangelog } from "../lib/changelog";
 import { useData } from "../lib/DataContext";
 import { SettingsPage } from "../lib/NavContext";
 import { ThemePreference, useTheme } from "../lib/ThemeContext";
@@ -19,6 +20,7 @@ import { useLimits } from "../lib/useLimits";
 import { useSubscription } from "../lib/useSubscription";
 import AutomationsScreen from "./AutomationsScreen";
 import CategoriesScreen from "./CategoriesScreen";
+import ChangelogScreen from "./ChangelogScreen";
 import ExportScreen from "./ExportScreen";
 import IncomeScreen from "./IncomeScreen";
 import LimitsScreen from "./LimitsScreen";
@@ -46,6 +48,7 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
   const { statuses } = useLimits();
   const { profile, automationActive, trialDaysLeft } = useSubscription();
   const lock = useAppLock();
+  const { unread } = useChangelog();
 
   async function toggleLock(next: boolean) {
     if (!next) {
@@ -125,6 +128,10 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
 
   if (page === "referral") {
     return <ReferralScreen onBack={() => setPage("root")} />;
+  }
+
+  if (page === "changelog") {
+    return <ChangelogScreen onBack={() => setPage("root")} />;
   }
 
   return (
@@ -276,6 +283,14 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
           value="CSV"
           onPress={() => setPage("export")}
         />
+        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+        <SettingRow
+          icon="sparkles"
+          label="Novità"
+          value={unread ? "" : "Cosa è cambiato"}
+          badge={unread}
+          onPress={() => setPage("changelog")}
+        />
       </View>
 
       <TouchableOpacity
@@ -294,12 +309,15 @@ function SettingRow({
   value,
   onPress,
   muted,
+  badge,
 }: {
   icon: string;
   label: string;
   value: string;
   onPress?: () => void;
   muted?: boolean;
+  /** Pallino d'accento: c'e' qualcosa di nuovo dietro questa riga. */
+  badge?: boolean;
 }) {
   const { palette } = useTheme();
   return (
@@ -314,6 +332,7 @@ function SettingRow({
       >
         {label}
       </Text>
+      {badge && <View style={[styles.badge, { backgroundColor: palette.accent }]} />}
       <Text style={[styles.settingValue, { color: palette.ink3 }]}>{value}</Text>
       {onPress && <Icon name="chevron-right" size={14} color={palette.ink3} />}
     </TouchableOpacity>
@@ -345,6 +364,7 @@ const styles = StyleSheet.create({
   },
   settingName: { ...type.body, flex: 1 },
   lockName: { ...type.body },
+  badge: { width: 7, height: 7, borderRadius: 3.5 },
   settingHint: { ...type.small, lineHeight: 15, marginTop: 2 },
   settingValue: { ...type.caption },
   logout: { alignItems: "center", paddingVertical: space.md },

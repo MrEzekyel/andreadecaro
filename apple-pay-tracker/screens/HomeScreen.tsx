@@ -19,6 +19,7 @@ import { PaymentRow } from "../components/PaymentRow";
 import { RecurringSummary } from "../components/RecurringSummary";
 import { SavingsSummary } from "../components/SavingsSummary";
 import { TrendChart, TrendPoint } from "../components/TrendChart";
+import { useChangelog } from "../lib/changelog";
 import { useData } from "../lib/DataContext";
 import { useNav } from "../lib/NavContext";
 import { useTheme } from "../lib/ThemeContext";
@@ -56,6 +57,7 @@ export default function HomeScreen() {
   const { monthlyOverall, alerts, reload: reloadLimits } = useLimits();
   const { profile: subscriptionProfile, automationActive, trialDaysLeft } =
     useSubscription();
+  const { unread: unreadNews } = useChangelog();
   const [refreshing, setRefreshing] = useState(false);
   const explorer = useExplorer(reload);
 
@@ -286,9 +288,17 @@ export default function HomeScreen() {
             onPress={() => openSettings("root")}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityRole="button"
-            accessibilityLabel="Impostazioni"
+            accessibilityLabel={
+              unreadNews ? "Impostazioni, ci sono novità" : "Impostazioni"
+            }
           >
             <Icon name="sliders-horizontal" size={19} color={palette.ink3} />
+            {/* Un changelog che sta solo dentro Impostazioni non lo apre
+                nessuno, ed e' proprio il punto di avere aggiornamenti
+                frequenti e non farlo sapere. */}
+            {unreadNews && (
+              <View style={[styles.newsDot, { borderColor: palette.ground, backgroundColor: palette.accent }]} />
+            )}
           </TouchableOpacity>
         </View>
 
@@ -573,6 +583,15 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     borderRadius: radius.card,
     padding: space.lg,
+  },
+  newsDot: {
+    position: "absolute",
+    top: -2,
+    right: -3,
+    width: 9,
+    height: 9,
+    borderRadius: 4.5,
+    borderWidth: 1.5,
   },
   alertTitle: { ...type.bodyMedium, fontSize: 12.5, marginBottom: 3 },
   alertBody: { ...type.small, lineHeight: 17 },

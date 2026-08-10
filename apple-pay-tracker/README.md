@@ -318,6 +318,27 @@ Ordine con cui la Edge Function assegna la categoria:
 3. `default_merchant_categories` — le regole predefinite
 4. `NULL` — resta da categorizzare
 
+## Cosa non fa, per scelta
+
+Diverso dai limiti qui sotto: non sono cose non ancora arrivate, sono cose
+che non sono in programma. Dirlo prima evita a qualcuno di adottare l'app
+aspettando che arrivino.
+
+- **Nessuna condivisione familiare o account condiviso.** Un conto in comune,
+  la spesa divisa col partner che compare in tempo reale su due telefoni, un
+  budget di coppia: non ci sono e non sono previsti. Il modello dati è
+  costruito attorno a un utente singolo — ogni tabella si aggancia a
+  `auth.users` e la RLS taglia su `auth.uid()` — e cambiarlo non sarebbe una
+  feature ma un'app diversa, con inviti, permessi, e la domanda "chi può
+  vedere/modificare cosa" su ogni singola riga.
+  Per dividere una spesa con qualcuno c'è **Mi devono**: registra la quota
+  altrui e tiene il conto dei crediti, senza che l'altra persona debba avere
+  l'app.
+- **Nessun collegamento bancario (Open Banking / PSD2).** L'automazione legge
+  quello che Apple Pay già mostra sul telefono, e nessuna credenziale
+  bancaria passa da qui. È anche il motivo per cui la copertura si ferma dove
+  si ferma — vedi in cima.
+
 ## Limiti noti
 
 - Il trigger Transazione ha avuto **problemi di timeout** segnalati su alcune
@@ -329,5 +350,8 @@ Ordine con cui la Edge Function assegna la categoria:
 - La transazione Wallet non espone l'MCC (codice categoria del commerciante),
   quindi la categorizzazione si basa sul nome. Per dati più affidabili
   servirebbe un collegamento Open Banking.
-- L'app non registra i pagamenti fatti quando il telefono è offline: la
-  Shortcut scatta ma la POST fallisce.
+- Un pagamento fatto col telefono offline non arriva subito: la Shortcut
+  scatta ma la POST fallisce. Non si perde — il ramo di errore lo scrive in
+  `spese-non-inviate.txt` su iCloud Drive, e da **Impostazioni → Automazioni
+  → Recupera spese non inviate** rientra senza doppioni. Resta un passaggio
+  manuale, perché Shortcuts non ritenta da solo.
