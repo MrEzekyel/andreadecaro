@@ -524,11 +524,27 @@ export default function HomeScreen() {
         )}
 
         {payments.length === 0 && (
-          <Text style={[styles.empty, { color: palette.ink3 }]}>
-            Nessuna spesa in questo mese. I pagamenti Apple Pay entrano da
-            soli una volta configurata l'automazione; contanti, bonifici e
-            addebiti diretti si aggiungono a mano o con Siri.
-          </Text>
+          <View style={styles.emptyBlock}>
+            <Text style={[styles.empty, { color: palette.ink3 }]}>
+              Nessuna spesa in questo mese. I pagamenti Apple Pay entrano da
+              soli una volta configurata l'automazione; contanti, bonifici e
+              addebiti diretti si aggiungono a mano o con Siri.
+            </Text>
+
+            {/* Il posto giusto per la guida e' questo: chi legge questa frase
+                e' esattamente chi non ha ancora configurato niente, e "una
+                volta configurata l'automazione" senza un modo per arrivarci
+                e' un rimando a vuoto. */}
+            <TouchableOpacity
+              style={[styles.emptyAction, { borderColor: palette.hairline }]}
+              onPress={() => openSettings("guide")}
+            >
+              <Icon name="book-open" size={14} color={palette.accent} />
+              <Text style={[styles.emptyActionText, { color: palette.accent }]}>
+                Come si configura
+              </Text>
+            </TouchableOpacity>
+          </View>
         )}
           </>
         )}
@@ -577,6 +593,18 @@ const styles = StyleSheet.create({
   },
   deltaNote: { ...type.small, fontSize: 10.5 },
   empty: { ...type.body, textAlign: "center", marginTop: space.xl, lineHeight: 21 },
+  emptyBlock: { alignItems: "center" },
+  emptyAction: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 7,
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    marginTop: space.md,
+  },
+  emptyActionText: { ...type.caption, fontWeight: "500" },
   alert: {
     flexDirection: "row",
     gap: 11,

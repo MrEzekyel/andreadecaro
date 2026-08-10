@@ -27,6 +27,7 @@ import AutomationsScreen from "./AutomationsScreen";
 import CategoriesScreen from "./CategoriesScreen";
 import ChangelogScreen from "./ChangelogScreen";
 import ExportScreen from "./ExportScreen";
+import GuideScreen from "./GuideScreen";
 import IncomeScreen from "./IncomeScreen";
 import LimitsScreen from "./LimitsScreen";
 import OwedScreen from "./OwedScreen";
@@ -118,12 +119,15 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
       limits: <LimitsScreen onBack={back} />,
       recurring: <RecurringScreen onBack={back} />,
       people: <OwedScreen onBack={back} />,
-      automations: <AutomationsScreen onBack={back} />,
+      automations: (
+        <AutomationsScreen onBack={back} onOpenGuide={() => setPage("guide")} />
+      ),
       income: <IncomeScreen onBack={back} />,
       export: <ExportScreen onBack={back} />,
       subscription: <SubscriptionScreen onBack={back} />,
       referral: <ReferralScreen onBack={back} />,
       changelog: <ChangelogScreen onBack={back} />,
+      guide: <GuideScreen onBack={() => setPage("automations")} />,
     }[page];
 
     return (

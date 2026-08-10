@@ -457,6 +457,30 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   va aggiunto in tre punti: `ALLOWED_SOURCES` nella function, e i
   `SOURCE_LABEL`/`SOURCE_ICON` di StatsScreen e TransactionDetailScreen.
 
+### Guida alla configurazione
+
+- `lib/guide.ts` (i passi come **dati**), `components/ActionPreview.tsx` (la
+  riproduzione di un'azione), `screens/GuideScreen.tsx`. Si arriva da
+  Automazioni e dallo stato vuoto della Home — cioè dai due punti in cui si
+  trova chi non ha ancora configurato niente.
+- Le azioni sono **riprodotte schematicamente, non fotografate**: uno
+  screenshot di iOS invecchia al primo aggiornamento che sposta un campo, e
+  chi lo guarda non capisce più se sta sbagliando lui o se è la guida a
+  essere vecchia. Quello che non cambia — e che quindi conta — è il **nome
+  esatto** dell'azione da cercare e i campi da riempire.
+- I valori che vanno presi dal **selettore variabili** sono evidenziati in
+  accento: confonderli con testo digitato è l'errore più comune, e dirlo solo
+  a parole non basta.
+- `lib/guideImages.ts` accoglie gli screenshot veri quando ci saranno, uno per
+  `id` di passo. Si affiancano allo schema invece di sostituirlo. I `require`
+  devono restare **letterali**: Metro risolve le immagini a compilazione, un
+  percorso costruito a runtime non finisce nel bundle. Vanno ritagliati sulla
+  singola azione e ridimensionati (~750px): a piena risoluzione finirebbero
+  interi dentro l'aggiornamento che ogni utente scarica.
+- Il progresso è salvato: questa procedura si fa passando avanti e indietro
+  fra due app, e ricominciare da capo a ogni ritorno è il modo più rapido per
+  farla abbandonare.
+
 ### Novità in-app
 
 - `lib/changelog.ts` tiene le voci in un **file del bundle**, non su Supabase:

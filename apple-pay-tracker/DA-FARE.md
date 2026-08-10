@@ -62,6 +62,33 @@ token valido) ma non hanno ragione di esistere ancora.
 
 ---
 
+## 📸 Screenshot per la guida — quando costruisci la Shortcut
+
+L'app ha ora una **guida passo per passo** (Impostazioni → Automazioni →
+Guida, e dallo stato vuoto della Home). Ogni passo mostra il nome esatto
+dell'azione da cercare e i campi da riempire, riprodotti schematicamente.
+
+Mentre costruisci il comando rapido sul tuo iPhone, fai uno screenshot di
+questi sette passaggi — sono quelli dove si sbaglia:
+
+| File da salvare in `assets/guida/` | Cosa deve mostrare |
+| --- | --- |
+| `merchant.png` | L'azione "Ottieni valore dizionario" con chiave `merchant` |
+| `amount.png` | La stessa con chiave `amount` |
+| `richiesta.png` | "Ottieni contenuti di URL" aperto, con metodo, intestazione e corpo JSON |
+| `se.png` | Il blocco "Se" con la condizione *contiene* `"ok":true` |
+| `salvataggio.png` | "Aggiungi a file" con il file di recupero |
+| `dizionario.png` | Il "Dizionario" dell'automazione con Esercente e Importo |
+| `esegui.png` | "Esegui comando rapido" con input il Dizionario |
+
+Ritaglia la singola azione invece della schermata intera (si legge su un
+telefono) e ridimensiona a circa 750px di larghezza: uno screenshot a piena
+risoluzione pesa qualche megabyte, e finirebbe dentro l'aggiornamento che
+ogni utente scarica. Poi mandameli e li aggancio io — i posti sono già
+predisposti in `lib/guideImages.ts`.
+
+---
+
 ## 🟡 Automazione iOS — ultimo pezzo in corso
 
 Il comando rapido condivisibile **«Registra spesa»** è la via che sostituisce

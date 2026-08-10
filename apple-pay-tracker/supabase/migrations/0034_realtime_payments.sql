@@ -1,0 +1,18 @@
+-- La spesa registrata dalla Shortcut compare da sola, ad app aperta.
+--
+-- `usePayments` era iscritto al canale realtime dal primo giorno, ma nessuna
+-- tabella e' mai stata nella publication: il canale si iscriveva e non
+-- riceveva niente. La promessa "il pagamento appare da solo" reggeva solo
+-- riaprendo la schermata o tirando per aggiornare — cioe' proprio il gesto
+-- che l'automazione esiste per togliere.
+--
+-- Solo `payments`: e' l'unica tabella che cambia per mano di qualcosa che non
+-- e' l'app stessa (la Edge Function chiamata dalla Shortcut). Tutto il resto
+-- lo scrive l'utente da dentro l'app, che sa gia' cosa ha appena fatto e
+-- ricarica da sola.
+--
+-- Non serve toccare `replica identity`: per gli INSERT — l'unico caso che ci
+-- interessa — il payload porta gia' la riga nuova per intero. Passare a FULL
+-- servirebbe solo a vedere i valori vecchi sui DELETE, al prezzo di scrivere
+-- ogni riga per intero nel WAL.
+alter publication supabase_realtime add table public.payments;

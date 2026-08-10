@@ -11,7 +11,8 @@ export type SettingsPage =
   | "export"
   | "subscription"
   | "referral"
-  | "changelog";
+  | "changelog"
+  | "guide";
 
 type Nav = {
   /** Porta alla scheda Impostazioni gia' aperta su una sua sottopagina. */

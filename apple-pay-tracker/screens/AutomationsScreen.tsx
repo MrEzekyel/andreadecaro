@@ -19,7 +19,13 @@ import { IngestToken } from "../lib/types";
 
 const INGEST_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/ingest-payment`;
 
-export default function AutomationsScreen({ onBack }: { onBack: () => void }) {
+type Props = {
+  onBack: () => void;
+  /** Apre la guida passo per passo, il primo posto dove mandare chi arriva qui. */
+  onOpenGuide?: () => void;
+};
+
+export default function AutomationsScreen({ onBack, onOpenGuide }: Props) {
   const { palette } = useTheme();
 
   const [tokens, setTokens] = useState<IngestToken[]>([]);
@@ -107,6 +113,31 @@ export default function AutomationsScreen({ onBack }: { onBack: () => void }) {
           né le carte fisiche fuori da Wallet: quelli si aggiungono a mano o
           con Siri.
         </Text>
+
+        {/* Prima di tutto il resto: chi arriva qui senza aver mai configurato
+            niente vede un URL e un token, che da soli non dicono cosa
+            farne. La guida e' la risposta a "e adesso?". */}
+        {onOpenGuide && (
+          <TouchableOpacity
+            onPress={onOpenGuide}
+            style={[
+              styles.guide,
+              { backgroundColor: palette.accentSoft },
+            ]}
+          >
+            <Icon name="book-open" size={17} color={palette.accent} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.guideTitle, { color: palette.ink }]}>
+                Guida passo per passo
+              </Text>
+              <Text style={[styles.guideBody, { color: palette.ink2 }]}>
+                Come costruire il comando rapido e l'automazione, un passo
+                alla volta
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={15} color={palette.accent} />
+          </TouchableOpacity>
+        )}
 
         <Text style={[styles.label, { color: palette.ink3 }]}>
           Collegamento Shortcut
@@ -229,6 +260,15 @@ const styles = StyleSheet.create({
   title: { ...type.title },
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.md },
   label: { ...type.label },
+  guide: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    borderRadius: radius.card,
+    padding: 13,
+  },
+  guideTitle: { ...type.bodyMedium, fontSize: 14 },
+  guideBody: { ...type.small, lineHeight: 16, marginTop: 2 },
   urlBox: {
     borderRadius: radius.field,
     borderWidth: 1,
