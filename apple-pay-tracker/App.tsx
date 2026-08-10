@@ -12,6 +12,8 @@ import {
 import type { Session } from "@supabase/supabase-js";
 import { AddPaymentSheet } from "./components/AddPaymentSheet";
 import { Icon } from "./components/Icon";
+import { LockCover, LockScreen } from "./components/LockScreen";
+import { AppLockProvider, useAppLock } from "./lib/AppLockContext";
 import { DataProvider, useData } from "./lib/DataContext";
 import { NavProvider, SettingsPage } from "./lib/NavContext";
 import { ThemeProvider, useTheme } from "./lib/ThemeContext";
@@ -202,16 +204,50 @@ function Root() {
   // Il provider dei dati vive dentro la sessione: al logout la cache delle
   // categorie viene smontata insieme a lui, senza restare appesa.
   return (
-    <DataProvider key={session.user.id}>
-      <Shell />
-    </DataProvider>
+    <LockGate>
+      <DataProvider key={session.user.id}>
+        <Shell />
+      </DataProvider>
+    </LockGate>
+  );
+}
+
+/**
+ * Tiene l'app coperta finche' il blocco non e' superato.
+ *
+ * Sta dentro la sessione e non fuori: senza dati a cui accedere non c'e'
+ * niente da proteggere, e chiedere il volto sulla schermata di accesso
+ * sarebbe un ostacolo davanti a una porta gia' chiusa.
+ */
+function LockGate({ children }: { children: React.ReactNode }) {
+  const { palette } = useTheme();
+  const { enabled, locked, covered, unlock } = useAppLock();
+
+  // Preferenza non ancora letta da disco: si aspetta invece di mostrare.
+  // Disegnare l'app e coprirla un istante dopo l'avrebbe comunque mostrata,
+  // ed e' esattamente il fotogramma che qualcuno potrebbe voler leggere.
+  if (enabled === null) {
+    return <View style={{ flex: 1, backgroundColor: palette.ground }} />;
+  }
+
+  if (locked) {
+    return <LockScreen onUnlock={unlock} />;
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      {children}
+      {covered && <LockCover />}
+    </View>
   );
 }
 
 export default function App() {
   return (
     <ThemeProvider>
-      <Root />
+      <AppLockProvider>
+        <Root />
+      </AppLockProvider>
     </ThemeProvider>
   );
 }

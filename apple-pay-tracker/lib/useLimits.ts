@@ -1,7 +1,27 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { describeAge, readCache, writeCache } from "./cache";
 import { firstError } from "./loadError";
 import { supabase } from "./supabase";
 import { Payment, SpendingLimit } from "./types";
+
+const CACHE_KEY = "limits";
+
+/**
+ * Copia locale dei limiti, con il periodo a cui si riferisce.
+ *
+ * I due istanti non sono un dettaglio: un limite e' sempre "quanto ho speso
+ * *in questo* periodo", e `evaluateLimit` ricalcola l'inizio del periodo al
+ * momento in cui gira. Una copia di lunedi' scorso, riletta oggi, verrebbe
+ * filtrata su una settimana che nei dati salvati non c'e': il risultato non
+ * sarebbe un numero vecchio ma "0,00 € spesi, 0% del budget" — un via libera
+ * inventato, esattamente nel punto dell'app che esiste per fermare qualcuno.
+ */
+type LimitsCache = {
+  limits: SpendingLimit[];
+  payments: Payment[];
+  weekStart: string;
+  monthStart: string;
+};
 
 /**
  * Inizio della settimana corrente, lunedi'.
@@ -66,11 +86,19 @@ export function useLimits() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [staleAt, setStaleAt] = useState<string | null>(null);
+  const [staleReason, setStaleReason] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const since = new Date(
-      Math.min(weekStart().getTime(), monthStart().getTime())
-    );
+    const week = weekStart();
+    const month = monthStart();
+    const since = new Date(Math.min(week.getTime(), month.getTime()));
+
+    // `getSession` legge da AsyncStorage e funziona anche offline, dove
+    // `getUser` fallirebbe lasciando la copia locale inutilizzata proprio nel
+    // momento in cui serve — vedi la stessa scelta in `usePayments`.
+    const { data: auth } = await supabase.auth.getSession();
+    const userId = auth.session?.user.id ?? null;
 
     const [limitsResult, paymentsResult] = await Promise.all([
       supabase
@@ -85,13 +113,48 @@ export function useLimits() {
     ]);
 
     const failure = firstError(limitsResult, paymentsResult);
-    setError(failure);
 
     // Un limite valutato su una lista di spese vuota direbbe "0% del budget"
     // proprio mentre non sappiamo quanto e' stato speso.
     if (!failure) {
-      setLimits((limitsResult.data ?? []) as SpendingLimit[]);
-      setPayments((paymentsResult.data ?? []) as Payment[]);
+      const righe = (limitsResult.data ?? []) as SpendingLimit[];
+      const spese = (paymentsResult.data ?? []) as Payment[];
+      setLimits(righe);
+      setPayments(spese);
+      setError(null);
+      setStaleAt(null);
+      setStaleReason(null);
+      if (userId) {
+        writeCache<LimitsCache>(userId, CACHE_KEY, {
+          limits: righe,
+          payments: spese,
+          weekStart: week.toISOString(),
+          monthStart: month.toISOString(),
+        });
+      }
+      setLoading(false);
+      return;
+    }
+
+    const cached = userId
+      ? await readCache<LimitsCache>(userId, CACHE_KEY)
+      : null;
+
+    // Stesso periodo o niente: una copia di un'altra settimana o di un altro
+    // mese non e' un dato vecchio da dichiarare, e' una risposta sbagliata a
+    // una domanda diversa da quella che l'utente sta facendo.
+    const stessoPeriodo =
+      cached?.value.weekStart === week.toISOString() &&
+      cached?.value.monthStart === month.toISOString();
+
+    if (cached && stessoPeriodo) {
+      setLimits(cached.value.limits);
+      setPayments(cached.value.payments);
+      setError(null);
+      setStaleAt(cached.at);
+      setStaleReason(failure);
+    } else {
+      setError(failure);
     }
     setLoading(false);
   }, []);
@@ -124,5 +187,15 @@ export function useLimits() {
     [statuses]
   );
 
-  return { statuses, monthlyOverall, alerts, loading, error, reload: load };
+  return {
+    statuses,
+    monthlyOverall,
+    alerts,
+    loading,
+    error,
+    staleAt,
+    staleLabel: staleAt ? describeAge(staleAt) : null,
+    staleReason,
+    reload: load,
+  };
 }

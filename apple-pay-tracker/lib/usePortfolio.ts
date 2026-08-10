@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { describeAge, readCache, writeCache } from "./cache";
 import { firstError } from "./loadError";
 import { supabase } from "./supabase";
 import {
@@ -12,6 +13,24 @@ import {
 } from "./portfolio";
 import { Asset, AssetGroup, Investment, InvestmentRule } from "./types";
 
+const CACHE_KEY = "portfolio";
+
+/**
+ * Copia locale del portafoglio: i dati **grezzi**, non le posizioni calcolate.
+ *
+ * `buildPositions` e `sumPositions` sono funzioni pure, quindi ricalcolare
+ * costa niente e tiene la cache indipendente dalla logica: se domani cambia
+ * il modo di contare le quote non eseguite, la copia salvata ieri non resta
+ * congelata sul conteggio vecchio.
+ */
+type PortfolioCache = {
+  assets: Asset[];
+  investments: Investment[];
+  rules: InvestmentRule[];
+  prices: Record<string, LatestPrice>;
+  series: SeriesPoint[];
+};
+
 type State = {
   assets: Asset[];
   investments: Investment[];
@@ -24,6 +43,9 @@ type State = {
   loading: boolean;
   /** Messaggio dell'ultima lettura fallita, `null` quando l'ultima e' riuscita. */
   error: string | null;
+  /** Quando risale la copia mostrata, `null` se i dati sono freschi. */
+  staleAt: string | null;
+  staleReason: string | null;
 };
 
 const EMPTY_TOTALS: PortfolioTotals = {
@@ -46,6 +68,29 @@ const EMPTY_TOTALS: PortfolioTotals = {
  * vorrebbe dire scaricare il prezzo di ogni asset per ognuno dei ~700 giorni
  * di storia a ogni apertura della schermata.
  */
+/** Da dati grezzi a stato pronto da mostrare: usato sia dalla rete sia dalla cache. */
+function build(
+  raw: PortfolioCache,
+  stale: { at: string; reason: string } | null
+): State {
+  const positions = buildPositions(raw.assets, raw.investments, raw.prices);
+  const totals = sumPositions(positions);
+
+  return {
+    assets: raw.assets,
+    investments: raw.investments,
+    rules: raw.rules,
+    positions,
+    totals,
+    series: raw.series,
+    xirr: portfolioXirr(raw.investments, totals.value),
+    loading: false,
+    error: null,
+    staleAt: stale?.at ?? null,
+    staleReason: stale?.reason ?? null,
+  };
+}
+
 export function usePortfolio() {
   const [state, setState] = useState<State>({
     assets: [],
@@ -57,9 +102,14 @@ export function usePortfolio() {
     xirr: null,
     loading: true,
     error: null,
+    staleAt: null,
+    staleReason: null,
   });
 
   const load = useCallback(async () => {
+    const { data: auth } = await supabase.auth.getSession();
+    const userId = auth.session?.user.id ?? null;
+
     const [assetsRes, opsRes, rulesRes, pricesRes, seriesRes] = await Promise.all([
       supabase.from("assets").select("*").eq("archived", false).order("sort_order"),
       supabase.from("investments").select("*").order("occurred_at"),
@@ -72,7 +122,19 @@ export function usePortfolio() {
     if (failure) {
       // Un portafoglio calcolato su liste vuote direbbe "valore 0,00 €", che
       // e' l'unica frase peggiore di "non ho letto" su una schermata di
-      // investimenti. Lo stato precedente resta com'e'.
+      // investimenti. Prima si guarda se c'e' una copia locale: il valore di
+      // stamattina e' vero, era il valore di stamattina — basta dirlo.
+      const cached = userId
+        ? await readCache<PortfolioCache>(userId, CACHE_KEY)
+        : null;
+
+      if (cached) {
+        const restored = build(cached.value, { at: cached.at, reason: failure });
+        setState(restored);
+        return restored;
+      }
+
+      // Senza copia locale lo stato precedente resta com'e'.
       setState((previous) => ({ ...previous, loading: false, error: failure }));
       return null;
     }
@@ -91,21 +153,17 @@ export function usePortfolio() {
       invested_eur: Number(p.invested_eur),
     }));
 
-    const positions = buildPositions(assets, investments, prices);
-    const totals = sumPositions(positions);
-
-    const next: State = {
+    const raw: PortfolioCache = {
       assets,
       investments,
       rules: (rulesRes.data ?? []) as InvestmentRule[],
-      positions,
-      totals,
+      prices,
       series,
-      xirr: portfolioXirr(investments, totals.value),
-      loading: false,
-      error: null,
     };
+
+    const next = build(raw, null);
     setState(next);
+    if (userId) writeCache<PortfolioCache>(userId, CACHE_KEY, raw);
     // Restituite anche direttamente: chi ha in mano una posizione presa da uno
     // stato precedente (es. la schermata di dettaglio aperta) altrimenti la
     // ritroverebbe aggiornata solo al render successivo, mai in questo stesso
@@ -139,7 +197,11 @@ export function usePortfolio() {
     return load();
   }, [load]);
 
-  return { ...state, reload };
+  return {
+    ...state,
+    staleLabel: state.staleAt ? describeAge(state.staleAt) : null,
+    reload,
+  };
 }
 
 /**

@@ -225,23 +225,38 @@ Mitigazioni, in ordine di costo:
 3. Riconciliazione da import estratto conto — l'infrastruttura esiste già per
    gli investimenti.
 
-### P13 · Lettura offline · **assente**
+### P13 · Lettura offline · **fatto**
 
-Nessuna cache locale. In metropolitana o in ascensore l'app è bianca. Tutti i
-concorrenti funzionano offline in lettura.
+`lib/cache.ts` tiene una copia locale dell'ultima lettura riuscita per tutte
+e quattro le letture che reggono una schermata intera: spese, limiti,
+portafoglio, abbonamento. Senza rete l'app mostra i dati dell'ultima volta
+dichiarando quando risalgono (`StaleNote`), invece di una schermata bianca o
+di un errore.
 
-Si incastra con `P3`: una cache locale trasforma "non riesco a leggere" in
-"questi sono i dati di stamattina", che è molto meglio di entrambe le
-alternative attuali.
+Come previsto si incastra con `P3`: "non riesco a leggere" è diventato
+"questi sono i dati di stamattina", che è vero e utile invece che solo vero.
+
+Un caso ha richiesto una regola in più: sui limiti la copia porta con sé il
+periodo a cui si riferisce e viene scartata se non è quello corrente —
+altrimenti una copia della settimana scorsa, filtrata su questa, direbbe
+"0% del budget" proprio nella schermata che esiste per fermare qualcuno.
 
 ---
 
 ## Sicurezza
 
-### P14 · Blocco biometrico · **assente**
+### P14 · Blocco biometrico · **fatto**
 
-L'app apre l'intero storico finanziario a chiunque abbia il telefono sbloccato.
-Ce l'hanno tutti i concorrenti. È `expo-local-authentication`, un pomeriggio.
+Face ID / Touch ID davanti all'app, opzionale e spento di default
+(Impostazioni → Blocco con Face ID). Dentro Expo Go, nessuna build nativa.
+
+Le tre scelte che lo rendono usabile e non solo sicuro: il codice del
+telefono resta un ripiego valido quando il volto non viene riconosciuto;
+mezzo minuto di tolleranza prima di richiederlo, perché uscire dall'app e
+rientrare è il giro normale di chi configura l'automazione; e un "Esci e
+accedi con la password" sulla schermata di blocco, senza il quale un guasto
+del riconoscimento renderebbe i propri dati irraggiungibili se non
+reinstallando l'app.
 
 ### P15 · Repository privato · **decisione aperta da mesi**
 

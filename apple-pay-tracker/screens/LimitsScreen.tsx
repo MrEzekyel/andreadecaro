@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
+import { StaleNote } from "../components/StaleNote";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { LimitCard } from "../components/LimitCard";
 import { CategoryPicker } from "../components/CategoryPicker";
@@ -30,7 +31,7 @@ function parseAmountInput(value: string): number | null {
 
 export default function LimitsScreen({ onBack }: { onBack: () => void }) {
   const { palette } = useTheme();
-  const { statuses, error, reload } = useLimits();
+  const { statuses, error, staleLabel, staleReason, reload } = useLimits();
 
   const [editing, setEditing] = useState<SpendingLimit | null>(null);
   const [open, setOpen] = useState(false);
@@ -159,6 +160,10 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
       </View>
 
       <ScrollView contentContainerStyle={styles.list}>
+        {staleLabel && (
+          <StaleNote label={staleLabel} reason={staleReason} onRetry={reload} />
+        )}
+
         {error && <LoadError message={error} onRetry={reload} />}
 
         {/* "Nessun limite impostato. Creane uno" su una lettura fallita porta

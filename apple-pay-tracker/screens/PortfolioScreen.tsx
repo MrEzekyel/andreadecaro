@@ -10,6 +10,7 @@ import {
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { ScrubChart } from "../components/ScrubChart";
+import { StaleNote } from "../components/StaleNote";
 import { StatTiles } from "../components/StatTiles";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, formatDate, splitAmount } from "../lib/format";
@@ -79,7 +80,8 @@ function RangePicker({
 export default function PortfolioScreen() {
   const { palette } = useTheme();
   const portfolio = usePortfolio();
-  const { positions, totals, series, xirr, rules, loading, error } = portfolio;
+  const { positions, totals, series, xirr, rules, loading, error, staleLabel } =
+    portfolio;
 
   // Un anno racconta gia' un andamento senza schiacciare gli ultimi mesi
   // contro il bordo, che e' quello che fa "Tutto" man mano che la storia
@@ -220,6 +222,14 @@ export default function PortfolioScreen() {
       }
     >
       <Text style={[styles.title, { color: palette.ink }]}>Investimenti</Text>
+
+      {staleLabel && (
+        <StaleNote
+          label={staleLabel}
+          reason={portfolio.staleReason}
+          onRetry={portfolio.reload}
+        />
+      )}
 
       {error && (
         <LoadError

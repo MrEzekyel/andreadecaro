@@ -130,9 +130,16 @@ rischio in ognuna:
 - **Export dati**: genera l'export da Impostazioni e apri i quattro file in
   un foglio di calcolo — controlla che gli accenti siano leggibili e che i
   totali corrispondano a quelli mostrati nell'app.
-- **Modalità offline**: disattiva la rete e apri l'app — ogni schermata deve
-  dire chiaramente "non sono riuscita a leggere", mai mostrare un valore
-  finto come se fosse vero (zero spese, limite non raggiunto, ecc.).
+- **Modalità offline**: apri l'app con la rete attiva (così salva la copia
+  locale), poi mettila in modalità aereo e riapri. Home, Limiti e
+  Investimenti devono mostrare i dati dell'ultima volta con la riga
+  "Senza connessione · aggiornato alle…", mai un valore finto come se fosse
+  vero (zero spese, limite non raggiunto). Su una schermata mai aperta prima
+  deve invece comparire l'errore con "Riprova".
+- **Blocco con Face ID**: attivalo da Impostazioni, chiudi l'app, aspetta
+  più di mezzo minuto e riaprila — deve chiedere il volto. Prova anche a
+  negare Face ID e verificare che il codice del telefono funzioni come
+  ripiego, e che "Esci e accedi con la password" ti faccia uscire davvero.
 - **Limiti e spese ricorrenti**: verifica che gli avvisi di soglia/limite
   scattino quando devono, e che una spesa ricorrente (mutuo, rata) compaia
   da sola al momento giusto.

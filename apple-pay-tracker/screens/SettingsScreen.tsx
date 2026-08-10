@@ -1,6 +1,15 @@
 import React, { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Switch,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { Icon } from "../components/Icon";
+import { biometricsAvailable, useAppLock } from "../lib/AppLockContext";
 import { useData } from "../lib/DataContext";
 import { SettingsPage } from "../lib/NavContext";
 import { ThemePreference, useTheme } from "../lib/ThemeContext";
@@ -36,6 +45,32 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
   const { categories, people } = useData();
   const { statuses } = useLimits();
   const { profile, automationActive, trialDaysLeft } = useSubscription();
+  const lock = useAppLock();
+
+  async function toggleLock(next: boolean) {
+    if (!next) {
+      await lock.disable();
+      return;
+    }
+
+    if (!(await biometricsAvailable())) {
+      Alert.alert(
+        "Face ID non disponibile",
+        "Attiva Face ID o Touch ID nelle impostazioni di iOS, poi torna qui."
+      );
+      return;
+    }
+
+    // Se la prova non riesce non si attiva niente: un blocco acceso su un
+    // telefono che non riconosce il volto chiuderebbe fuori dai propri dati
+    // al prossimo avvio.
+    if (!(await lock.enable())) {
+      Alert.alert(
+        "Blocco non attivato",
+        "Il riconoscimento non è andato a buon fine. Riprova."
+      );
+    }
+  }
 
   const subscriptionValue =
     profile?.subscription_status === "active"
@@ -131,6 +166,30 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
               </TouchableOpacity>
             );
           })}
+        </View>
+      </View>
+
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: palette.surface, borderColor: palette.hairline },
+        ]}
+      >
+        <View style={styles.settingRow}>
+          <Icon name="lock" size={17} color={palette.ink2} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.lockName, { color: palette.ink }]}>
+              Blocco con Face ID
+            </Text>
+            <Text style={[styles.settingHint, { color: palette.ink3 }]}>
+              Chiede il volto all'apertura e dopo mezzo minuto fuori dall'app
+            </Text>
+          </View>
+          <Switch
+            value={lock.enabled === true}
+            onValueChange={toggleLock}
+            trackColor={{ true: palette.accent }}
+          />
         </View>
       </View>
 
@@ -285,6 +344,8 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
   },
   settingName: { ...type.body, flex: 1 },
+  lockName: { ...type.body },
+  settingHint: { ...type.small, lineHeight: 15, marginTop: 2 },
   settingValue: { ...type.caption },
   logout: { alignItems: "center", paddingVertical: space.md },
   logoutText: { ...type.body },

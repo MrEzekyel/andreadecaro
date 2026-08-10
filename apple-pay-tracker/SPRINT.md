@@ -15,8 +15,8 @@ si riporta nella tabella di stato.
 | --- | --- | --- | --- |
 | 1 · Fiducia | P1, P2, P3 | P2 e P3 chiusi · P1 in attesa di Andrea | 10 rilievi, tutti corretti (`bb2e466`) |
 | 2 · Attrito zero | P5, P6, P12 | P6 e P12 chiusi · P5 in attesa di Andrea | 7 rilievi, tutti corretti |
-| 3 · Integrità del dato | P11, P13 | P11 deployato e live · P13 da fare | — |
-| 4 · Sicurezza e trasparenza | P14, P4, P18 | da fare | — |
+| 3 · Integrità del dato | P11, P13 | chiuso | — |
+| 4 · Sicurezza e trasparenza | P14, P4, P18 | P14 chiuso · P4 e P18 da fare | — |
 | 5 · Pricing | P9, P10, P7, P8, P20 | decisione presa · schema e `ingest-payment` in produzione · manca RevenueCat/IAP (richiede uscire da Expo Go) | — |
 | 6 · Differenziazione | P17, P16 | bloccato — richiede development build | — |
 | Fuori sprint | P15, P19 | decisioni, non implementazioni | — |
@@ -147,7 +147,11 @@ il passo di gestione errore che oggi manca, è in `DA-FARE.md` sezione 5ter.
   visualizzazione. L'infrastruttura dei cambi esiste già in `sync-prices`.
   **Chiuso** — resta da verificare con un pagamento reale in valuta estera
   (vedi `DA-FARE.md`, sezione test).
-- **P13** cache locale per la lettura offline — ancora da fare
+- **P13** cache locale per la lettura offline. **Chiuso**: copre spese,
+  limiti, portafoglio e abbonamento. Sui limiti la copia porta con sé il
+  periodo e viene scartata se non è quello corrente — una copia della
+  settimana scorsa, filtrata su questa, direbbe "0% del budget" invece di
+  un numero vecchio.
 
 Vanno insieme: entrambi toccano il modo in cui i dati arrivano a schermo, e
 `P13` completa `P3` — "questi sono i dati di stamattina" è meglio sia di una
@@ -157,9 +161,14 @@ schermata bianca sia di un errore.
 
 ## Sprint 4 · Sicurezza e trasparenza
 
-- **P14** blocco biometrico (`expo-local-authentication`, dentro Expo Go)
+- **P14** blocco biometrico. **Chiuso**: `lib/AppLockContext.tsx` +
+  `components/LockScreen.tsx`, opzionale e spento di default. Context e non
+  hook usato due volte — con due istanze separate attivarlo dalle
+  Impostazioni non avrebbe avuto effetto fino al riavvio.
 - **P4** privacy policy pubblicata + la riga sulla continuità dei dati.
-  Ha senso solo dopo `P2`: prometterlo senza export è una bugia
+  Ha senso solo dopo `P2`: prometterlo senza export è una bugia.
+  **In attesa del dominio** che Andrea prenderà per l'SMTP: serve un URL
+  pubblico dove ospitarla, ed è lo stesso acquisto che sblocca `P1`.
 - **P18** changelog in-app
 
 ---

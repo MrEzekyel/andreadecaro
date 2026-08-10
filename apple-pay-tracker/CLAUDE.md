@@ -365,6 +365,20 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   database — ma serve al **terzo stato** fra dato fresco ed errore: "questi
   sono i dati di stamattina" è meglio sia di una schermata bianca sia di un
   errore, e resta vero.
+- Copertura: `usePayments`, `useLimits`, `usePortfolio`, `useSubscription` —
+  cioè tutte le letture che reggono una schermata intera. Si salvano **i dati
+  grezzi**, non il risultato calcolato: `usePortfolio` ricostruisce posizioni
+  e totali con `buildPositions`/`sumPositions`, che sono funzioni pure, così
+  una modifica al modo di contare le quote non resta congelata dentro una
+  copia salvata ieri.
+- **Un dato che vale solo dentro un periodo va datato al periodo, non
+  all'istante.** `useLimits` salva anche `weekStart`/`monthStart` e scarta la
+  copia quando non combaciano con quelli di adesso: `evaluateLimit` ricalcola
+  sempre l'inizio del periodo, quindi una copia di lunedì scorso riletta oggi
+  non darebbe un numero vecchio ma "0,00 € spesi, 0% del budget" — un via
+  libera inventato, proprio nel punto dell'app che esiste per fermare
+  qualcuno. La regola "sono vecchi, non falsi" regge finché la domanda a cui
+  quei numeri rispondono è ancora la stessa.
 - `StaleNote` va scritto piccolo e senza colori d'allarme: un riquadro rosso
   sopra a dati corretti farebbe dubitare di numeri giusti, mentre non dire
   niente li spaccerebbe per aggiornati. L'ordine di precedenza è: dato fresco →
@@ -442,6 +456,36 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   passare direttamente la voce di uno *Scegli da elenco*. Ogni valore nuovo
   va aggiunto in tre punti: `ALLOWED_SOURCES` nella function, e i
   `SOURCE_LABEL`/`SOURCE_ICON` di StatsScreen e TransactionDetailScreen.
+
+### Blocco dell'app
+
+- `lib/AppLockContext.tsx` + `components/LockScreen.tsx`: Face ID / Touch ID
+  davanti all'app, opzionale, spento di default. Usa
+  `expo-local-authentication`, che è nell'SDK 54 e quindi **dentro Expo Go** —
+  nessuna build nativa.
+- È un **context, non un hook usato due volte**: il gate che copre l'app e
+  l'interruttore in Impostazioni devono condividere lo stato, altrimenti
+  attivarlo non avrebbe effetto fino al riavvio — chi lo accende esce,
+  rientra, e trova l'app aperta come prima.
+- Protegge da chi ha in mano il telefono già sbloccato, non i dati sul
+  server: quelli stanno dietro alla RLS di Postgres e non cambiano di una
+  virgola con questo interruttore.
+- Tre scelte che decidono se è usabile invece che solo sicuro:
+  `disableDeviceFallback: false` (Face ID sbaglia — buio, occhiali da sole —
+  e il codice del telefono resta una via valida); soglia di 30 secondi in
+  background prima di richiedere il volto, perché il giro normale
+  dell'automazione è proprio uscire dall'app e rientrare; e il pulsante
+  **"Esci e accedi con la password"** sulla schermata di blocco, senza il
+  quale un guasto del riconoscimento renderebbe i propri dati irraggiungibili
+  se non reinstallando l'app.
+- Si attiva solo dopo una prova riuscita (`enable()` autentica *prima* di
+  salvare la preferenza): accenderlo su un telefono che non riconosce il
+  volto chiuderebbe l'utente fuori al prossimo avvio.
+- Finché la preferenza non è stata letta da disco `LockGate` non disegna
+  niente: stampare l'app e coprirla un istante dopo l'avrebbe comunque
+  mostrata, ed è esattamente il fotogramma che il blocco esiste per negare.
+  Per lo stesso motivo `LockCover` copre su `inactive` e non solo su
+  `background` — è lì che iOS scatta l'anteprima per il selettore app.
 
 ### Abbonamento e referral
 
