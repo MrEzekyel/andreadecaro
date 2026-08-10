@@ -1,380 +1,195 @@
-# Cose che devi fare tu
+# Da fare prima di pubblicare
 
-Elenco di tutto ciò che richiede le tue mani, il tuo telefono o un tuo account.
-Tutto il resto (schema DB, Edge Function, codice app) è già fatto o lo faccio io.
+Elenco aggiornato di tutto ciò che manca prima che l'app sia pronta per un
+pubblico vero — solo cose che richiedono le tue mani, il tuo account o una tua
+decisione. Il resto (schema DB, Edge Function, codice app) è già fatto o lo
+faccio io.
 
----
-
-## 🔴 Bloccanti — senza questi l'app non parte
-
-### 1. Creare il file `.env`
-
-Nella cartella `apple-pay-tracker/`, crea un file chiamato `.env` con dentro:
-
-```
-EXPO_PUBLIC_SUPABASE_URL=https://<project-ref>.supabase.co
-EXPO_PUBLIC_SUPABASE_ANON_KEY=<publishable key>
-```
-
-Entrambi i valori li trovi su **Supabase → Project Settings → API** (la chiave
-è quella `publishable` / `anon`, **non** la `service_role`). Te li ho anche
-scritti in chat.
-
-> Il file è già in `.gitignore`: non finirà mai su GitHub. **Non committarlo
-> mai a mano** — il repository `andreadecaro` è pubblico, e per lo stesso
-> motivo qui sopra trovi dei segnaposto invece dei valori veri.
-
-### 2. Avviare l'app e registrarti
-
-```bash
-cd apple-pay-tracker
-npm install
-npx expo start
-```
-
-Installa **Expo Go** dall'App Store sul tuo iPhone, inquadra il QR code che
-compare nel terminale, e nell'app registrati con email + password.
-
-Questo crea il tuo utente. Da quel momento i dati sono tuoi e solo tuoi (la
-Row Level Security del database lo garantisce a livello di Postgres).
-
-> Se Supabase ti chiede la conferma via email e la mail non arriva: vai su
-> Supabase → Authentication → Providers → Email e disattiva
-> *"Confirm email"*. È un progetto personale, puoi permettertelo.
-
-### 3. Generare il token di ingestione
-
-Nell'app: tab **Impostazioni** → *Genera nuovo token*.
-
-Il token viene mostrato **una sola volta**. Copialo e tienilo da parte: serve
-in qualunque automazione decideremo di usare. Se lo perdi non è un dramma: ne
-generi un altro e revochi il vecchio.
-
-### 4. Creare l'automazione Wallet
-
-iOS ha un trigger dedicato alle transazioni Wallet: riceve la transazione come
-input **gia' strutturata**, quindi non serve nessuna espressione regolare.
-
-> Nota storica: in una versione precedente di questo documento avevo scritto
-> prima "quando Wallet riceve una notifica" (trigger inesistente) e poi che
-> l'automazione non fosse possibile. Sbagliato in entrambi i casi: il trigger
-> giusto e' **Transazione**, rinominato **Wallet** da iOS 26.
-
-**Comandi Rapidi → Automazione → Nuova automazione → Transazione** (o Wallet).
-
-1. Seleziona la **carta** o le carte che usi con Apple Pay
-2. Attiva **Esegui immediatamente** — senza questo devi confermare ogni
-   pagamento a mano e l'automatismo perde senso
-3. La prima azione e' gia' **Ricevi transazione come input**
-4. Aggiungi l'azione **Ottieni contenuto URL** e configurala cosi':
-
-| Campo | Valore |
-| --- | --- |
-| URL | quello che trovi in **Impostazioni** dell'app, pronto da copiare |
-| Metodo | `POST` |
-| Intestazioni | `x-ingest-token` → il token del passo 3 |
-| Corpo richiesta | **JSON** |
-
-Campi del corpo JSON (il valore e' la **variabile** della transazione, non
-testo scritto a mano — la scegli dal selettore variabili):
-
-| Chiave | Tipo | Valore | |
-| --- | --- | --- | --- |
-| `merchant` | Testo | variabile **Esercente** | obbligatorio |
-| `amount` | Testo | variabile **Importo** | obbligatorio |
-| `source` | Testo | `shortcut` | consigliato |
-| `card` | Testo | variabile **Carta o biglietto** | facoltativo |
-| `name` | Testo | variabile **Nome** | facoltativo |
-| `city` | Testo | variabile **Città** | facoltativo |
-
-I tre facoltativi vengono salvati e mostrati nel dettaglio della spesa. La
-città serve anche per la mappa dei luoghi in cui hai speso — se per una
-transazione non è disponibile, il campo resta vuoto e non succede nulla.
-
-Non serve mandare la data: la function usa l'istante in cui riceve la
-chiamata, che per un trigger in tempo reale e' corretto.
-
-`Importo` arriva come "12,99 €" o simile: la function pulisce il simbolo di
-valuta e gestisce la virgola decimale italiana, quindi va bene cosi'.
-
-**Ordine dei passi**: prima `.env` → app → registrazione → token, poi
-l'automazione. Senza token la chiamata risponde 401.
-
-### 5. Comando Siri per l'inserimento a voce
-
-Serve per quello che Apple Pay non vede: contanti, bonifici, carta fisica.
-Non e' un'automazione ma un **comando rapido** che lanci a voce.
-
-**Comandi Rapidi → + (nuovo comando) →** aggiungi in ordine:
-
-1. **Chiedi input** → Tipo: **Numero** → Richiesta: `Quanto hai speso?`
-2. **Chiedi input** → Tipo: **Testo** → Richiesta: `Dove?`
-3. **Ottieni contenuto URL** — stessa configurazione del punto 4, con il
-   corpo JSON:
-
-| Chiave | Tipo | Valore |
-| --- | --- | --- |
-| `merchant` | Testo | risultato della **seconda** Chiedi input |
-| `amount` | Testo | risultato della **prima** Chiedi input |
-| `source` | Testo | `siri` |
-
-⚠️ Attenzione all'ordine: nel selettore variabili le due "Chiedi input" si
-chiamano uguale, e scambiarle manda l'importo come esercente.
-
-4. Rinomina il comando **Aggiungi spesa** (il nome e' la frase che dirai)
-5. Dettagli comando → attiva **Mostra in Siri**
-
-Poi ti basta dire *"Ehi Siri, aggiungi spesa"*.
+Ordine consigliato: prima le azioni sul database (🔴, cinque minuti l'una),
+poi l'automazione, poi le decisioni aperte, poi il giro di test, e solo alla
+fine il percorso verso l'App Store vero e proprio.
 
 ---
 
-## 🟡 Decisioni che devo sentire da te
+## 🔴 Azioni sul database — le devi fare tu, dalla dashboard Supabase
 
-### 5bis. I due template email 🔴
+Non sono automatizzabili da qui: richiedono di essere loggato come titolare
+del progetto.
 
-> I due file HTML pronti da incollare sono in
-> `supabase/templates/confirm-signup.html` e
-> `supabase/templates/reset-password.html`. Sono nello stile dell'app: fondo
-> caldo, accento argilla, pesi bassi. Copia il contenuto di ognuno nel campo
-> *Message body* del template corrispondente.
+### 1. Incollare i due template email
 
-L'app non usa **nessuna pagina web**: né per confermare l'indirizzo alla
-registrazione, né per recuperare la password. Entrambe le cose vanno a
-**codice a sei cifre**, verificato dall'app via API.
+Due file HTML pronti, nello stile dell'app (fondo caldo, accento argilla):
 
-È una scelta, non un ripiego: in Expo Go l'URL dell'app cambia a ogni
-sessione, quindi un link di ritorno sarebbe fragile proprio nel momento in cui
-l'utente è già in difficoltà. E il link di default porta al `Site URL` del
-progetto, che se non è mai stato impostato è `http://localhost:3000` — una
-pagina morta.
+- `supabase/templates/confirm-signup.html`
+- `supabase/templates/reset-password.html`
 
-Servono due modifiche su **Authentication → Emails**:
+L'app non usa **nessuna pagina web** per confermare l'email o recuperare la
+password — entrambe vanno a **codice a sei cifre**, verificato dentro l'app.
+È una scelta voluta: in Expo Go l'URL dell'app cambia a ogni sessione, quindi
+un link di ritorno sarebbe fragile proprio quando l'utente è già in difficoltà.
 
-**Confirm signup** e **Reset Password** — in entrambi i template:
+Su **Supabase → Authentication → Emails**, per **entrambi** i template
+(*Confirm signup* e *Reset Password*):
 
-1. aggiungi al corpo del messaggio:
+1. Copia il contenuto del file HTML corrispondente nel campo *Message body*.
+2. Assicurati che il corpo contenga `{{ .Token }}` (è già nei file pronti).
+3. **Togli il link** `{{ .ConfirmationURL }}` se presente — altrimenti l'utente
+   clicca il link invece di digitare il codice, e il link porta a una pagina
+   morta.
 
-   ```
-   {{ .Token }}
-   ```
+**Finché non lo fai**: le email arrivano senza codice, quindi sia la
+registrazione sia il recupero password restano bloccati sulla schermata del
+codice. Questo è anche l'unico motivo per cui `P1` (recupero password) in
+`SPRINT.md` risulta ancora aperto — il codice è pronto, manca solo questo.
 
-2. **togli il link** (`{{ .ConfirmationURL }}`).
+> Non serve impostare `Site URL` né le *Redirect URLs*: senza link non c'è
+> nessun redirect da autorizzare.
 
-Il punto 2 conta quanto il punto 1: lasciando il link accanto al codice,
-l'utente cliccherà il link — è più naturale che digitare sei cifre — e
-finirebbe su quella pagina morta. Per la conferma della registrazione
-l'account verrebbe comunque confermato (Supabase verifica il token prima di
-reindirizzare), ma l'utente non ha modo di saperlo.
+### 2. Eliminare due Edge Function di debug rimaste attive
 
-Senza il punto 1 le email arrivano senza codice, e sia la registrazione sia il
-recupero restano bloccati sulla schermata del codice.
+`price-probe` e `nav-probe` erano funzioni temporanee usate per verificare i
+prezzi degli asset durante lo sviluppo. Sono disarmate (non fanno danni) ma
+sono ancora **attive** sul progetto, e non esiste uno strumento che le possa
+cancellare da qui — solo dalla dashboard.
 
-> Non serve invece impostare `Site URL` né le *Redirect URLs*: senza link non
-> c'è nessun redirect da autorizzare.
+**Supabase → Edge Functions** → apri `price-probe` → elimina. Ripeti per
+`nav-probe`.
 
----
-
-### 5ter. Il comando rapido condivisibile 🔴
-
-#### Prima: c'è un difetto nell'automazione di adesso
-
-La condizione `Se Contenuti URL **presenta qualsiasi valore**` non è un test di
-successo. `ingest-payment` risponde con un JSON **anche quando fallisce**
-(`{"error":"unauthorized"}`, `{"error":"..."}`), quindi quel body "presenta un
-valore" esattamente come `{"ok":true}`.
-
-Conseguenza: il ramo "Altrimenti" non scatta quasi mai, e arriva **"Pagamento
-inviato con successo"** anche quando la spesa non è stata registrata. Il
-controllo c'è ma dice sempre di sì.
-
-La condizione giusta è: `Contenuti URL` **contiene** `"ok":true`
-
-#### Poi: un'automazione non si può condividere
-
-iOS non permette di esportare le automazioni — il pulsante Condividi esiste
-solo sui comandi rapidi normali. Un file `.shortcut` dell'automazione non è
-generabile, e non per un limite nostro.
-
-La struttura giusta è quindi rovesciata: **la logica sta in un comando rapido
-condivisibile**, e l'automazione lo chiama in due azioni. Così il pezzo
-complicato si distribuisce con un link iCloud e a chi lo installa restano due
-tocchi invece di dieci.
-
-#### Un dettaglio scoperto costruendola: la Transazione non attraversa il confine
-
-**Esegui comando rapido** non porta con sé il tipo ricco "Transazione":
-dall'altra parte arriva appiattito a un Dizionario generico, e le chiavi che
-usa non sono documentate né affidabili. Non ci si può costruire sopra un JSON.
-
-La soluzione è non fidarsi di quella conversione automatica: si costruisce un
-dizionario **con chiavi scelte da noi**, dentro l'automazione dove il tipo
-Transazione è ancora disponibile per intero, e si passa quello.
-
-#### L'automazione, tre azioni invece di due
-
-Comandi Rapidi → Automazione → **Transazione** (o Wallet):
-
-1. **Ricevi transazione come input** (c'è già)
-2. **Dizionario**, due voci:
-   - chiave `merchant` → valore: variabile **Transazione** → **Esercente**
-   - chiave `amount` → valore: variabile **Transazione** → **Importo**
-3. **Esegui comando rapido** → «Registra spesa», Input = il **Dizionario** del passo 2
-
-Attiva **Esegui immediatamente**. Lascia *Notifica in caso di esecuzione*
-disattivata: le notifiche che servono le manda già il comando rapido, e solo
-quando c'è qualcosa da dire.
-
-#### Il comando rapido «Registra spesa»
-
-Comandi Rapidi → **+** → nelle impostazioni del comando attiva
-*Mostra nel foglio di condivisione* e imposta il tipo di input su **Qualsiasi**.
-
-| # | Azione | Configurazione |
-| --- | --- | --- |
-| 1 | **Ottieni valore dizionario** | Dizionario: *Input Comando rapido* · chiave: `merchant` |
-| 2 | **Ottieni valore dizionario** | Dizionario: *Input Comando rapido* · chiave: `amount` |
-| 3 | **Ottieni contenuti di URL** | URL: quello in Impostazioni → Automazioni · Metodo `POST` · Intestazione `x-ingest-token` = il token · Corpo **JSON** con `merchant` = risultato passo 1, `amount` = risultato passo 2, `source` = `shortcut` |
-| 4 | **Se** | `Contenuti URL` **contiene** `"ok":true` |
-| 5 | *(dentro Se)* **Mostra notifica** | opzionale — se la tieni, ogni pagamento ti notifica |
-| 6 | **Altrimenti** | |
-| 7 | *(dentro Altrimenti)* **Testo** | `{"merchant":"«risultato passo 1»","amount":"«risultato passo 2»","occurred_at":"«Data corrente formattata ISO 8601»"}` |
-| 8 | *(dentro Altrimenti)* **Aggiungi a file** | File: `spese-non-inviate.txt` in iCloud Drive → Comandi Rapidi · **Attiva "Aggiungi nuova riga"** |
-| 9 | *(dentro Altrimenti)* **Mostra notifica** | `Spesa non registrata: «risultato passo 1» «risultato passo 2» — recuperala dall'app` |
-| 10 | **Fine del blocco Se** | |
-
-I passi **7–8 sono quelli che oggi mancano** e sono il motivo per cui una
-spesa fatta offline si perde per sempre. Con loro finisce in un file, e
-dall'app la reimporti da **Impostazioni → Automazioni → Recupera spese non
-inviate**. I doppioni vengono riconosciuti, quindi puoi reimportare lo stesso
-file quante volte vuoi senza fare danni.
-
-> ⚠️ Nel passo 7 l'importo va inserito come **variabile**, non riscritto a
-> mano: dentro quella stringa c'è anche la valuta ("12,99 €", "£12.99"), ed è
-> da lì che l'app capisce che una spesa era in sterline. Perderla riporterebbe
-> il difetto che la multi-valuta ha appena chiuso.
-
-#### Da mandarmi
-
-Dal comando rapido «Registra spesa» → **Condividi → Copia link iCloud**.
-Con quello aggancio il link alla schermata Automazioni al posto delle
-istruzioni, e per chiunque altro il setup diventa: apri il link, incolla il
-token, crea l'automazione a due azioni.
+Non è bloccante per l'uso dell'app, ma prima di pubblicare è pulizia dovuta:
+sono endpoint pubblici (`verify_jwt: true`, quindi non chiamabili senza un
+token valido) ma non hanno ragione di esistere ancora.
 
 ---
 
-### 6. Repository privato?
+## 🟡 Automazione iOS — ultimo pezzo in corso
 
-Ora il codice sta in `MrEzekyel/andreadecaro`, che è **pubblico**. Il codice in
-sé non contiene segreti, ma è un'app di finanza personale: normalmente la si
-tiene privata.
+Il comando rapido condivisibile **«Registra spesa»** è la via che sostituisce
+le istruzioni testuali con un link iCloud da un tocco. La ricetta corretta
+(quella con Dizionario a chiavi esplicite, non il tipo Transazione che si
+perde attraversando "Esegui comando rapido") è quella che stai costruendo ora.
 
-Opzioni: lasciare così, oppure sposto tutto in un repo dedicato e privato
-(consigliato). Dimmi tu — è una cosa che costa poco adesso e molto dopo.
+Quando è pronto: dal comando rapido → **Condividi → Copia link iCloud** →
+mandamelo. Con quello aggancio il link alla schermata Automazioni dell'app al
+posto delle istruzioni attuali, e chiunque altro voglia usarla fa solo: apri
+il link, incolla il token, crea l'automazione a due azioni.
 
-### 7. Notifiche push — ✅ deciso: rimandate
-
-Deciso di rimandarle. I limiti di spesa funzionano già con **avvisi dentro
-l'app**: la Home mostra un riquadro quando superi la soglia di preavviso o il
-limite stesso.
-
-Quando vorrai le push servirà passare a una **development build** (gratis, la
-build gira in cloud, ma da quel momento non si usa più Expo Go per testare).
-Il lavoro residuo è solo il canale di consegna: soglie, periodi e stato dei
-limiti sono già nel database.
+Se vuoi rivedere la ricetta completa (i 10 passi del comando, incluso il
+recupero delle spese offline che oggi manca), è nella cronologia di questa
+chat — è troppo lunga per ripeterla qui, ma in sintesi: il passo critico è che
+il blocco **Se** controlli `Contenuti URL` **contiene** `"ok":true`, non
+*è vero*, altrimenti il controllo non distingue mai un invio riuscito da uno
+fallito.
 
 ---
 
-## 🟢 Aprire l'app senza tunnel/PC — gratis, resta dentro Expo Go
+## 🟡 Decisioni aperte
 
-Giusto rimandare i 99$/anno finché non sai se l'app avrà altri utenti: non
-servono per questo. La app non usa nessun modulo nativo custom (solo cose già
-incluse in Expo Go), quindi si può **pubblicare il bundle JS sui server di
-Expo** (gratis, account Expo senza carta di credito) e continuare ad aprirla
-da **Expo Go** — la stessa app che hai già installato — con un link fisso,
-senza nessun PC o tunnel acceso. Esattamente l'idea del server cloud che
-proponevi, solo che il "server" te lo offre gratis Expo stesso.
+### Repository pubblico o privato?
 
-Ho già aggiunto la dipendenza `expo-updates` al progetto e pushato. Da un
-Codespace (serve solo una volta per collegare il progetto):
+Il codice sta in `MrEzekyel/andreadecaro`, che oggi è **pubblico**. Non
+contiene segreti (le chiavi vere sono solo nel tuo `.env`, mai committato),
+ma è un'app di finanza personale — normalmente la si tiene privata.
+
+Due strade: lasciare così, oppure sposto tutto in un repo dedicato e privato
+(consigliato). Costa poco deciderlo ora, molto di più deciderlo dopo che
+qualcuno l'ha già clonato.
+
+### Prezzo e paywall
+
+Ancora da decidere se e come far pagare l'app — quali funzioni restano
+gratuite (es. l'automazione base) e quali dietro abbonamento (es. il modulo
+investimenti/portafoglio). Finché non è deciso, lo Sprint 5 di `SPRINT.md`
+resta bloccato e non ha senso preparare schermate di acquisto che poi
+cambiano struttura. Ne parliamo con calma quando arriviamo alla parte
+marketing, perché le due cose sono legate: chi è il pubblico decide anche
+cosa gli si fa pagare.
+
+### Notifiche push — ✅ già deciso: rimandate
+
+I limiti di spesa avvisano già dentro l'app (riquadro in Home quando superi
+soglia o limite). Le push richiederebbero uscire da Expo Go con una
+development build — lavoro rimandato finché non serve davvero.
+
+---
+
+## 🧪 Test prima di pubblicare
+
+Hai ragione: prima di far usare l'app a qualcun altro serve un giro di test
+vero, non solo "sembra funzionare". Aree da coprire, con quello che è più a
+rischio in ognuna:
+
+- **Automazione Wallet end-to-end**: un pagamento reale in Apple Pay deve
+  comparire nell'app entro pochi secondi, con esercente e importo corretti.
+  Fallo sia con una carta in euro sia — se capita un'occasione — con una spesa
+  all'estero, per verificare davvero la conversione valuta appena deployata.
+- **Recupero password**: dopo il punto 1 sopra, prova per intero il flusso
+  "password dimenticata" con un'email vera, dal codice ricevuto fino al
+  login con la password nuova.
+- **Export dati**: genera l'export da Impostazioni e apri i quattro file in
+  un foglio di calcolo — controlla che gli accenti siano leggibili e che i
+  totali corrispondano a quelli mostrati nell'app.
+- **Modalità offline**: disattiva la rete e apri l'app — ogni schermata deve
+  dire chiaramente "non sono riuscita a leggere", mai mostrare un valore
+  finto come se fosse vero (zero spese, limite non raggiunto, ecc.).
+- **Limiti e spese ricorrenti**: verifica che gli avvisi di soglia/limite
+  scattino quando devono, e che una spesa ricorrente (mutuo, rata) compaia
+  da sola al momento giusto.
+- **Spese divise**: dividi una spesa con una persona, verifica che "quanto mi
+  devono" e i grafici usino la tua quota (`my_share`) e non l'importo intero.
+- **Investimenti**: se hai comprato o venduto qualcosa nel frattempo,
+  registra il movimento e controlla che il grafico del portafoglio si
+  aggiorni in modo credibile.
+- **Cambio tema**: chiaro / scuro / sistema, su almeno due schermate diverse.
+
+Non serve un piano di test formale scritto da qualche parte — basta che tu
+percorra questa lista una volta con calma prima di far provare l'app a
+qualcun altro, e mi segnali qualunque cosa sembri storta (come hai già fatto
+con i grafici — continua così, è il modo giusto).
+
+---
+
+## 🟢 Percorso verso l'App Store — quando deciderai di investire
+
+Oggi l'app gira su **Expo Go** con aggiornamenti via `eas update` (OTA,
+gratis): quando cambio il codice, pubblico l'aggiornamento e alla prossima
+apertura dell'app su Expo Go arriva da solo, senza reinstallare nulla.
+
+> Nota operativa: la pipeline automatica di pubblicazione ("Workflow") ha
+> esaurito la quota gratuita fino al 1° settembre 2026. Il comando manuale
+> `npx eas-cli update --branch production --message "..."` resta comunque
+> disponibile e funziona — è un canale separato dalla quota esaurita.
+
+Questo percorso basta finché l'app resta tua/di poche persone fidate. Quando
+deciderai di aprirla davvero al pubblico (App Store), serviranno in ordine:
+
+### 1. Apple Developer Program — 99$/anno
+
+Intestato a te, non automatizzabile. Iscrizione su
+[developer.apple.com/programs](https://developer.apple.com/programs/).
+
+### 2. Build e TestFlight
 
 ```
 cd apple-pay-tracker
-npx eas-cli login                # account Expo, gratuito
-npx eas-cli update:configure      # collega il progetto, aggiorna app.json da solo
-npx eas-cli update --branch production --message "prima pubblicazione"
-```
-
-Alla fine il comando stampa un link (tipo `https://expo.dev/@tuo-account/apple-pay-tracker`
-o un QR): apri quel link e trovi un pulsante "Apri in Expo Go" / QR dedicato.
-Da lì in poi apri sempre l'app così, anche da iPhone/iPad, senza bisogno del
-mio sandbox né del tuo PC acceso.
-
-**Limite**: resti dentro Expo Go, quindi niente notifiche push né moduli
-nativi extra (comunque già rimandati). Quando fai una modifica al codice,
-rifaccio `eas update` e la prossima apertura dell'app prende la versione
-nuova — non serve ricompilare né reinstallare nulla.
-
-Quando in futuro deciderai come monetizzare (e se vale la pena investire i
-99$/anno), il passaggio a TestFlight è descritto qui sotto: resta tutto
-pronto, lo attiviamo quando vuoi.
-
-### 8. Apple Developer Program — solo quando deciderai di investire
-
-Costa **99$/anno** e deve essere intestato a te — non è automatizzabile.
-Iscrizione su [developer.apple.com/programs](https://developer.apple.com/programs/).
-L'approvazione richiede di solito poche ore, a volte fino a un giorno.
-
-Ti serve anche un account **Expo** gratuito su [expo.dev](https://expo.dev)
-per usare EAS Build (le build girano nel loro cloud, non serve un Mac).
-
-### 8bis. Build e installazione via TestFlight (consigliato)
-
-Una volta iscritto, da un Codespace (o dal PC quando lo riavrai):
-
-```
-cd apple-pay-tracker
-npx eas-cli login              # account Expo
-npx eas-cli build:configure    # collega il progetto al tuo account Expo
+npx eas-cli login
+npx eas-cli build:configure
 npx eas-cli build --platform ios --profile production
-```
-
-La prima volta EAS chiede le credenziali Apple e genera da solo certificato
-e provisioning profile — non serve toccare Xcode. A build finita:
-
-```
 npx eas-cli submit --platform ios
 ```
 
-La carica su App Store Connect. Poi su
-[appstoreconnect.apple.com](https://appstoreconnect.apple.com) → TestFlight →
-aggiungiti come **tester interno** (il tuo stesso Apple ID) — nessuna review
-richiesta per i tester interni, è quasi immediato. Installi l'app **TestFlight**
-dall'App Store e da lì l'app vera, senza più Expo Go né tunnel.
+Poi su [appstoreconnect.apple.com](https://appstoreconnect.apple.com) →
+TestFlight → aggiungiti come tester interno (il tuo Apple ID, nessuna review
+richiesta). Da lì in poi l'app vera, senza più Expo Go.
 
-Gli aggiornamenti successivi sono lo stesso comando `build` + `submit`; se
-cambi solo JS (non moduli nativi) puoi anche usare `eas update` per spingere
-l'aggiornamento senza ricompilare.
+### 3. Pubblicazione pubblica sull'App Store
 
-> Per l'Android che vorrai in futuro non serve nessun account a pagamento:
-> `npx eas-cli build --platform android --profile preview` genera un APK
-> scaricabile e installabile direttamente, gratis. Ha senso farlo solo
-> quando avrai davvero un telefono Android da testare.
+Serviranno: icona 1024×1024, screenshot (li genero io dalla build),
+descrizione e parole chiave, **privacy policy pubblicata a un URL**
+(obbligatoria — trattando dati finanziari — te la scrivo io, serve solo un
+posto dove ospitarla), e il questionario "App Privacy" su App Store Connect.
 
-### 9. Se vorrai pubblicarla davvero sull'App Store (pubblico)
-
-Quando ci arriveremo ti servirà preparare:
-
-- Icona 1024×1024
-- Screenshot dell'app (li genero io dalla build)
-- Descrizione e parole chiave
-- **Privacy policy pubblicata a un URL** — obbligatoria, l'app tratta dati
-  finanziari. Te la scrivo io, ma serve un posto dove ospitarla (il tuo sito
-  personale va benissimo)
-- Compilazione del questionario privacy ("App Privacy") su App Store Connect
-
-> Nota: un'app che traccia spese personali passa la review senza problemi.
-> L'unica cosa a cui Apple guarda con attenzione è la privacy policy e la
-> dichiarazione su quali dati raccogli.
+Un'app che traccia spese personali passa la review senza problemi; l'unica
+cosa a cui Apple guarda con attenzione è la privacy policy.
 
 ---
 
@@ -385,26 +200,21 @@ Quando ci arriveremo ti servirà preparare:
 | Project ref e chiavi | Supabase → Project Settings → API |
 | URL ingestione | tab **Impostazioni** dell'app (pronto da copiare) |
 | Header token | `x-ingest-token` |
+| Template email | Supabase → Authentication → Emails |
+| Edge Function da eliminare | Supabase → Edge Functions → `price-probe`, `nav-probe` |
 
 > Project ref, URL e chiave non sono scritti in questo file di proposito: il
 > repository è pubblico.
 
 ---
 
-## Cosa NON devi fare
+## Già fatto — non richiede niente da te
 
-Solo per chiarezza, questi sono già fatti e non richiedono niente da te:
-
-- ✅ Schema del database (15 migration applicate, RLS attiva ovunque)
-- ✅ 206 regole di categorizzazione predefinite già caricate
-- ✅ Edge Function deployata e attiva
+- ✅ Schema del database, RLS attiva ovunque
+- ✅ Edge Function `ingest-payment` e `sync-prices` deployate con supporto
+  multi-valuta (conversione automatica al cambio del giorno)
 - ✅ Sistema di token (generazione, revoca, hashing)
-- ✅ App: login, Home, elenco spese, statistiche, impostazioni
-- ✅ Modifica ed eliminazione spese, aggiunta manuale
-- ✅ Categorie personalizzate con colore e icona
-- ✅ Limiti settimanali e mensili con avvisi in-app
-- ✅ Tema chiaro / scuro / sistema
-- ✅ Spese ricorrenti generate ogni notte (mutuo, rata auto)
-- ✅ Spese divise, con schermata "Mi devono" e crediti in ritardo
-- ✅ Statistiche per settimana / mese / anno
-- ✅ Dettaglio per esercente e per categoria
+- ✅ App completa: login, Home, spese, statistiche, impostazioni,
+  investimenti, introiti, spese divise, spese ricorrenti
+- ✅ Categorie personalizzate, limiti con avvisi in-app, tema chiaro/scuro
+- ✅ Automazione Wallet e comando Siri per l'inserimento a voce
