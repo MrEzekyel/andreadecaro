@@ -43,10 +43,33 @@ export async function biometricsAvailable() {
   return hardware && enrolled;
 }
 
+/**
+ * Come si chiama il riconoscimento su **questo** telefono.
+ *
+ * Dice cosa supporta l'hardware, non se il permesso e' stato concesso: se
+ * l'utente ha negato Face ID all'app contenitore (dentro Expo Go e' Expo Go
+ * a chiederlo, non noi), iOS passa direttamente al codice senza segnalare
+ * niente di distinguibile da qui.
+ */
+export async function biometricName(): Promise<"Face ID" | "Touch ID" | null> {
+  const types = await LocalAuthentication.supportedAuthenticationTypesAsync();
+  if (types.includes(LocalAuthentication.AuthenticationType.FACIAL_RECOGNITION)) {
+    return "Face ID";
+  }
+  if (types.includes(LocalAuthentication.AuthenticationType.FINGERPRINT)) {
+    return "Touch ID";
+  }
+  return null;
+}
+
 async function authenticate() {
   const result = await LocalAuthentication.authenticateAsync({
     promptMessage: "Sblocca le tue spese",
     cancelLabel: "Annulla",
+    // Non richiede una conferma dopo il riconoscimento: su Face ID
+    // aggiungerebbe un tocco a ogni apertura per confermare una cosa gia'
+    // decisa.
+    requireConfirmation: false,
     // Il codice del telefono resta una via valida. Face ID sbaglia — occhiali
     // da sole, buio, un graffio sulla fotocamera — e senza ripiego l'unico
     // modo di rientrare nei propri dati sarebbe disinstallare l'app.

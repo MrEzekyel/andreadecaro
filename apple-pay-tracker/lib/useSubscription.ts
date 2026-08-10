@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useId, useState } from "react";
 import { describeAge, readCache, writeCache } from "./cache";
 import { firstError } from "./loadError";
 import { supabase } from "./supabase";
@@ -18,6 +18,17 @@ const CACHE_KEY = "profile";
  * Shortcut ma da un avviso leggibile prima che gli capiti.
  */
 export function useSubscription() {
+  /**
+   * Un nome di canale per **istanza**, non per hook.
+   *
+   * Questo hook vive in piu' punti contemporaneamente: Impostazioni lo tiene
+   * montato mentre mostra Abbonamento o Invita un amico, che lo montano a
+   * loro volta. Con un nome fisso le due istanze aprivano due canali sullo
+   * stesso topic, e la seconda `subscribe()` sollevava un'eccezione — che nel
+   * bundle di produzione non apre nessuna schermata rossa: smonta l'albero e
+   * lascia la pagina vuota, senza un motivo scritto da nessuna parte.
+   */
+  const channelId = useId();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,7 +81,7 @@ export function useSubscription() {
     load();
 
     const channel = supabase
-      .channel("profile-live")
+      .channel(`profile-live:${channelId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "profiles" },
@@ -81,7 +92,7 @@ export function useSubscription() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [load]);
+  }, [load, channelId]);
 
   const trialEndsAt = profile ? new Date(profile.trial_ends_at) : null;
   const trialDaysLeft = trialEndsAt

@@ -486,6 +486,15 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 - Protegge da chi ha in mano il telefono già sbloccato, non i dati sul
   server: quelli stanno dietro alla RLS di Postgres e non cambiano di una
   virgola con questo interruttore.
+- **Dentro Expo Go il permesso Face ID è di Expo Go, non nostro.** Se è stato
+  negato, iOS passa al codice del telefono senza restituire niente di
+  distinguibile: `authenticateAsync` risponde `success: true` come se il
+  riconoscimento fosse andato. Non è rilevabile dal codice — si risolve da
+  Impostazioni iOS › Face ID e codice › Altre app › Expo Go. Con una build
+  propria il permesso torna a essere dell'app e la domanda la fa lei.
+- L'etichetta in Impostazioni segue `supportedAuthenticationTypesAsync()`:
+  chiamarlo "Face ID" su un telefono con Touch ID sarebbe sbagliato, e su uno
+  senza biometria prometterebbe una cosa che non arriverà mai.
 - Tre scelte che decidono se è usabile invece che solo sicuro:
   `disableDeviceFallback: false` (Face ID sbaglia — buio, occhiali da sole —
   e il codice del telefono resta una via valida); soglia di 30 secondi in
@@ -546,6 +555,27 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   funziona dentro Expo Go. Fino a quel momento il pulsante "Abbonati" in
   `SubscriptionScreen` resta disattivato di proposito: lo schema e
   l'enforcement sono pronti, manca solo il pagamento.
+
+### Canali realtime e schermate che cadono
+
+- **Il nome di un canale Supabase va reso univoco per istanza**
+  (`` `payments-live:${useId()}` ``). Due componenti che montano lo stesso
+  hook contemporaneamente aprivano due canali sullo stesso topic e la seconda
+  `subscribe()` sollevava: è successo con `useSubscription`, che Impostazioni
+  tiene montato mentre mostra Abbonamento o Invita un amico — quelle due
+  schermate si aprivano vuote.
+- **Nel bundle di produzione un errore di render non apre nessuna schermata
+  rossa**: React smonta l'albero e resta il fondo vuoto, senza motivo e senza
+  via d'uscita. È il motivo per cui una pagina bianca su Expo Go dopo un
+  `eas update` va letta come "qualcosa è andato in eccezione", non come "non
+  ha caricato". `components/ScreenBoundary.tsx` avvolge le sottopagine di
+  Impostazioni e mostra il messaggio dell'errore, selezionabile, con
+  "Riprova" e "Indietro".
+- Nessuna tabella è oggi nella publication `supabase_realtime`, quindi questi
+  canali si iscrivono e non ricevono mai niente: la spesa registrata dalla
+  Shortcut mentre l'app è aperta **non** compare da sola, serve il
+  tira-per-aggiornare. Va abilitata la publication su `payments` perché
+  quella promessa diventi vera.
 
 ## Git e pubblicazione
 

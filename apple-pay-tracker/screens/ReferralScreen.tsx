@@ -22,7 +22,12 @@ const GOAL = 5;
 
 export default function ReferralScreen({ onBack }: { onBack: () => void }) {
   const { palette } = useTheme();
-  const { profile } = useSubscription();
+  const {
+    profile,
+    loading: profileLoading,
+    error: profileError,
+    reload: reloadProfile,
+  } = useSubscription();
 
   const [confirmed, setConfirmed] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -92,9 +97,17 @@ export default function ReferralScreen({ onBack }: { onBack: () => void }) {
                 Tocca per copiare
               </Text>
             </TouchableOpacity>
+          ) : profileError ? (
+            // "Il codice arriva appena il profilo è pronto" su una lettura
+            // fallita farebbe aspettare qualcosa che non sta arrivando.
+            <LoadError
+              message={profileError}
+              onRetry={reloadProfile}
+              variant="inline"
+            />
           ) : (
             <Text style={[styles.hint, { color: palette.ink3 }]}>
-              Il codice arriva appena il tuo profilo è pronto.
+              {profileLoading ? "Un istante…" : "Il codice non è ancora disponibile."}
             </Text>
           )}
 

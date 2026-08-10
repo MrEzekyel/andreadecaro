@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { describeAge, readCache, writeCache } from "./cache";
 import { firstError } from "./loadError";
 import { supabase } from "./supabase";
@@ -29,6 +29,12 @@ export function comparisonCutoff(month: Date) {
 }
 
 export function usePayments(month: Date) {
+  // Un nome di canale per istanza: due schermate che montano questo hook
+  // insieme aprirebbero due canali sullo stesso topic, e la seconda
+  // `subscribe()` solleva. Oggi Home e Spese sono schede alternative e non
+  // capita mai, ma e' l'unica cosa che lo impedisce — vedi `useSubscription`,
+  // dove è già successo.
+  const channelId = useId();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [previous, setPrevious] = useState<Payment[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,7 +147,7 @@ export function usePayments(month: Date) {
     // La Shortcut scrive dal telefono mentre l'app e' aperta: senza il canale
     // realtime la spesa comparirebbe solo al refresh manuale.
     const channel = supabase
-      .channel("payments-live")
+      .channel(`payments-live:${channelId}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "payments" },
@@ -152,7 +158,7 @@ export function usePayments(month: Date) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [load]);
+  }, [load, channelId]);
 
   const total = useMemo(
     () => payments.reduce((sum, p) => sum + Number(p.effective_amount), 0),

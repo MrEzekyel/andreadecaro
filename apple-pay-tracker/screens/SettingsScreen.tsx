@@ -9,7 +9,12 @@ import {
   View,
 } from "react-native";
 import { Icon } from "../components/Icon";
-import { biometricsAvailable, useAppLock } from "../lib/AppLockContext";
+import { ScreenBoundary } from "../components/ScreenBoundary";
+import {
+  biometricName,
+  biometricsAvailable,
+  useAppLock,
+} from "../lib/AppLockContext";
 import { useChangelog } from "../lib/changelog";
 import { useData } from "../lib/DataContext";
 import { SettingsPage } from "../lib/NavContext";
@@ -50,6 +55,14 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
   const lock = useAppLock();
   const { unread } = useChangelog();
 
+  // Come si chiama il riconoscimento su questo telefono: chiamarlo "Face ID"
+  // su un iPhone con Touch ID sarebbe sbagliato, e su uno senza biometria
+  // prometterebbe una cosa che non arrivera' mai.
+  const [biometria, setBiometria] = useState<"Face ID" | "Touch ID" | null>(null);
+  useEffect(() => {
+    biometricName().then(setBiometria);
+  }, []);
+
   async function toggleLock(next: boolean) {
     if (!next) {
       await lock.disable();
@@ -58,7 +71,7 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
 
     if (!(await biometricsAvailable())) {
       Alert.alert(
-        "Face ID non disponibile",
+        "Riconoscimento non disponibile",
         "Attiva Face ID o Touch ID nelle impostazioni di iOS, poi torna qui."
       );
       return;
@@ -94,44 +107,30 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
     setPage(initialPage);
   }, [openNonce, initialPage]);
 
-  if (page === "categories") {
-    return <CategoriesScreen onBack={() => setPage("root")} />;
-  }
+  if (page !== "root") {
+    const back = () => setPage("root");
 
-  if (page === "limits") {
-    return <LimitsScreen onBack={() => setPage("root")} />;
-  }
+    // Ogni sottopagina passa dal boundary: se una cade, si vede il motivo e
+    // si torna indietro, invece di restare davanti a una pagina vuota da cui
+    // l'unica uscita e' chiudere l'app.
+    const subpage = {
+      categories: <CategoriesScreen onBack={back} />,
+      limits: <LimitsScreen onBack={back} />,
+      recurring: <RecurringScreen onBack={back} />,
+      people: <OwedScreen onBack={back} />,
+      automations: <AutomationsScreen onBack={back} />,
+      income: <IncomeScreen onBack={back} />,
+      export: <ExportScreen onBack={back} />,
+      subscription: <SubscriptionScreen onBack={back} />,
+      referral: <ReferralScreen onBack={back} />,
+      changelog: <ChangelogScreen onBack={back} />,
+    }[page];
 
-  if (page === "recurring") {
-    return <RecurringScreen onBack={() => setPage("root")} />;
-  }
-
-  if (page === "people") {
-    return <OwedScreen onBack={() => setPage("root")} />;
-  }
-
-  if (page === "automations") {
-    return <AutomationsScreen onBack={() => setPage("root")} />;
-  }
-
-  if (page === "income") {
-    return <IncomeScreen onBack={() => setPage("root")} />;
-  }
-
-  if (page === "export") {
-    return <ExportScreen onBack={() => setPage("root")} />;
-  }
-
-  if (page === "subscription") {
-    return <SubscriptionScreen onBack={() => setPage("root")} />;
-  }
-
-  if (page === "referral") {
-    return <ReferralScreen onBack={() => setPage("root")} />;
-  }
-
-  if (page === "changelog") {
-    return <ChangelogScreen onBack={() => setPage("root")} />;
+    return (
+      <ScreenBoundary key={page} name={page} onBack={back}>
+        {subpage}
+      </ScreenBoundary>
+    );
   }
 
   return (
@@ -186,10 +185,12 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
           <Icon name="lock" size={17} color={palette.ink2} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.lockName, { color: palette.ink }]}>
-              Blocco con Face ID
+              {biometria ? `Blocco con ${biometria}` : "Blocco all'apertura"}
             </Text>
             <Text style={[styles.settingHint, { color: palette.ink3 }]}>
-              Chiede il volto all'apertura e dopo mezzo minuto fuori dall'app
+              {biometria
+                ? `Chiede ${biometria} all'apertura e dopo mezzo minuto fuori dall'app. Se iOS chiede il codice invece del riconoscimento, controlla che Expo Go sia abilitato in Impostazioni › ${biometria} e codice › Altre app.`
+                : "Chiede il codice del telefono all'apertura e dopo mezzo minuto fuori dall'app"}
             </Text>
           </View>
           <Switch
