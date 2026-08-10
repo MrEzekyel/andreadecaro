@@ -45,6 +45,7 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [referralCode, setReferralCode] = useState("");
   const [mode, setMode] = useState<Mode>("signin");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -66,7 +67,20 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
     setPendingCode(null);
     setCode("");
     setPassword("");
+    setReferralCode("");
     setShowPassword(false);
+  }
+
+  /** Collega l'account appena confermato a chi l'ha invitato, se un codice e' stato digitato. */
+  async function redeemReferralIfAny() {
+    const trimmed = referralCode.trim();
+    if (!trimmed) return;
+    const { error } = await supabase.rpc("redeem_referral_code", {
+      p_code: trimmed,
+    });
+    // Un codice sbagliato non deve bloccare la registrazione: chi lo ha
+    // digitato male ha comunque il suo account e i suoi 2 mesi di prova.
+    if (error) console.warn("redeem_referral_code failed", error.message);
   }
 
   async function submit() {
@@ -131,7 +145,10 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
     // e si e' gia' dentro. Si guarda cosa e' tornato invece di assumere una
     // delle due configurazioni: cambiarla sulla dashboard non deve rompere
     // l'app.
-    if (data.session) return;
+    if (data.session) {
+      await redeemReferralIfAny();
+      return;
+    }
 
     setPendingCode("signup");
     // Con la protezione contro l'enumerazione degli indirizzi, `signUp` su una
@@ -166,6 +183,8 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
       );
       return;
     }
+
+    await redeemReferralIfAny();
   }
 
   async function resendSignupCode() {
@@ -308,6 +327,8 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
   const mostraCodice = pendingCode !== null;
   /** In registrazione la password l'ha gia' scelta; nel recupero la sceglie ora. */
   const mostraPassword = attesaRecupero || (!recovering && pendingCode === null);
+  /** Il codice invito ha senso solo alla prima registrazione, mai al login o al recupero. */
+  const mostraCodiceInvito = mode === "signup" && pendingCode === null;
 
   return (
     <KeyboardAvoidingView
@@ -399,6 +420,25 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
               />
             </TouchableOpacity>
           </View>
+        )}
+
+        {mostraCodiceInvito && (
+          <TextInput
+            value={referralCode}
+            onChangeText={setReferralCode}
+            placeholder="Codice invito (facoltativo)"
+            placeholderTextColor={palette.ink3}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            style={[
+              styles.input,
+              {
+                backgroundColor: palette.surface,
+                borderColor: palette.hairline,
+                color: palette.ink,
+              },
+            ]}
+          />
         )}
 
         <TouchableOpacity

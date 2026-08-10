@@ -39,6 +39,10 @@ import {
   monthRange,
   usePayments,
 } from "../lib/usePayments";
+import { useSubscription } from "../lib/useSubscription";
+
+/** Sotto questa soglia il trial merita un avviso, non solo la voce in Impostazioni. */
+const TRIAL_WARNING_DAYS = 7;
 
 export default function HomeScreen() {
   const { palette, dark } = useTheme();
@@ -50,6 +54,8 @@ export default function HomeScreen() {
   const { payments, total, previousTotal, error, staleLabel, staleReason, reload } =
     usePayments(month);
   const { monthlyOverall, alerts, reload: reloadLimits } = useLimits();
+  const { profile: subscriptionProfile, automationActive, trialDaysLeft } =
+    useSubscription();
   const [refreshing, setRefreshing] = useState(false);
   const explorer = useExplorer(reload);
 
@@ -345,6 +351,52 @@ export default function HomeScreen() {
         {/* Solo sul mese corrente: sfogliando l'archivio la domanda sul mese
             scorso sarebbe fuori posto. */}
         {viewingCurrentMonth && <MonthCheck onReview={setMonth} />}
+
+        {/* Non legato al mese guardato: l'abbonamento e' un fatto
+            dell'account, non del periodo che si sta sfogliando. Il segnale
+            deve arrivare da qui, prima che dalla notifica di errore della
+            Shortcut — nessuno apre le notifiche dell'automazione per capire
+            perche' ha smesso di funzionare. */}
+        {automationActive === false ? (
+          <TouchableOpacity
+            style={[styles.alert, { backgroundColor: `${palette.over}1f` }]}
+            onPress={() => openSettings("subscription")}
+          >
+            <Icon name="triangle-alert" size={16} color={palette.over} />
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.alertTitle, { color: palette.ink }]}>
+                Automazione ferma
+              </Text>
+              <Text style={[styles.alertBody, { color: palette.ink2 }]}>
+                La prova gratuita è finita. Storico e statistiche restano
+                come sempre — riattivala per tornare a registrare le spese
+                Apple Pay da sola.
+              </Text>
+            </View>
+          </TouchableOpacity>
+        ) : (
+          subscriptionProfile?.subscription_status === "trialing" &&
+          trialDaysLeft !== null &&
+          trialDaysLeft <= TRIAL_WARNING_DAYS && (
+            <TouchableOpacity
+              style={[styles.alert, { backgroundColor: `${palette.warn}1f` }]}
+              onPress={() => openSettings("subscription")}
+            >
+              <Icon name="triangle-alert" size={16} color={palette.warn} />
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.alertTitle, { color: palette.ink }]}>
+                  Automazione, ultimi giorni di prova
+                </Text>
+                <Text style={[styles.alertBody, { color: palette.ink2 }]}>
+                  {trialDaysLeft <= 0
+                    ? "Ultimo giorno gratis."
+                    : `Ancora ${trialDaysLeft} giorn${trialDaysLeft === 1 ? "o" : "i"} gratis.`}{" "}
+                  Poi 1,99 €/mese o 15 €/anno per continuare.
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )
+        )}
 
         {!balanceError && (monthlyIncome > 0 || monthlyInvested > 0) && (
           <View>

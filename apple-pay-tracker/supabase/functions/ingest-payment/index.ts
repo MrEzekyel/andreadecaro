@@ -9,7 +9,7 @@
 //
 // Deploy: supabase functions deploy ingest-payment --no-verify-jwt
 
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 type IngestBody = {
   amount: number | string;
@@ -326,6 +326,33 @@ Deno.serve(async (req) => {
 
   const userId = tokenRow.user_id;
 
+  // ── Trial e abbonamento ──────────────────────────────────────────────────
+  // Ogni chiamata a questa function e' automazione (Wallet, Shortcut
+  // condivisibile, o Siri): l'app non la chiama mai per l'inserimento
+  // manuale. Non serve quindi distinguere per `source`, basta sapere se
+  // *questo utente* ha ancora diritto all'automazione.
+  //
+  // Se il profilo manca (non dovrebbe succedere: lo crea il trigger alla
+  // registrazione) si lascia passare invece di bloccare: un profilo mancante
+  // e' un difetto di integrita', non una decisione sull'abbonamento, e non
+  // deve diventare la base per negare un servizio gia' pagato.
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("subscription_status, trial_ends_at")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (profile) {
+    const trialActive = new Date(profile.trial_ends_at).getTime() > Date.now();
+    const subscriptionActive = profile.subscription_status === "active";
+    if (!trialActive && !subscriptionActive) {
+      return jsonResponse(
+        { error: "subscription_required", trial_ended_at: profile.trial_ends_at },
+        403
+      );
+    }
+  }
+
   let body: IngestBody;
   try {
     body = await req.json();
@@ -484,6 +511,17 @@ Deno.serve(async (req) => {
     }
   }
 
+  // Serve prima dell'insert, non dopo: e' il conteggio di *prima* che dice
+  // se quello che sta per entrare e' il primo pagamento automatico di questo
+  // utente — la prova che ha impostato l'automazione, la condizione che
+  // conferma un referral in sospeso.
+  const { count: priorAutomationCount } = await supabase
+    .from("payments")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", userId)
+    .in("source", ["shortcut", "shortcut_manual", "siri"]);
+  const isFirstAutomationPayment = (priorAutomationCount ?? 0) === 0;
+
   const { data: inserted, error } = await supabase
     .from("payments")
     .insert({
@@ -519,5 +557,75 @@ Deno.serve(async (req) => {
     return jsonResponse({ error: error.message }, 500);
   }
 
+  if (isFirstAutomationPayment) {
+    // Non deve mai poter far fallire la risposta: la spesa e' gia' salva,
+    // un intoppo qui riguarda solo il referral di chi ha invitato.
+    try {
+      await confirmReferral(supabase, userId);
+    } catch (e) {
+      console.error("referral confirmation failed", e);
+    }
+  }
+
   return jsonResponse({ ok: true, payment: inserted }, 201);
 });
+
+/**
+ * Conferma il referral in sospeso di un utente al suo primo pagamento
+ * automatico riuscito, e premia chi l'ha invitato dopo 5 conferme totali.
+ *
+ * Il traguardo e' unico e non ripetibile: `bonus_months_granted` blocca un
+ * secondo premio anche se in futuro l'utente invitasse altri 5 amici.
+ *
+ * L'estensione si aggancia al riferimento *attivo* di chi ha invitato: se e'
+ * ancora in trial estende `trial_ends_at`, se ha gia' un abbonamento estende
+ * `current_period_end` — mai il trial di chi paga gia', altrimenti il premio
+ * sparirebbe dentro un campo che a quel punto non conta piu' niente.
+ */
+async function confirmReferral(supabase: SupabaseClient, referredUserId: string) {
+  const { data: referral } = await supabase
+    .from("referrals")
+    .select("id, referrer_user_id")
+    .eq("referred_user_id", referredUserId)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  if (!referral) return;
+
+  await supabase
+    .from("referrals")
+    .update({ status: "confirmed", confirmed_at: new Date().toISOString() })
+    .eq("id", referral.id);
+
+  const { count: confirmedCount } = await supabase
+    .from("referrals")
+    .select("id", { count: "exact", head: true })
+    .eq("referrer_user_id", referral.referrer_user_id)
+    .eq("status", "confirmed");
+
+  if ((confirmedCount ?? 0) < 5) return;
+
+  const { data: referrer } = await supabase
+    .from("profiles")
+    .select("subscription_status, trial_ends_at, current_period_end, bonus_months_granted")
+    .eq("user_id", referral.referrer_user_id)
+    .maybeSingle();
+
+  if (!referrer || referrer.bonus_months_granted > 0) return;
+
+  const onSubscription = referrer.subscription_status === "active" &&
+    referrer.current_period_end;
+  const base = new Date(onSubscription ? referrer.current_period_end! : referrer.trial_ends_at);
+  const now = new Date();
+  const anchor = base > now ? base : now;
+  anchor.setMonth(anchor.getMonth() + 2);
+
+  await supabase
+    .from("profiles")
+    .update(
+      onSubscription
+        ? { current_period_end: anchor.toISOString(), bonus_months_granted: 1 }
+        : { trial_ends_at: anchor.toISOString(), bonus_months_granted: 1 }
+    )
+    .eq("user_id", referral.referrer_user_id);
+}

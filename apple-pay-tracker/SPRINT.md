@@ -17,7 +17,7 @@ si riporta nella tabella di stato.
 | 2 · Attrito zero | P5, P6, P12 | P6 e P12 chiusi · P5 in attesa di Andrea | 7 rilievi, tutti corretti |
 | 3 · Integrità del dato | P11, P13 | P11 deployato e live · P13 da fare | — |
 | 4 · Sicurezza e trasparenza | P14, P4, P18 | da fare | — |
-| 5 · Pricing | P9, P10, P7, P8 | bloccato — decisione di Andrea | — |
+| 5 · Pricing | P9, P10, P7, P8, P20 | decisione presa · schema e `ingest-payment` in produzione · manca RevenueCat/IAP (richiede uscire da Expo Go) | — |
 | 6 · Differenziazione | P17, P16 | bloccato — richiede development build | — |
 | Fuori sprint | P15, P19 | decisioni, non implementazioni | — |
 
@@ -164,13 +164,26 @@ schermata bianca sia di un errore.
 
 ---
 
-## Sprint 5 · Pricing — bloccato
+## Sprint 5 · Pricing — decisione presa, implementazione in corso
 
-`P9`, `P10`, `P7`, `P8` sono una decisione di Andrea prima che
-un'implementazione, e richiedono l'Apple Developer Program (99$/anno) più gli
-acquisti in-app.
+Andrea ha deciso: 2 mesi di automazione gratis dalla registrazione (`P8`),
+poi 1,99 €/mese o 15 €/anno per continuare a usarla (`P10`) — solo
+l'automazione si blocca, tutto il resto resta gratis per sempre (`P7`,
+`P9`). Più un programma referral (`P20`): 5 amici confermati (primo
+pagamento automatico riuscito, non solo registrazione) sbloccano 2 mesi
+extra, traguardo unico.
 
-Da riaprire quando Andrea decide se invertire il paywall.
+**Fatto**: migration `0033_subscriptions_referrals.sql` (tabelle `profiles`
+e `referrals`, RPC `redeem_referral_code`, trigger esteso su
+`handle_new_user`), enforcement in `ingest-payment` (v8, in produzione) con
+conferma referral e bonus automatico, `lib/useSubscription.ts`,
+`screens/SubscriptionScreen.tsx`, `screens/ReferralScreen.tsx`, campo
+codice invito in `AuthScreen.tsx`, banner trial in `HomeScreen.tsx`.
+
+**Manca**: l'acquisto vero. Serve RevenueCat + Apple In-App Purchase, che
+richiede lasciare Expo Go per una build nativa (EAS Build → TestFlight) —
+vedi `DA-FARE.md` per la sequenza. Fino ad allora il pulsante "Abbonati" in
+`SubscriptionScreen` resta disabilitato.
 
 ---
 

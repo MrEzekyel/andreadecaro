@@ -132,45 +132,57 @@ fai e vinci.
 Vale ovunque compaia la promessa: schermata di acquisto, `README.md`, App
 Store, e il testo vuoto della Home.
 
-### P7 · Cosa succede alla scadenza dell'abbonamento · **non definito**
+### P7 · Cosa succede alla scadenza dell'abbonamento · **deciso: si ferma solo l'automazione**
 
-Non è deciso né scritto da nessuna parte. È la domanda che un cliente fa
-**prima** di pagare.
+Senza abbonamento attivo Wallet, Siri e la Shortcut smettono di registrare
+spese da sole — `ingest-payment` rifiuta con `subscription_required`. Storico,
+statistiche, spese manuali, categorie, limiti ed export **restano sempre
+accessibili**, abbonati o no: non è mai un sequestro dei dati, solo la
+sospensione della parte che ha un costo ricorrente per farla funzionare.
 
-Se l'ingestione si ferma, lo storico ha un buco permanente nei mesi non pagati,
-e quel buco non si recupera. Va deciso, e va scritto nella schermata di
-acquisto — non nei termini di servizio.
+Il segnale arriva dall'app (banner in Home, sezione Abbonamento in
+Impostazioni), non dalla notifica di errore della Shortcut — nessuno apre le
+notifiche dell'automazione per capire perché ha smesso di funzionare.
 
-### P8 · Durata del trial · **1 mese, tarato al contrario**
+### P8 · Durata del trial · **deciso: 2 mesi dalla registrazione**
 
-Un tracker di spese vale **quando puoi confrontare**: questo mese contro il
-precedente, la categoria che scivola, la media a sei mesi. Con un mese di trial
-l'utente arriva alla scadenza con un solo mese di dati e zero confronti — il
-trial finisce nel momento esatto in cui l'app stava per diventare utile.
+Due mesi di automazione gratis dal momento dell'iscrizione (`profiles.trial_ends_at`,
+scritto dal trigger `handle_new_user`). Abbastanza per un primo confronto
+mese-su-mese, che con un solo mese di dati non è mai possibile.
 
-Due mesi, o meglio legato ai dati: gratis finché non hai tre mesi di storico.
+### P9 · Paywall · **deciso: si paga l'automazione, non il portafoglio**
 
-### P9 · Inversione del paywall · **automazione gratis, portafoglio a pagamento**
+Decisione opposta a quella sketchata in precedenza in questo stesso punto:
+l'automazione stessa — non il modulo investimenti — è dietro il paywall dopo
+il trial. Tutto il resto dell'app resta gratuito per sempre, `P7`.
 
-L'automazione è la promessa che procura gli utenti: dietro un paywall soffoca
-l'acquisizione, ed è per giunta la parte che non controlliamo e che genererà i
-reclami.
+Richiede l'Apple Developer Program e gli acquisti in-app (Apple impone
+StoreKit per un abbonamento consumato dentro l'app, regola 3.1.1 — niente
+Stripe/checkout web). Implementazione in corso: schema e enforcement lato
+server sono già in produzione; l'acquisto vero e proprio arriva con
+l'integrazione RevenueCat, che richiede di lasciare Expo Go per una build
+nativa (vedi `DA-FARE.md`).
 
-Il portafoglio è differenziato, affidabile e vale davvero soldi. Si fa pagare
-la cosa solida e distintiva, non l'integrazione client-side che dipende da
-Apple.
+### P10 · Prezzo · **deciso: 1,99 €/mese o 15 €/anno**
 
-Dipende da `P10`, e insieme richiedono l'Apple Developer Program e gli acquisti
-in-app: è una decisione di Andrea, non un'implementazione.
+Prezzo basso e diretto in-app tramite Apple: nessun checkout esterno, nessuna
+frizione oltre al foglio di acquisto nativo con Face ID/Touch ID. Netto reale
+dopo la quota Apple (15% con Small Business Program): ~1,69 €/mese, ~12,75
+€/anno.
 
-### P10 · Prezzo · **da €15/anno a €24-29/anno**
+### P20 · Referral · **deciso: 5 amici confermati = 2 mesi extra**
 
-A €15/anno si è il più economico del mercato di un fattore 2-6× (YNAB ~$109,
-Copilot ~$95, Spendee ~€30). Non rassicura: segnala "progetto personale, tra
-diciotto mesi non esiste più" — che è esattamente il dubbio del punto `P4`.
+Ogni utente ha un codice personale (`profiles.referral_code`). Un amico che si
+registra con quel codice conferma il referral al **suo primo pagamento
+registrato con successo dall'automazione** — non alla semplice registrazione,
+non a un suo eventuale abbonamento: è la prova che ha impostato tutto
+correttamente, non solo che ha scaricato l'app. Dopo 5 referral confermati
+totali, chi ha invitato sblocca 2 mesi extra di automazione — traguardo unico,
+non ripetibile. L'amico invitato non riceve nulla oltre ai 2 mesi standard.
 
-A €24-29 si resta metà di chiunque altro e si smette di segnalare hobby. Il
-cliente sta comprando anche la probabilità che l'app esista fra due anni.
+Vive **solo dentro l'app**, in una sezione dedicata (Impostazioni → Invita un
+amico): mai citato in campagne pubblicitarie a pagamento — è un beneficio per
+chi già usa l'app, non un gancio di marketing.
 
 ---
 

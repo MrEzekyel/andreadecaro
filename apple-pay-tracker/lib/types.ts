@@ -204,3 +204,29 @@ export type IngestToken = {
   last_used_at: string | null;
   revoked_at: string | null;
 };
+
+export type SubscriptionStatus = "trialing" | "active" | "expired";
+export type SubscriptionPlan = "monthly" | "annual";
+
+export type Profile = {
+  user_id: string;
+  trial_ends_at: string;
+  subscription_status: SubscriptionStatus;
+  subscription_plan: SubscriptionPlan | null;
+  current_period_end: string | null;
+  revenuecat_app_user_id: string | null;
+  referral_code: string;
+  bonus_months_granted: number;
+  created_at: string;
+};
+
+export type ReferralStatus = "pending" | "confirmed";
+
+export type Referral = {
+  id: string;
+  referrer_user_id: string;
+  referred_user_id: string;
+  status: ReferralStatus;
+  created_at: string;
+  confirmed_at: string | null;
+};

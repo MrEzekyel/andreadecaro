@@ -6,8 +6,9 @@ decisione. Il resto (schema DB, Edge Function, codice app) è già fatto o lo
 faccio io.
 
 Ordine consigliato: prima le azioni sul database (🔴, cinque minuti l'una),
-poi l'automazione, poi le decisioni aperte, poi il giro di test, e solo alla
-fine il percorso verso l'App Store vero e proprio.
+poi l'automazione, poi le decisioni aperte, poi il giro di test — e in
+parallelo, quando hai tempo, il percorso verso l'App Store: con il prezzo
+deciso non è più rimandabile, è quello che sblocca l'abbonamento vero.
 
 ---
 
@@ -94,15 +95,16 @@ Due strade: lasciare così, oppure sposto tutto in un repo dedicato e privato
 (consigliato). Costa poco deciderlo ora, molto di più deciderlo dopo che
 qualcuno l'ha già clonato.
 
-### Prezzo e paywall
+### Prezzo e paywall — ✅ deciso
 
-Ancora da decidere se e come far pagare l'app — quali funzioni restano
-gratuite (es. l'automazione base) e quali dietro abbonamento (es. il modulo
-investimenti/portafoglio). Finché non è deciso, lo Sprint 5 di `SPRINT.md`
-resta bloccato e non ha senso preparare schermate di acquisto che poi
-cambiano struttura. Ne parliamo con calma quando arriviamo alla parte
-marketing, perché le due cose sono legate: chi è il pubblico decide anche
-cosa gli si fa pagare.
+2 mesi di automazione gratis dalla registrazione, poi 1,99 €/mese o 15
+€/anno per continuarla. Solo l'automazione si blocca: il resto dell'app
+resta gratis per sempre. Più un referral interno (5 amici confermati = 2
+mesi extra, dettagli in `PRODOTTO.md` → `P20`).
+
+Schema DB ed enforcement lato server sono già in produzione. Manca solo il
+pagamento vero — vedi "RevenueCat e Apple In-App Purchase" più sotto,
+sezione App Store: è l'unico pezzo che serve davvero lasciare Expo Go.
 
 ### Notifiche push — ✅ già deciso: rimandate
 
@@ -148,26 +150,46 @@ con i grafici — continua così, è il modo giusto).
 
 ---
 
-## 🟢 Percorso verso l'App Store — quando deciderai di investire
+## 🔴 Percorso verso l'App Store — ora serve davvero, non è più rimandabile
+
+Con il prezzo deciso (2 mesi gratis, poi 1,99 €/mese o 15 €/anno) questo
+percorso smette di essere "quando vorrai investire" e diventa un
+prerequisito: **un abbonamento consumato dentro un'app iOS deve passare da
+In-App Purchase Apple** (regola 3.1.1 dell'App Store, non aggirabile con
+Stripe o un checkout esterno). Finché non lo fai, nessuno può davvero
+pagare — il pulsante "Abbonati" nella nuova schermata Abbonamento resta
+disattivato apposta.
 
 Oggi l'app gira su **Expo Go** con aggiornamenti via `eas update` (OTA,
-gratis): quando cambio il codice, pubblico l'aggiornamento e alla prossima
-apertura dell'app su Expo Go arriva da solo, senza reinstallare nulla.
+gratis) — questo resta il canale per ogni modifica al codice finché non
+serve il pagamento vero.
 
 > Nota operativa: la pipeline automatica di pubblicazione ("Workflow") ha
 > esaurito la quota gratuita fino al 1° settembre 2026. Il comando manuale
 > `npx eas-cli update --branch production --message "..."` resta comunque
 > disponibile e funziona — è un canale separato dalla quota esaurita.
 
-Questo percorso basta finché l'app resta tua/di poche persone fidate. Quando
-deciderai di aprirla davvero al pubblico (App Store), serviranno in ordine:
-
 ### 1. Apple Developer Program — 99$/anno
 
 Intestato a te, non automatizzabile. Iscrizione su
 [developer.apple.com/programs](https://developer.apple.com/programs/).
 
-### 2. Build e TestFlight
+Una volta dentro, iscriviti anche al **App Store Small Business Program**
+(gratuito, automatico se il fatturato resta sotto 1M$/anno): la commissione
+Apple scende dal 30% al 15% su ogni abbonamento — la differenza fra ~1,39 €
+e ~1,69 € netti sul piano mensile.
+
+### 2. RevenueCat — prima della build
+
+Account gratuito su [revenuecat.com](https://www.revenuecat.com) (resta
+gratis fino a 2.500$/mese di fatturato tracciato). Si occupa di validare le
+ricevute Apple e tenere sincronizzato lo stato abbonamento con
+`profiles.subscription_status` — costruirlo a mano da zero non ha senso a
+questo volume. Dentro RevenueCat vanno creati i due prodotti (mensile 1,99
+€, annuale 15 €) collegati ad App Store Connect: serve quindi fare il primo
+punto (Developer Program) prima di questo.
+
+### 3. Build e TestFlight
 
 ```
 cd apple-pay-tracker
@@ -179,9 +201,11 @@ npx eas-cli submit --platform ios
 
 Poi su [appstoreconnect.apple.com](https://appstoreconnect.apple.com) →
 TestFlight → aggiungiti come tester interno (il tuo Apple ID, nessuna review
-richiesta). Da lì in poi l'app vera, senza più Expo Go.
+richiesta). Da lì in poi l'app vera, senza più Expo Go — è anche il momento
+in cui l'SDK di RevenueCat entra nel codice (richiede una build nativa, non
+funziona dentro Expo Go).
 
-### 3. Pubblicazione pubblica sull'App Store
+### 4. Pubblicazione pubblica sull'App Store
 
 Serviranno: icona 1024×1024, screenshot (li genero io dalla build),
 descrizione e parole chiave, **privacy policy pubblicata a un URL**
@@ -218,3 +242,6 @@ cosa a cui Apple guarda con attenzione è la privacy policy.
   investimenti, introiti, spese divise, spese ricorrenti
 - ✅ Categorie personalizzate, limiti con avvisi in-app, tema chiaro/scuro
 - ✅ Automazione Wallet e comando Siri per l'inserimento a voce
+- ✅ Trial di 2 mesi, blocco automazione a scadenza, referral (schema,
+  `ingest-payment`, schermate Abbonamento e Invita un amico, banner in
+  Home) — manca solo l'acquisto vero via RevenueCat, vedi sopra

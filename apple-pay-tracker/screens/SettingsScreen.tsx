@@ -7,6 +7,7 @@ import { ThemePreference, useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
 import { useLimits } from "../lib/useLimits";
+import { useSubscription } from "../lib/useSubscription";
 import AutomationsScreen from "./AutomationsScreen";
 import CategoriesScreen from "./CategoriesScreen";
 import ExportScreen from "./ExportScreen";
@@ -14,6 +15,8 @@ import IncomeScreen from "./IncomeScreen";
 import LimitsScreen from "./LimitsScreen";
 import OwedScreen from "./OwedScreen";
 import RecurringScreen from "./RecurringScreen";
+import ReferralScreen from "./ReferralScreen";
+import SubscriptionScreen from "./SubscriptionScreen";
 
 const THEME_OPTIONS: { value: ThemePreference; label: string; icon: string }[] = [
   { value: "light", label: "Chiaro", icon: "sun" },
@@ -32,6 +35,16 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
   const { palette, preference, setPreference } = useTheme();
   const { categories, people } = useData();
   const { statuses } = useLimits();
+  const { profile, automationActive, trialDaysLeft } = useSubscription();
+
+  const subscriptionValue =
+    profile?.subscription_status === "active"
+      ? "attivo"
+      : automationActive === false
+        ? "scaduto"
+        : trialDaysLeft !== null
+          ? `${trialDaysLeft}g di prova`
+          : "…";
 
   const [page, setPage] = useState<SettingsPage>(initialPage);
 
@@ -69,6 +82,14 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
 
   if (page === "export") {
     return <ExportScreen onBack={() => setPage("root")} />;
+  }
+
+  if (page === "subscription") {
+    return <SubscriptionScreen onBack={() => setPage("root")} />;
+  }
+
+  if (page === "referral") {
+    return <ReferralScreen onBack={() => setPage("root")} />;
   }
 
   return (
@@ -160,6 +181,20 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
           label="Automazioni"
           value="Gestisci"
           onPress={() => setPage("automations")}
+        />
+        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+        <SettingRow
+          icon="crown"
+          label="Abbonamento"
+          value={subscriptionValue}
+          onPress={() => setPage("subscription")}
+        />
+        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+        <SettingRow
+          icon="gift"
+          label="Invita un amico"
+          value="Gestisci"
+          onPress={() => setPage("referral")}
         />
       </View>
 

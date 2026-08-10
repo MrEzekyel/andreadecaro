@@ -1,8 +1,9 @@
 # Apple Pay Tracker
 
 Tracker di spese personale per iOS. App Expo/React Native + backend Supabase.
-Uso privato di Andrea, niente App Store per ora — si distribuisce con EAS
-Update dentro Expo Go (vedi sotto), niente Apple Developer Program.
+Distribuzione oggi via EAS Update dentro Expo Go; con il modello di business
+deciso (vedi "Abbonamento e referral" sotto) l'Apple Developer Program e il
+passaggio a una build nativa non sono più rimandabili — vedi `DA-FARE.md`.
 
 ## Stack
 
@@ -441,6 +442,50 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   passare direttamente la voce di uno *Scegli da elenco*. Ogni valore nuovo
   va aggiunto in tre punti: `ALLOWED_SOURCES` nella function, e i
   `SOURCE_LABEL`/`SOURCE_ICON` di StatsScreen e TransactionDetailScreen.
+
+### Abbonamento e referral
+
+- Modello deciso da Andrea: 2 mesi di automazione gratis dalla registrazione
+  (`profiles.trial_ends_at`), poi 1,99 €/mese o 15 €/anno. **Solo
+  l'automazione si blocca** — Wallet, Siri, la Shortcut condivisibile —
+  mai il resto dell'app: storico, statistiche, spese manuali ed export
+  restano sempre accessibili, abbonati o no. Dettagli e motivazione in
+  `PRODOTTO.md` (`P7`-`P10`, `P20`).
+- `public.profiles` non è scrivibile dal client (nessuna policy `insert`/
+  `update` per `authenticated`): un utente che potesse scrivere
+  `subscription_status` da solo si auto-assegnerebbe un abbonamento senza
+  pagare. La riga nasce dal trigger `handle_new_user` (security definer,
+  bypassa RLS); `subscription_status`/`current_period_end` cambiano solo da
+  un servizio con la `service_role` key — oggi `ingest-payment` per il
+  bonus referral, in futuro il webhook di RevenueCat.
+- L'enforcement vive in `ingest-payment`, non nell'app: **ogni chiamata a
+  quella function è automazione** (l'app non la chiama mai per
+  l'inserimento manuale), quindi basta un controllo per utente all'inizio,
+  senza distinguere per `source`. Risponde `403 subscription_required`
+  quando il trial è scaduto e non c'è un abbonamento attivo — un profilo
+  mancante fa passare la richiesta invece di bloccarla, perché un profilo
+  mancante è un difetto di integrità, non una decisione sull'abbonamento
+  (stessa logica delle letture fallite: un errore non deve diventare la
+  base per negare un servizio).
+- `lib/useSubscription.ts` è lo stesso schema rete→cache→errore di
+  `usePayments`, ma per una riga sola: serve a mostrare il banner del trial
+  in Home *prima* che l'utente lo scopra da una notifica di errore della
+  Shortcut, che nessuno apre per capire perché l'automazione si è fermata.
+- Referral: ogni utente ha un `referral_code` (8 esadecimali, generato dal
+  trigger). `redeem_referral_code(code)` è un'RPC e non un insert diretto
+  dal client — altrimenti chi si registra potrebbe assegnarsi un referrer
+  qualsiasi modificando la chiamata. Il referral si conferma in
+  `ingest-payment`, non alla registrazione: solo al **primo pagamento
+  automatico riuscito** dell'amico invitato, la prova che ha impostato
+  l'automazione e non solo scaricato l'app. Dopo 5 referral confermati
+  totali chi ha invitato sblocca 2 mesi extra — `bonus_months_granted`
+  rende il traguardo unico e non ripetibile.
+- L'acquisto vero richiede **In-App Purchase Apple** (regola App Store
+  3.1.1, un abbonamento consumato dentro l'app non può passare da uno
+  checkout esterno) tramite RevenueCat, che serve una build nativa — non
+  funziona dentro Expo Go. Fino a quel momento il pulsante "Abbonati" in
+  `SubscriptionScreen` resta disattivato di proposito: lo schema e
+  l'enforcement sono pronti, manca solo il pagamento.
 
 ## Git e pubblicazione
 

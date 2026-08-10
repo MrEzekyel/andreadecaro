@@ -8,7 +8,9 @@ export type SettingsPage =
   | "people"
   | "automations"
   | "income"
-  | "export";
+  | "export"
+  | "subscription"
+  | "referral";
 
 type Nav = {
   /** Porta alla scheda Impostazioni gia' aperta su una sua sottopagina. */
