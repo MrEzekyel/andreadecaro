@@ -22,6 +22,19 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-11",
+    date: "2026-08-11",
+    title: "La Home, ridisegnata",
+    items: [
+      "Due schede in cima: Uscite ed Entrate, per lo stesso mese.",
+      "Il budget è un semicerchio: quanto hai speso, quanto resta, e una tacca che segna dove saresti spendendo uguale ogni giorno.",
+      "Accanto, tre numeri nuovi: quanto spendi al giorno, dove finisci di questo passo, e quanti giorni mancano.",
+      "Introiti e uscite a confronto sulla stessa scala: lo spazio fra le due barre è quello che ti avanza.",
+      "Un grafico dice se questo mese è pesante rispetto agli ultimi sei.",
+      "In Entrate: da dove arrivano i soldi, quanto te ne resta giorno per giorno, e le entrate mese per mese dell'anno.",
+    ],
+  },
+  {
     id: "2026-08-10",
     date: "2026-08-10",
     title: "Protezione e uso senza rete",

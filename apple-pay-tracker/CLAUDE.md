@@ -137,12 +137,54 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   capire che il primo è la somma degli altri due. `StatTiles` affianca i
   numeri secondari in riquadri: un elenco verticale di coppie
   etichetta-valore si legge tutto o niente e nessun numero emerge.
-- L'hero della Home affianca allo speso il **"Restano X €"** (verde, o
-  "Oltre il limite" in rosso) quando esiste un limite mensile e si guarda
-  il mese corrente: è il numero con cui si decide ("posso permettermi
-  questa cena?"), non un derivato da calcolare a mente. È il "Free to
-  Spend" di Copilot Money, il riferimento del settore — confermato
-  guardando la concorrenza su richiesta di Andrea.
+- **La Home ha due schede, «Uscite» ed «Entrate»** (segmented control sotto
+  il titolo del mese). Rispondono a domande opposte e messe in colonna una
+  dopo l'altra facevano scorrere mezza schermata per arrivare alla seconda.
+  Il mese scelto vale per entrambe: si sfoglia il calendario una volta sola.
+- **`components/SemiGauge.tsx` — il semicerchio, non l'anello.** Prima
+  versione: anello a 270°, bocciata da Andrea («é gigantesco»). Un
+  semicerchio dice le stesse tre cose (quanto, su quanto, se sei in
+  anticipo grazie alla tacca del ritmo) in metà dell'altezza, e lo spazio
+  liberato accanto porta i numeri che prima non c'erano: spesa media al
+  giorno, proiezione di fine mese, giorni rimasti. La proiezione va in
+  ambra quando supera il limite — è l'unico avviso che arriva *prima* di
+  sforare. Regge più segmenti per arco perché in «Entrate» l'arco esterno è
+  diviso per fonte di introito.
+- **La proiezione di fine mese non moltiplica i costi fissi.** Sono già
+  interi dentro `fixedCostsTotal` dal primo giorno: proiettarli
+  moltiplicherebbe il mutuo per trenta. Si proietta solo la parte
+  variabile (`fixedCostsTotal + variabile / giorniTrascorsi * giorniMese`).
+- **`components/FlowCompare.tsx` — introiti contro uscite su una scala
+  sola.** Idea di Andrea, e risolve un difetto vero del diagramma di flusso
+  classico: con tre rami che partono da sinistra e finiscono tutti
+  allineati a destra, il divario fra quanto entra e quanto esce non si vede
+  affatto. Qui la barra più lunga è quella che vince (introiti se il mese
+  chiude in positivo, uscite se in rosso) e l'altra si misura contro di
+  lei; l'investito riparte da dove finisce lo speso, quindi **la distanza
+  fra le due punte è quello che avanza** — uno spazio da guardare, non un
+  numero da leggere. Ha sostituito `SavingsSummary`, che diceva la stessa
+  cosa come sottrazione scritta a parole.
+- **`components/MonthBars.tsx`** risponde a «sto spendendo tanto?», che il
+  totale del mese da solo non può: solo il confronto coi mesi già vissuti
+  lo dice. I mesi passati restano spenti, solo quello corrente prende il
+  colore pieno — è l'unico ancora in movimento. Le barre qui sono volute da
+  Andrea esplicitamente, dopo aver escluso i grafici a barre altrove.
+- **`components/BalanceChart.tsx` — l'andamento delle spese rovesciato.**
+  Nella scheda Entrate: parte da zero, sale a ogni introito (gradino
+  etichettato con l'importo, altrimenti sembra un errore di lettura) e
+  scende a ogni spesa. È l'unico grafico che risponde a «quanto mi resta»
+  senza far fare sottrazioni: la linea **è** quello che resta. L'asse
+  scende sotto zero solo se il saldo ci è andato davvero.
+- **Le fonti di introito usano gradazioni di verde** (`INCOME_SHADES` in
+  `HomeScreen.tsx`), non i colori delle categorie di spesa: devono restare
+  leggibili come «entrata» a colpo d'occhio, e un rosa o un blu accanto al
+  verde romperebbe quella lettura prima ancora di dire quale fonte è.
+- Il semicerchio delle Uscite mostra **"restano X €"** dentro l'arco (o
+  "oltre di X €" in rosso): è il numero con cui si decide ("posso
+  permettermi questa cena?"), non un derivato da calcolare a mente. È il
+  "Free to Spend" di Copilot Money, il riferimento del settore — confermato
+  guardando la concorrenza su richiesta di Andrea. Sostituisce del tutto la
+  vecchia barra `LimitCard` in Home (che resta usata in `LimitsScreen`).
 - **"Prossimi addebiti" invece del peso percentuale dei ricorrenti**: la
   vecchia barra ("6 pagamenti ricorrenti · 56%") era un numero che non
   chiedeva niente a nessuno; le prossime 2-3 rate con la data relativa
@@ -201,6 +243,14 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   invece di decidere caso per caso.
 - `recurring_rules` → `materialize_recurring()` genera le spese ricorrenti
   ogni notte via pg_cron (mutuo, abbonamenti).
+- `monthly_totals(p_months)` (migration `0035`) aggrega spese, introiti e
+  investito **per mese, nel database**, per i due grafici a barre della
+  Home. Stessa ragione di `portfolio_daily`: sommare lato app vorrebbe dire
+  scaricare un anno di pagamenti a ogni apertura, e PostgREST tronca a 1000
+  righe *senza dare errore* — un mese vecchio comparirebbe più basso del
+  vero senza che niente lo segnali. È `security invoker` e non `definer`:
+  qui la RLS serve, non va aggirata, e ogni utente vede i propri totali
+  perché le policy sulle tabelle sottostanti si applicano a lui.
 - `investment_rules` = i **piani di accumulo** (schermata PAC). Il ciclo è
   interamente automatico e **non richiede mai un import**:
   1. `materialize_investments()` (cron 05:00 UTC) inserisce la rata il giorno
