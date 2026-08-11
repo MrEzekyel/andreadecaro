@@ -20,6 +20,27 @@ Prompt per la generazione immagini (Nanobanana Pro) per la pagina social di
   peso basso, mai bold pesante, coerente con lo stile tipografico di Claude
   già usato in app (`CLAUDE.md` → "pesi tipografici bassi, mai oltre 600")
 
+## UI reale, non generata
+
+È un'app: quando lo schermo del telefono deve mostrare l'interfaccia, si usa
+uno **screenshot vero** composto dentro una cornice iPhone, non un'interfaccia
+inventata dal modello — altrimenti il rischio è un'app "plausibile" ma diversa
+da quella reale (colori sballati, layout inventato), la stessa disonestà che
+il resto del progetto evita sempre. Nanobanana Pro accetta un'immagine di
+riferimento insieme al prompt: si allega lo screenshot e si chiede di
+comporlo dentro una cornice iPhone nella scena descritta, senza modificarne il
+contenuto.
+
+Screenshot serviti, e dove vanno:
+1. **Home con una spesa appena registrata in cima alla lista** → A2, A6 slide 2, B2
+2. **Home o Statistiche con il grafico dell'andamento mensile** → A7
+3. **Investimenti** → B4
+
+Ogni prompt qui sotto segnato **[UI reale]** presuppone lo screenshot allegato
+come immagine di riferimento. I prompt senza quel segno restano generazione
+pura — lo schermo del telefono, dove compare, resta volutamente non
+leggibile (gesto, non contenuto), quindi non serve nessuno screenshot.
+
 ## Blocco stile (da includere in ogni prompt)
 
 ```
@@ -33,9 +54,9 @@ Brand color palette: warm orange #FF5E2C as dominant background/accent, warm van
 [Blocco stile] Full-bleed warm orange #FF5E2C background. Large, light-weight sans-serif headline in vanilla #FFF6C0, centered, reading "Il rumore dei soldi che spendi, finalmente lo senti prima" — but only the word "Clinck" is set much larger and bolder than the rest, acting as the visual anchor. In the bottom third, a small comic-style sound burst / speech-bubble shape in vanilla outline containing the word "CLINCK!" like an onomatopoeia in a comic panel. Plenty of empty orange space around the type. No photography, no icons, pure typographic poster.
 ```
 
-### A2 — Il gancio prodotto (prima/dopo)
+### A2 — Il gancio prodotto (prima/dopo) **[UI reale — screenshot 1]**
 ```
-[Blocco stile] Split composition, top half solid vanilla #FFF6C0, bottom half solid orange #FF5E2C. Top half: a photorealistic hand holding an iPhone near a payment terminal, subtle motion/glow suggesting an Apple Pay tap, minimal, cropped tight, warm color grading toward orange tones. Bottom half: light-weight vanilla sans-serif text "Paghi. Appare da sola." with a small comic-style burst icon containing "clinck" next to the word "appare". No app UI screenshots in this one — pure gesture and typography.
+[Blocco stile] Split composition, top half solid vanilla #FFF6C0, bottom half solid orange #FF5E2C. Top half: a photorealistic hand holding an iPhone near a payment terminal, subtle motion/glow suggesting an Apple Pay tap, minimal, cropped tight, warm color grading toward orange tones — the phone screen is angled away from camera or motion-blurred, not showing app content here. Bottom half: a second iPhone shown straight-on and sharp, composited using the attached real app screenshot inside a realistic iPhone 15/16 frame (no watch, no other UI chrome), the screenshot content exactly as provided, not altered or reinterpreted. Vanilla sans-serif light-weight caption above the second phone: "Paghi. Appare da sola." with a small comic-style burst icon containing "clinck" next to the word "appare".
 ```
 
 ### A3 — La leva privacy
@@ -53,6 +74,11 @@ Brand color palette: warm orange #FF5E2C as dominant background/accent, warm van
 [Blocco stile] Solid vanilla #FFF6C0 background. A minimal flat line-art icon in orange #FF5E2C of an ascending bar chart (matching the app icon style, four bars ascending left to right), centered, medium size. Below, ink #141413 light-weight headline: "Spese e investimenti. Un posto solo." Clean, generous white space, no additional graphic elements.
 ```
 
+### A7 — Vetrina prodotto: andamento mensile **[UI reale — screenshot 2]**
+```
+[Blocco stile] Solid orange #FF5E2C background. A realistic iPhone 15/16 frame, centered and large (occupying most of the vertical space), containing the attached real app screenshot exactly as provided, not altered or reinterpreted, shown straight-on. Small vanilla #FFF6C0 light-weight caption above the phone: "Il mese, in una schermata." App Store screenshot style — the phone is the hero, minimal additional graphic elements, generous orange margin around it.
+```
+
 ### A6 — Carosello "Come funziona" (3 slide, organico)
 
 *Slide 1:*
@@ -60,9 +86,9 @@ Brand color palette: warm orange #FF5E2C as dominant background/accent, warm van
 [Blocco stile] Solid orange #FF5E2C background. Large vanilla numeral "1" top-left, small and light-weight. Centered below, vanilla headline: "Paghi con Apple Pay." Simple flat icon of a phone tapping a payment symbol, orange-on-vanilla line art, small, placed below the text.
 ```
 
-*Slide 2:*
+*Slide 2:* **[UI reale — screenshot 1]**
 ```
-[Blocco stile] Solid vanilla #FFF6C0 background. Large orange numeral "2" top-left, small and light-weight. Centered below, ink #141413 headline: "Clinck la registra da sola." Small comic-style burst icon with "clinck" inside, orange outline, placed below the text.
+[Blocco stile] Solid vanilla #FFF6C0 background. Large orange numeral "2" top-left, small and light-weight. Centered below, ink #141413 headline: "Clinck la registra da sola." Below the headline, a realistic iPhone 15/16 frame containing the attached real app screenshot exactly as provided, not altered or reinterpreted, shown straight-on, medium size, centered. Small comic-style burst icon with "clinck" inside, orange outline, placed near the top of the phone frame as if popping out of the screen.
 ```
 
 *Slide 3:*
@@ -81,14 +107,19 @@ primo test renderebbe il risultato illeggibile.
 [Blocco stile] Solid vanilla #FFF6C0 background. Bold light-weight ink #141413 headline, large, taking most of the frame: "Hai scaricato tre app per tracciare le spese e le hai mollate tutte?" Small orange sans-serif line at the very bottom: "Questa si scrive da sola." No photography, pure typographic hook slide — designed to be the first slide of a carousel ad, must stop the scroll with text alone.
 ```
 
-### B2 — Hook sul gesto (prima/dopo visivo)
+### B2 — Hook sul gesto (prima/dopo visivo) **[UI reale — screenshot 1, facoltativo]**
 ```
-[Blocco stile] Solid orange #FF5E2C background, photorealistic close-up of a hand tapping an iPhone against a payment terminal, warm orange color grading, cropped tight and cinematic, shot from a low angle. Overlaid in the lower third, vanilla #FFF6C0 light-weight sans-serif text: "Il momento in cui la tua spesa si registra da sola." Small comic burst icon with "clinck" near the tap point. Designed as the first slide of a carousel ad.
+[Blocco stile] Solid orange #FF5E2C background, photorealistic close-up of a hand tapping an iPhone against a payment terminal, warm orange color grading, cropped tight and cinematic, shot from a low angle — the phone screen is angled away from camera, not showing app content. Below or beside this, a second small realistic iPhone frame containing the attached real app screenshot exactly as provided, not altered, positioned as if it's what happens a second later. Overlaid vanilla #FFF6C0 light-weight sans-serif text: "Il momento in cui la tua spesa si registra da sola." Small comic burst icon with "clinck" near the tap point. Designed as the first slide of a carousel ad. (If no screenshot is attached for this one, omit the second phone and keep it as pure gesture photography.)
 ```
 
 ### B3 — Hook sul prezzo/trial
 ```
 [Blocco stile] Solid orange #FF5E2C background. Enormous vanilla #FFF6C0 light-weight numeral "2" as the dominant visual element, filling most of the vertical space. Beneath it, smaller vanilla text: "mesi gratis per provarla." Small ink-on-vanilla caption pill at the very bottom: "poi 1,99€/mese." Minimal, numeral-led, no photography.
+```
+
+### B4 — Vetrina prodotto: investimenti **[UI reale — screenshot 3]**
+```
+[Blocco stile] Solid vanilla #FFF6C0 background. A realistic iPhone 15/16 frame, centered and large, containing the attached real app screenshot (Investimenti) exactly as provided, not altered or reinterpreted, shown straight-on. Ink #141413 light-weight caption above the phone: "Le tue spese. I tuoi investimenti. Un'app sola." App Store screenshot style — the phone is the hero, minimal additional graphic elements.
 ```
 
 ## Prossimo passo
