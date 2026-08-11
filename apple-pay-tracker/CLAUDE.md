@@ -596,6 +596,14 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   `Image`. Se in futuro la foto torna a sballarsi, il sospetto numero uno è
   di nuovo `width: "%"` o `aspectRatio` su un `Image`, non il dato in
   `guideImages.ts`.
+- **La didascalia viene prima della foto, non dopo**, e la foto è al 65%
+  di larghezza allineata a sinistra invece che a piena larghezza: sui passi
+  con uno screenshot di una schermata intera (alta quanto lo schermo)
+  leggere la didascalia sotto costringeva a scorrere per arrivarci, e la
+  foto a piena larghezza da sola occupava già tutto lo spazio visibile.
+  Piccola e a sinistra lascia vedere titolo, didascalia e un pezzo di foto
+  senza scorrere, su ogni passo — non solo quelli con lo screenshot più
+  alto.
 - **Il permesso di iOS per l'automazione non ha uno screenshot vero**
   (Andrea non ce l'ha): il passo `consenti` disegna un alert **simulato**
   in codice (`step.action === "consent-illustration"` in

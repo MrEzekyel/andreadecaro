@@ -143,14 +143,27 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
             {step.title}
           </Text>
 
-          {/* Lo screenshot vero è il passo, non un'aggiunta: la didascalia
-              sotto è una riga sola apposta, per non tornare a un muro di
-              testo che nessuno legge mentre ha in mano Comandi Rapidi.
-              Width e height sono numeri espliciti calcolati dalla larghezza
-              misurata via onLayout, non percentuali: vedi il commento sopra
-              su shotWidth per il perché. */}
+          {/* La didascalia viene prima della foto, non dopo: su un passo con
+              uno screenshot alto (una schermata intera invece di
+              un'azione ritagliata) leggerla sotto costringeva a scorrere
+              per arrivarci. Un rigo letto subito, poi l'immagine come
+              conferma visiva. */}
+          <Text style={[styles.caption, { color: palette.ink2 }]}>
+            {step.caption}
+          </Text>
+
+          {/* Lo screenshot vero è il passo, non un'aggiunta. Larghezza al
+              65% e allineato a sinistra (non a piena larghezza): tenerlo
+              più piccolo lascia più schermate visibili senza scorrere,
+              specialmente quelle alte quanto lo schermo intero. Width e
+              height sono numeri espliciti calcolati dalla larghezza
+              misurata via onLayout, non percentuali sulla Image stessa:
+              vedi il commento sopra su shotWidth per il perché. */}
           {shot && (
-            <View onLayout={(e) => setShotWidth(e.nativeEvent.layout.width)}>
+            <View
+              style={styles.shotWrap}
+              onLayout={(e) => setShotWidth(e.nativeEvent.layout.width)}
+            >
               {shotWidth > 0 && (
                 <Image
                   source={shot.source}
@@ -199,10 +212,6 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
               </Text>
             </View>
           )}
-
-          <Text style={[styles.caption, { color: palette.ink2 }]}>
-            {step.caption}
-          </Text>
 
           {step.action === "open-install" && (
             <TouchableOpacity
@@ -306,13 +315,17 @@ const styles = StyleSheet.create({
   },
   chapter: { ...type.small, fontWeight: "500", letterSpacing: 0.6 },
   stepTitle: { ...type.title, fontSize: 20, marginTop: -4 },
-  caption: { ...type.body, lineHeight: 21, textAlign: "center" },
+  caption: { ...type.body, lineHeight: 21 },
   button: {
     borderRadius: radius.button,
     paddingVertical: 13,
     alignItems: "center",
   },
   buttonText: { ...type.bodyMedium, fontSize: 14.5 },
+  shotWrap: {
+    width: "65%",
+    alignSelf: "flex-start",
+  },
   shot: {
     borderRadius: radius.card,
   },
