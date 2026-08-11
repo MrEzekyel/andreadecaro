@@ -286,3 +286,13 @@ cosa a cui Apple guarda con attenzione è la privacy policy.
 - ✅ Trial di 2 mesi, blocco automazione a scadenza, referral (schema,
   `ingest-payment`, schermate Abbonamento e Invita un amico, banner in
   Home) — manca solo l'acquisto vero via RevenueCat, vedi sopra
+- ✅ **Account demo per gli screenshot** — `andysuper2002@gmail.com`, dati
+  finti (non i tuoi) su sei mesi: ~15-18 spese al giorno sparse fra
+  esercenti italiani veri, affitto/Netflix/Spotify/palestra ricorrenti,
+  stipendio + entrate occasionali, limite mensile a 1.300 €, 3 prossimi
+  addebiti attivi, un piccolo portafoglio (ETF S&P 500 + Bitcoin) con sei
+  mesi di PAC. Agosto si ferma all'11, per non "spendere" giorni che non
+  sono ancora passati. I prezzi degli asset sono plausibili ma scritti a
+  mano (`source='manual'`), non veri: bastano a far quadrare i grafici,
+  ma se apri Investimenti e tocchi "Aggiorna" prenderà i prezzi veri da
+  Yahoo da quel momento in poi.
