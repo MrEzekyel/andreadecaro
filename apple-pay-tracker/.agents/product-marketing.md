@@ -1,6 +1,6 @@
 # Product Marketing Context
 
-**Document version:** v2
+**Document version:** v3
 **Last updated:** 2026-08-11
 
 > ⚠️ Documento redatto sulle informazioni di prodotto disponibili, **senza
@@ -146,7 +146,7 @@ Prodotto B2C self-serve: nessuna catena di decisione, una sola persona che scari
 
 ## Goals
 
-**Business goal:** Validare se l'automazione Apple Pay è un gancio sufficiente a generare conversione trial→abbonamento, prima di investire in canali più costosi. Primo test: sponsorizzazione Meta Ads (caroselli Instagram) per un mese dopo la pubblicazione su App Store, con soglia indicativa di 20-50 utenti che completano l'automazione (non solo il download) per decidere se scalare o passare a contenuti organici TikTok.
+**Business goal:** Validare se l'automazione Apple Pay è un gancio sufficiente a generare conversione trial→abbonamento, prima di investire in canali più costosi. Primo test: sponsorizzazione Meta Ads (caroselli Instagram) dopo la pubblicazione su App Store, **budget fisso di 100€** (esclusi i costi Apple Developer Program) — con questo tetto lo scenario centrale plausibile è 15-20 utenti che completano l'automazione (non solo il download), non le 50 del riferimento iniziale. La lettura del risultato è sul **costo per automazione completata**, non su un conteggio assoluto: dettagli e regola di decisione in `.agents/marketing-plan.md` §4/§13.
 
 **Key conversion action:** Non il download — è **completare l'automazione** (costruire la Shortcut, registrare il primo pagamento vero). È il vero "aha moment": un download senza automazione attiva non dimostra niente sul prodotto.
 
@@ -156,5 +156,6 @@ Prodotto B2C self-serve: nessuna catena di decisione, una sola persona che scari
 
 ## Changelog
 *Newest first. One line per revision: what changed and why.*
+- v3 (2026-08-11) — Fissato il budget del test Meta Ads a 100€ (tetto deciso da Andrea): ricalibrata la soglia di successo in Goals da "20-50 utenti" a "15-20 scenario centrale, letto sul costo per automazione" — dettaglio in `.agents/marketing-plan.md`.
 - v2 (2026-08-11) — Aggiunta la data di lancio target (10 ottobre pubblicazione, metà ottobre lancio) in Goals, decisa da Andrea con finestra di 60 giorni.
 - v1 (2026-08-11) — Documento iniziale, redatto da contesto di prodotto (README, PRODOTTO.md, decisioni di business già prese) senza customer research reale: sezioni target, differenziazione, objections e customer language sono ipotesi di lavoro marcate ⚠️, da rivedere con i primi utenti veri.

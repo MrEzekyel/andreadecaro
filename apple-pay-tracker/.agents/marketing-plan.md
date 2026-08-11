@@ -7,10 +7,17 @@
 
 **Nota sul metodo:** questo piano segue la struttura fCMO a 13 sezioni/AARRR, ma è
 adattato in modo pesante alla realtà del cliente: **fondatore solo, autofinanziato,
-senza round di raccolta, senza budget marketing ancora definito, pre-lancio**.
-Dove il template standard presuppone un team e capitale di rischio, questo piano lo
-dice esplicitamente e sostituisce la logica "cosa sblocca il prossimo round" con
-"cosa sblocca il primo segnale di ricavo reale" — è la metrica che conta qui.
+senza round di raccolta, pre-lancio**. Dove il template standard presuppone un
+team e capitale di rischio, questo piano lo dice esplicitamente e sostituisce la
+logica "cosa sblocca il prossimo round" con "cosa sblocca il primo segnale di
+ricavo reale" — è la metrica che conta qui.
+
+**Aggiornamento 11 agosto:** budget del test Meta Ads fissato da Andrea a
+**100€, tetto fisso** (esclusi i costi Apple Developer Program). Di conseguenza
+la soglia "20-50 utenti" del brief iniziale è stata ricalibrata: con 100€ lo
+scenario centrale plausibile è 15-20 automazioni completate, e la metrica di
+lettura del test diventa il **costo per automazione**, non un conteggio
+assoluto — vedi §4 Move 3 e §13 per i conti e la regola di decisione.
 
 ---
 
@@ -30,11 +37,15 @@ l'automazione, prima di decidere se e quanto investire in canali a pagamento.
    (installare Expo Go per installare l'app dentro). Ogni settimana di ritardo sul
    primo anello si mangia margine dal lancio, non dal budget ads.
 2. **Il test a pagamento deve rispondere a una domanda sola, non a tre.** Il piano
-   di Andrea (caroselli Meta Ads → 20-50 utenti attivi sull'automazione → eventuale
+   di Andrea (caroselli Meta Ads → utenti attivi sull'automazione → eventuale
    TikTok organico) è corretto nell'impianto, ma va isolato: creativo unico,
-   messaggio unico, un mese, una soglia numerica netta. Mescolare più varianti nel
-   primo test renderebbe il risultato illeggibile — non si saprebbe se un fallimento
-   è colpa del messaggio, del prezzo o del pubblico.
+   messaggio unico. Mescolare più varianti nel primo test renderebbe il risultato
+   illeggibile — non si saprebbe se un fallimento è colpa del messaggio, del
+   prezzo o del pubblico. Con un tetto di **100€** (deciso da Andrea, esclusi i
+   costi Apple Developer Program), la lettura giusta non è più "quanti utenti
+   totali" ma **quanto costa un'automazione completata** — coi conti fatti in
+   §4/§9, 100€ producono realisticamente 5-40 automazioni, non i 20-50 ipotizzati
+   inizialmente come riferimento comodo.
 3. **La metrica giusta non è il download.** È **l'automazione completata con un
    pagamento vero registrato**. Un download è gratis e non dice niente sul
    prodotto; un'automazione configurata è la prova che qualcuno ha davvero superato
@@ -58,8 +69,9 @@ l'automazione, prima di decidere se e quanto investire in canali a pagamento.
 2. Costruire una pagina prodotto minima (non esiste oggi) — serve da bio-link per TikTok/Instagram e da destinazione per i primi click organici, prima ancora dell'App Store
 3. Portare a termine RevenueCat, build nativa, TestFlight, submission (catena tecnica, non marketing, ma la precondizione di tutto)
 4. Preparare i creativi Meta Ads (caroselli) con Andrea che cura palette/moodboard — pronti *prima* della pubblicazione, non dopo
-5. Definire il budget test reale (oggi non ancora deciso — vedi §13, decisione aperta #1)
-6. Lanciare il test Meta Ads a lancio pubblicazione, con la soglia 20-50 come criterio di stop/scale già scritto prima di partire, non deciso a posteriori
+5. ~~Definire il budget test reale~~ — **fatto: 100€, esclusi i costi Apple Developer Program**
+6. Spendere i primi ~20-25€ in 2-3 giorni per leggere il CPI reale prima di impegnare il resto — con un tetto così piccolo, un CPI disastroso letto solo a fine budget non lascerebbe margine per correggere
+7. Lanciare il resto del test con la regola costo-per-automazione già scritta in §9/§13, non decisa a posteriori
 
 ---
 
@@ -125,8 +137,11 @@ pagamento funziona, andrebbe considerato solo dopo un segnale di ricavo reale
 
 ### Budget marketing (oggi)
 
-- **Paid acquisition: da definire — decisione aperta #1 (§13).** Andrea ha in
-  mente "caroselli Meta Ads per un mese" ma non ha ancora fissato una cifra.
+- **Paid acquisition: 100€, tetto fisso, esclusi i costi Apple Developer Program.**
+  Deciso da Andrea l'11 agosto. Cifra piccola per un test app-install: coi
+  benchmark indicativi in §4 Move 3, produce realisticamente 5-40 automazioni
+  completate, non le 50 ipotizzate come riferimento iniziale — il piano legge il
+  risultato sul costo per automazione, non su un conteggio assoluto (§13).
 - **Stack tooling:** Supabase (già in uso per il prodotto, non marketing puro),
   nessun tool marketing dedicato ancora (no Mixpanel/Amplitude, no ESP per
   lifecycle email, no tool ASO a pagamento)
@@ -229,12 +244,33 @@ paid all'inizio, l'ASO è l'unico canale che porta traffico "gratis" — chi cer
 submission, non dopo. **Skill:** `aso`.
 
 **Move 3 — Meta Ads (caroselli Instagram), il test principale.**
-Come da piano di Andrea: caroselli sponsorizzati, un mese, dopo la pubblicazione
-App Store (mai prima — vedi §1, il funnel Expo Go romperebbe la lettura del
-test). Creativo unico e coerente con la voce del brand (onesto sui limiti,
-niente hype), obiettivo di installazione app reale (non traffico al link, ora
-che l'app store esiste). Soglia di successo: **20-50 utenti che completano
-l'automazione**, non download. **Skill:** `ads`, `ad-creative`.
+Come da piano di Andrea: caroselli sponsorizzati dopo la pubblicazione App Store
+(mai prima — vedi §1, il funnel Expo Go romperebbe la lettura del test).
+Creativo unico e coerente con la voce del brand (onesto sui limiti, niente
+hype), obiettivo di installazione app reale (non traffico al link, ora che
+l'app store esiste). **Skill:** `ads`, `ad-creative`.
+
+**Budget: 100€, tetto fisso deciso da Andrea (esclusi i costi Apple Developer
+Program).** I conti, indicativi e da verificare live in Meta Ads Manager una
+volta partita la campagna:
+
+| Voce | Stima bassa | Stima alta |
+|---|---|---|
+| Costo per installazione (CPI, Italia, categoria finanza/utility) | 0,60 € | 1,80 € |
+| Installazioni con 100€ | ~165 | ~55 |
+| % che completa l'automazione (attrito reale: Comandi Rapidi, anche con guida e shortcut pronto) | 25% | 10% |
+| **Automazioni completate** | **~41** | **~6** |
+
+Scenario centrale plausibile: **15-20 automazioni**, non le 50 del riferimento
+iniziale. Non è un fallimento del piano, è la matematica di un budget di 100€:
+la metrica che conta a questa cifra è il **costo per automazione completata**,
+non il conteggio assoluto — regola di lettura in §13.
+
+**Gestione del rischio con un tetto così piccolo:** spendere ~20-25€ nei primi
+2-3 giorni, leggere il CPI reale, e solo a quel punto decidere se impegnare i
+restanti 75-80€ sullo stesso creativo o fermarsi prima — con 100€ totali, un
+CPI disastroso scoperto solo a budget esaurito non lascerebbe margine per
+correggere nulla.
 
 **Move 4 — TikTok organico, canale di riserva/prosecuzione.**
 Non "in caso di fallimento" ma "in parallelo, a costo zero, indipendentemente
@@ -442,7 +478,7 @@ crescita.
 |---|---|---|
 | Avviare iscrizione Apple Developer Program + Small Business Program | Prerequisito | Andrea |
 | Acquistare il dominio (sblocca anche email/privacy policy, non solo marketing) | Prerequisito | Andrea |
-| Fissare il budget del test Meta Ads (decisione aperta #1) | Revenue/Acquisition | Andrea |
+| ~~Fissare il budget del test Meta Ads~~ — fatto: 100€ | Revenue/Acquisition | Andrea |
 | Iniziare bozza pagina prodotto minima | Acquisition | Claude, con contenuti da Andrea |
 | Migrazione a repo privato | Prerequisito | Claude, su comando di Andrea |
 
@@ -475,10 +511,11 @@ crescita.
 |---|---|---|
 | Review Apple (con margine per un ciclo di richiesta chiarimenti) | Prerequisito | Apple |
 | **Pubblicazione App Store** | — | — |
-| **Lancio campagna Meta Ads** (1 mese, creativo unico, obiettivo installazione app) | Acquisition | Andrea |
+| **Lancio campagna Meta Ads** — tranche iniziale ~20-25€, 2-3 giorni, per leggere il CPI reale | Acquisition | Andrea |
+| Se il CPI regge: impegnare i restanti 75-80€ sullo stesso creativo | Acquisition | Andrea |
 | Andrea come primo referrer (§7 Move 2) | Referral | Andrea |
-| Monitoraggio settimanale: download vs. automazioni completate vs. spesa | Measurement | Claude, dati da Andrea |
-| A fine mese: lettura del risultato contro soglia 20-50, decisione scala/pivot | Measurement | Andrea + Claude |
+| Monitoraggio continuo: installazioni vs. automazioni completate vs. spesa residua | Measurement | Claude, dati da Andrea |
+| A budget esaurito (100€): lettura del risultato sul costo per automazione completata (regola in §13), decisione scala/pivot | Measurement | Andrea + Claude |
 
 ---
 
@@ -506,7 +543,7 @@ primo mese di utenti veri.
 - Primo dato di conversione trial→abbonamento (parziale — il trial dura 2 mesi, quindi solo i primissimi utenti del lancio avranno già attraversato l'intero ciclo)
 - Decisione esplicita: raddoppiare su Meta Ads, spostarsi su TikTok organico, o entrambi
 
-**Target KPI:** 20-50 utenti con automazione attiva (soglia già fissata); CAC osservato (nessun target a priori — è il numero da scoprire).
+**Target KPI:** 100€ di spesa totale; 15-20 automazioni completate come scenario centrale plausibile (range realistico 6-41, vedi §4 Move 3); costo per automazione osservato, letto contro le soglie di §13 (≤5€ forte, 5-10€ borderline, >10€ pivot).
 
 **Posizione sulla curva S:** un'unica curva in avvio (paid Meta Ads), nessun'altra ancora attiva.
 
@@ -726,14 +763,18 @@ duplicarla qui.
 
 ### Decisioni aperte, per impatto
 
-1. **Budget del test Meta Ads.** Non ancora fissato. È la decisione a più alto
-   impatto del piano: senza un numero, §9-§10 restano scheletro. Andrea deve
-   fissarlo prima della settimana 9 (lancio campagna).
-2. **CAC target implicito.** Nessuna soglia di CAC accettabile è stata
-   discussa, solo una soglia di utenti totali (20-50). Vale la pena decidere
-   *prima* del lancio anche "se il CAC supera X€, fermiamo comunque, anche se
-   sotto i 50 utenti" — altrimenti il rischio è continuare a spendere solo
-   perché la soglia numero-utenti non è ancora raggiunta.
+1. ~~**Budget del test Meta Ads.**~~ **Risolto (11 agosto): 100€, tetto fisso,
+   esclusi i costi Apple Developer Program.** Conseguenza diretta: la soglia di
+   successo si sposta da "20-50 utenti" a "costo per automazione completata"
+   (§4 Move 3, §9, §10) — con questo budget lo scenario centrale plausibile è
+   15-20 automazioni, non 50.
+2. **Regola di lettura del costo per automazione — proposta, da confermare con
+   Andrea prima del lancio:** ≤5€/automazione = segnale forte, si valuta un
+   budget più alto in Q2; 5-10€ = borderline, si rifinisce il creativo prima
+   di spendere ancora; >10€ = il canale paid non regge a questo budget, si
+   passa su TikTok organico come piano B già previsto. Senza questa regola
+   scritta *prima* del lancio, il rischio è interpretare il risultato a
+   posteriori in modo troppo indulgente.
 3. **Chi fa i primi 1-2 tester esterni del giro di test pre-lancio.** Il
    checklist di test in `DA-FARE.md` è pensato per Andrea; un secondo paio
    d'occhi (non tecnico, non il fondatore) troverebbe punti di attrito che
