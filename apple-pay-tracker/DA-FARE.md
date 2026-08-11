@@ -69,16 +69,18 @@ Guida, e dallo stato vuoto della Home). Ogni passo mostra il nome esatto
 dell'azione da cercare e i campi da riempire, riprodotti schematicamente.
 
 Mentre costruisci il comando rapido sul tuo iPhone, fai uno screenshot di
-questi sette passaggi — sono quelli dove si sbaglia:
+questi passaggi — sono quelli dove si sbaglia:
 
 | File da salvare in `assets/guida/` | Cosa deve mostrare |
 | --- | --- |
 | `merchant.png` | L'azione "Ottieni valore dizionario" con chiave `merchant` |
 | `amount.png` | La stessa con chiave `amount` |
-| `richiesta.png` | "Ottieni contenuti di URL" aperto, con metodo, intestazione e corpo JSON |
+| `token.png` | La stessa con chiave `token` |
+| `richiesta.png` | "Ottieni contenuti di URL" aperto, con metodo, intestazione (il valore preso come variabile, non scritto a mano) e corpo JSON |
 | `se.png` | Il blocco "Se" con la condizione *contiene* `"ok":true` |
 | `salvataggio.png` | "Aggiungi a file" con il file di recupero |
-| `dizionario.png` | Il "Dizionario" dell'automazione con Esercente e Importo |
+| `chiave.png` | Il passo "Genera la tua chiave" nel capitolo dell'automazione |
+| `dizionario.png` | Il "Dizionario" dell'automazione con token, Esercente e Importo |
 | `esegui.png` | "Esegui comando rapido" con input il Dizionario |
 
 Ritaglia la singola azione invece della schermata intera (si legge su un

@@ -544,6 +544,19 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 - Il progresso è salvato: questa procedura si fa passando avanti e indietro
   fra due app, e ricominciare da capo a ogni ritorno è il modo più rapido per
   farla abbandonare.
+- **Il Dizionario dell'automazione (capitolo 2) deve contenere `token`,
+  `merchant` e `amount` — non solo gli ultimi due.** Chi installa il comando
+  già pronto dal link salta per intero il capitolo 1, quindi il capitolo 2 è
+  l'unico posto in cui vede il passo "Genera la tua chiave": se il Dizionario
+  non porta anche `token`, «Registra spesa» (che lo legge da lì, non da un
+  valore scritto al suo interno) risponde 401 a ogni chiamata e la spesa
+  finisce solo nel recupero locale, mai in app — bug reale, scoperto da
+  Andrea leggendo la guida a mente fredda dopo averla seguita. Per lo stesso
+  motivo il capitolo 1 costruisce «Registra spesa» leggendo anch'esso il
+  token da «Input Comando rapido» invece di scriverlo dentro l'azione
+  "Ottieni contenuti di URL": le due varianti (installata o costruita a
+  mano) devono restare identiche nell'architettura, altrimenti il capitolo 2
+  smette di valere per una delle due.
 
 ### Novità in-app
 

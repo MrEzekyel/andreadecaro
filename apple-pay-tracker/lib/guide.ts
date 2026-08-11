@@ -109,30 +109,41 @@ export const GUIDE: GuideChapter[] = [
         ],
       },
       {
+        id: "token",
+        title: "Estrai la chiave",
+        body: "Aggiungi una terza «Ottieni valore dizionario», identica alle altre due ma con chiave token. È così che il comando riconosce di chi è la spesa: la chiave vera e propria la generi nel capitolo successivo, e arriva qui dentro un Dizionario passato dall'automazione — mai scritta dentro questo comando.",
+        blocks: [
+          {
+            action: "Ottieni valore dizionario",
+            fields: [
+              { label: "Ottieni", value: "Valore" },
+              { label: "Chiave", value: "token" },
+              { label: "In", value: "Input Comando rapido", variable: true },
+            ],
+          },
+        ],
+      },
+      {
         id: "url",
         title: "Copia l'indirizzo a cui mandare la spesa",
         body: "Serve nel passo successivo. Toccalo qui sotto per copiarlo: è personale del tuo account, non condividerlo insieme al comando.",
         action: "copy-url",
       },
       {
-        id: "token",
-        title: "Genera la tua chiave",
-        body: "È la password che dice al server che quella spesa è tua. Si vede una volta sola: generala adesso, copiala, e incollala subito nel passo seguente.",
-        action: "copy-token",
-        warning:
-          "Se la perdi non è un dramma: ne generi un'altra e revochi la vecchia da Impostazioni → Automazioni.",
-      },
-      {
         id: "richiesta",
         title: "Aggiungi la chiamata al server",
-        body: "Aggiungi «Ottieni contenuti di URL» e incolla l'indirizzo copiato. Apri «Mostra altro» per trovare metodo, intestazioni e corpo della richiesta. I valori di merchant e amount sono le variabili dei due passi precedenti, non testo scritto a mano.",
+        body: "Aggiungi «Ottieni contenuti di URL» e incolla l'indirizzo copiato. Apri «Mostra altro» per trovare metodo, intestazioni e corpo della richiesta. I valori di token, merchant e amount sono le variabili dei tre passi precedenti, non testo scritto a mano — se scrivi la chiave a mano qui dentro, chiunque installi questo stesso comando da un link condiviso finirebbe per usare la tua.",
         blocks: [
           {
             action: "Ottieni contenuti di URL",
             fields: [
               { label: "URL", value: "l'indirizzo copiato" },
               { label: "Metodo", value: "POST" },
-              { label: "Intestazione", value: "x-ingest-token = la tua chiave" },
+              {
+                label: "Intestazione",
+                value: "x-ingest-token = Valore dizionario (3º)",
+                variable: true,
+              },
               { label: "Corpo richiesta", value: "JSON" },
               { label: "merchant", value: "Valore dizionario (1º)", variable: true },
               { label: "amount", value: "Valore dizionario (2º)", variable: true },
@@ -217,20 +228,29 @@ export const GUIDE: GuideChapter[] = [
         body: "Attiva «Esegui immediatamente» e lascia spenta la notifica di esecuzione. Senza «Esegui immediatamente» dovresti confermare ogni pagamento a mano, e l'automatismo perderebbe senso.",
       },
       {
+        id: "chiave",
+        title: "Genera la tua chiave",
+        body: "È la password che dice al server che quella spesa è tua. Si vede una volta sola: generala adesso, copiala, e incollala subito nel passo seguente. Serve anche se hai installato il comando già pronto dal link — è personale tua, il comando condiviso non ne contiene nessuna.",
+        action: "copy-token",
+        warning:
+          "Se la perdi non è un dramma: ne generi un'altra e revochi la vecchia da Impostazioni → Automazioni.",
+      },
+      {
         id: "dizionario",
         title: "Prepara i dati da passare",
-        body: "Aggiungi un'azione «Dizionario» con due voci, prendendo i valori dal selettore variabili della transazione.",
+        body: "Aggiungi un'azione «Dizionario» con tre voci: incolla la chiave copiata nel passo precedente per token, poi prendi merchant e amount dal selettore variabili della transazione.",
         blocks: [
           {
             action: "Dizionario",
             fields: [
+              { label: "token", value: "la chiave copiata" },
               { label: "merchant", value: "Esercente", variable: true },
               { label: "amount", value: "Importo", variable: true },
             ],
           },
         ],
         warning:
-          "Questo passo sembra superfluo ma non lo è: il tipo «Transazione» non sopravvive al passaggio verso un altro comando rapido, arriva dall'altra parte svuotato. Ricostruire un dizionario con chiavi tue è l'unico modo perché i dati arrivino interi.",
+          "Il tipo «Transazione» non sopravvive al passaggio verso un altro comando rapido, arriva dall'altra parte svuotato — ricostruire un dizionario con chiavi tue è l'unico modo perché i dati arrivino interi. E senza la voce token il comando «Registra spesa» non sa a chi appartiene la spesa: la richiesta viene rifiutata e la spesa finisce solo nel recupero locale, mai in app.",
       },
       {
         id: "esegui",

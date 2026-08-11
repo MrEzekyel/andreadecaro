@@ -20,9 +20,11 @@ import { ImageSourcePropType } from "react-native";
 export const GUIDE_IMAGES: Record<string, ImageSourcePropType> = {
   // merchant: require("../assets/guida/merchant.png"),
   // amount: require("../assets/guida/amount.png"),
+  // token: require("../assets/guida/token.png"),
   // richiesta: require("../assets/guida/richiesta.png"),
   // se: require("../assets/guida/se.png"),
   // salvataggio: require("../assets/guida/salvataggio.png"),
+  // chiave: require("../assets/guida/chiave.png"),
   // dizionario: require("../assets/guida/dizionario.png"),
   // esegui: require("../assets/guida/esegui.png"),
 };
