@@ -14,7 +14,7 @@ si riporta nella tabella di stato.
 | Sprint | Punti | Stato | Verifica |
 | --- | --- | --- | --- |
 | 1 · Fiducia | P1, P2, P3 | P2 e P3 chiusi · P1 in attesa di Andrea | 10 rilievi, tutti corretti (`bb2e466`) |
-| 2 · Attrito zero | P5, P6, P12 | P6 e P12 chiusi · P5 in attesa di Andrea | 7 rilievi, tutti corretti |
+| 2 · Attrito zero | P5, P6, P12 | chiuso | 7 rilievi, tutti corretti |
 | 3 · Integrità del dato | P11, P13 | chiuso | — |
 | 4 · Sicurezza e trasparenza | P14, P4, P18 | P14 e P18 chiusi · P4 in attesa del dominio | — |
 | 5 · Pricing | P9, P10, P7, P8, P20 | decisione presa · schema e `ingest-payment` in produzione · manca RevenueCat/IAP (richiede uscire da Expo Go) | — |
@@ -114,16 +114,16 @@ soldi. Tutte dicono che non sono riuscite a leggere, e offrono di riprovare.
 conversione, ma ha senso solo dopo che l'app di cui si attiva l'automazione è
 affidabile.
 
-- **P5** file `.shortcut` pronto, con il token in un campo solo
+- **P5** comando rapido pronto, condiviso via link iCloud, con il token
+  passato come variabile e non scritto dentro. **Chiuso**: Andrea ha
+  costruito ed esportato il comando (`SHORTCUT_INSTALL_URL` in
+  `lib/guide.ts`), raggiungibile con un tocco da Automazioni e dalla guida.
+  Resta da costruire l'automazione stessa — non condivisibile per limite di
+  Apple, non di questa app — coperta dal secondo capitolo della guida.
 - **P6** claim onesto sulla copertura, ovunque compaia la promessa
 - **P12** mitigazione delle perdite silenziose — si parte dal controllo mensile
   in-app, che è il più economico e trasforma un errore invisibile in una
   domanda esplicita
-
-`P5` richiede di costruire e ospitare un file `.shortcut`: parte del lavoro è
-di Andrea (creare il comando su iPhone ed esportarlo su iCloud), parte è di
-qui (la schermata che genera il token e il link precompilato). La ricetta, con
-il passo di gestione errore che oggi manca, è in `DA-FARE.md` sezione 5ter.
 
 > **Esito.** Sette rilievi, tutti corretti. Il più grave era di nuovo in
 > scrittura e di nuovo silenzioso: il controllo mensile non registrava niente

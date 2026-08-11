@@ -2,6 +2,7 @@ import * as Clipboard from "expo-clipboard";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -13,6 +14,7 @@ import { LoadError } from "../components/LoadError";
 import { RecoverSheet } from "../components/RecoverSheet";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useTheme } from "../lib/ThemeContext";
+import { SHORTCUT_INSTALL_URL } from "../lib/guide";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
 import { IngestToken } from "../lib/types";
@@ -116,7 +118,23 @@ export default function AutomationsScreen({ onBack, onOpenGuide }: Props) {
 
         {/* Prima di tutto il resto: chi arriva qui senza aver mai configurato
             niente vede un URL e un token, che da soli non dicono cosa
-            farne. La guida e' la risposta a "e adesso?". */}
+            farne. Due strade, dalla piu' rapida alla piu' esplicita. */}
+        <TouchableOpacity
+          onPress={() => Linking.openURL(SHORTCUT_INSTALL_URL)}
+          style={[styles.install, { backgroundColor: palette.accent }]}
+        >
+          <Icon name="download" size={17} color={palette.onAccent} />
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.installTitle, { color: palette.onAccent }]}>
+              Installa il comando pronto
+            </Text>
+            <Text style={[styles.installBody, { color: palette.onAccent }]}>
+              Un tocco al posto di costruirlo — resta comunque da creare
+              l'automazione che lo richiama
+            </Text>
+          </View>
+        </TouchableOpacity>
+
         {onOpenGuide && (
           <TouchableOpacity
             onPress={onOpenGuide}
@@ -131,8 +149,7 @@ export default function AutomationsScreen({ onBack, onOpenGuide }: Props) {
                 Guida passo per passo
               </Text>
               <Text style={[styles.guideBody, { color: palette.ink2 }]}>
-                Come costruire il comando rapido e l'automazione, un passo
-                alla volta
+                Per costruirlo tu, o per capire come funziona
               </Text>
             </View>
             <Icon name="chevron-right" size={15} color={palette.accent} />
@@ -260,6 +277,15 @@ const styles = StyleSheet.create({
   title: { ...type.title },
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.md },
   label: { ...type.label },
+  install: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 11,
+    borderRadius: radius.card,
+    padding: 13,
+  },
+  installTitle: { ...type.bodyMedium, fontSize: 14 },
+  installBody: { ...type.small, lineHeight: 16, marginTop: 2, opacity: 0.9 },
   guide: {
     flexDirection: "row",
     alignItems: "center",

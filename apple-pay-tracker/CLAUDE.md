@@ -21,12 +21,14 @@ pagamento automatico riuscito, non la sola registrazione) sbloccano 2 mesi
 extra a chi ha invitato — traguardo unico, non ripetibile, mai citato nelle
 campagne ads. Dettagli tecnici in "Abbonamento e referral" più sotto.
 
-**Cosa è già costruito e pushato**, sprint 1-4 di `SPRINT.md` sostanzialmente
-chiusi: fiducia (recupero password, export, errori onesti), attrito zero
-sull'automazione (guida passo-passo, Shortcut condivisibile), integrità del
-dato (multi-valuta, lettura offline ovunque), sicurezza e trasparenza
-(blocco Face ID, changelog in-app, non-obiettivi dichiarati nel README).
-Schema, enforcement e schermate del modello di business sono in produzione.
+**Cosa è già costruito e pushato**, sprint 1-4 di `SPRINT.md` chiusi:
+fiducia (recupero password, export, errori onesti), attrito zero
+sull'automazione (guida passo-passo, comando rapido «Registra spesa» già
+pronto e condiviso via link — vedi "Guida alla configurazione" sotto),
+integrità del dato (multi-valuta, lettura offline ovunque), sicurezza e
+trasparenza (blocco Face ID, changelog in-app, non-obiettivi dichiarati nel
+README). Schema, enforcement e schermate del modello di business sono in
+produzione.
 
 **Cosa manca, e di chi è la mossa:**
 
@@ -38,9 +40,6 @@ Schema, enforcement e schermate del modello di business sono in produzione.
   EAS → TestFlight. Finché non parte, il modello di business non incassa
   davvero — il pulsante "Abbonati" in `SubscriptionScreen` resta disattivato
   apposta.
-- *Andrea* — **link iCloud del comando rapido «Registra spesa»** (`P5`): va
-  costruito seguendo la guida in-app e poi condiviso, per sostituire le
-  istruzioni testuali con un link da un tocco.
 - *Andrea* — **7 screenshot veri** per la guida alla Shortcut, elenco
   preciso in `DA-FARE.md`. I posti sono già predisposti in
   `lib/guideImages.ts`.
@@ -512,6 +511,22 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   riproduzione di un'azione), `screens/GuideScreen.tsx`. Si arriva da
   Automazioni e dallo stato vuoto della Home — cioè dai due punti in cui si
   trova chi non ha ancora configurato niente.
+- **Il comando rapido «Registra spesa» è già pronto e condiviso** via link
+  iCloud (`SHORTCUT_INSTALL_URL` in `lib/guide.ts`, `P5` in `PRODOTTO.md`).
+  Sicuro da tenere pubblico dentro l'app perché **non contiene nessun
+  token**: il campo dell'intestazione `x-ingest-token` dentro «Ottieni
+  contenuti di URL» è una variabile presa dall'input, non un valore scritto
+  — verificato con Andrea prima di agganciarlo, perché un token hardcoded
+  in un link condiviso avrebbe fatto scrivere le spese di chiunque
+  sull'account di chi l'ha condiviso.
+- Installare il link **non basta**: sostituisce solo il capitolo "Il
+  comando rapido". L'**automazione** che lo richiama non è condivisibile in
+  nessun modo (Apple non dà il pulsante Condividi alle automazioni, solo ai
+  comandi rapidi normali) e va sempre costruita a mano — due azioni,
+  coperte dal secondo capitolo della guida. Per questo `GuideScreen` offre,
+  solo dentro il capitolo del comando, un modo di saltare direttamente al
+  capitolo dell'automazione (`automazioneIndex` in `GuideScreen.tsx`) per
+  chi ha già installato il link.
 - Le azioni sono **riprodotte schematicamente, non fotografate**: uno
   screenshot di iOS invecchia al primo aggiornamento che sposta un campo, e
   chi lo guarda non capisce più se sta sbagliando lui o se è la guida a

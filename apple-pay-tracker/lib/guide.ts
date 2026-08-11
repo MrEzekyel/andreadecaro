@@ -45,6 +45,22 @@ export type GuideChapter = {
   steps: GuideStep[];
 };
 
+/**
+ * Il comando rapido «Registra spesa» già pronto, condivisibile via iCloud.
+ *
+ * Non contiene nessun token: il campo dell'intestazione `x-ingest-token` è
+ * una variabile presa dall'input, non un valore scritto dentro — chi lo
+ * installa userà comunque la propria automazione con la propria chiave, mai
+ * quella di chi l'ha condiviso. È il motivo per cui questo link si può
+ * pubblicare qui senza rischi.
+ *
+ * Installandolo si salta per intero il capitolo "Il comando rapido": resta
+ * solo da costruire l'automazione, che Apple non permette di condividere in
+ * nessun modo — quella tocca farla a ognuno.
+ */
+export const SHORTCUT_INSTALL_URL =
+  "https://www.icloud.com/shortcuts/ad8b80ff1c3b4ed28f5c50e493e37f9d";
+
 export const GUIDE: GuideChapter[] = [
   {
     id: "comando",

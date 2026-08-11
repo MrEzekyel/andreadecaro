@@ -4,6 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   Alert,
   Image,
+  Linking,
   ScrollView,
   StyleSheet,
   Text,
@@ -14,7 +15,7 @@ import { ActionPreview } from "../components/ActionPreview";
 import { Icon } from "../components/Icon";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useTheme } from "../lib/ThemeContext";
-import { GUIDE_FLAT, GUIDE_STEPS } from "../lib/guide";
+import { GUIDE_FLAT, GUIDE_STEPS, SHORTCUT_INSTALL_URL } from "../lib/guide";
 import { GUIDE_IMAGES } from "../lib/guideImages";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
@@ -46,6 +47,13 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
   const { chapter, step } = GUIDE_FLAT[index];
   const primo = index === 0;
   const ultimo = index === GUIDE_STEPS - 1;
+  // Il comando rapido è l'unico dei due pezzi che si può condividere: chi ha
+  // il link pronto può saltare tutto questo capitolo. L'automazione no —
+  // Apple non permette di condividerla in nessun modo — quindi il salto si
+  // ferma al primo passo del secondo capitolo, non oltre.
+  const automazioneIndex = GUIDE_FLAT.findIndex(
+    (item) => item.chapter.id === "automazione"
+  );
 
   async function copiaUrl() {
     await Clipboard.setStringAsync(INGEST_URL);
@@ -98,6 +106,27 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
             {index + 1} di {GUIDE_STEPS}
           </Text>
         </View>
+
+        {chapter.id === "comando" && (
+          <View style={[styles.shortcutBanner, { backgroundColor: palette.accentSoft }]}>
+            <Text style={[styles.shortcutBannerText, { color: palette.ink2 }]}>
+              Hai già il link del comando pronto?
+            </Text>
+            <View style={styles.shortcutBannerActions}>
+              <TouchableOpacity onPress={() => Linking.openURL(SHORTCUT_INSTALL_URL)}>
+                <Text style={[styles.shortcutBannerLink, { color: palette.accent }]}>
+                  Installalo
+                </Text>
+              </TouchableOpacity>
+              <Text style={[styles.shortcutBannerText, { color: palette.ink3 }]}>·</Text>
+              <TouchableOpacity onPress={() => setIndex(automazioneIndex)}>
+                <Text style={[styles.shortcutBannerLink, { color: palette.accent }]}>
+                  Vai al capitolo 2
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        )}
 
         <ScrollView ref={scroller} contentContainerStyle={styles.content}>
           <Text style={[styles.chapter, { color: palette.accent }]}>
@@ -216,6 +245,20 @@ const styles = StyleSheet.create({
   track: { flex: 1, height: 3, borderRadius: 2, overflow: "hidden" },
   fill: { height: 3, borderRadius: 2 },
   progressText: { ...type.small },
+  shortcutBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: space.sm,
+    marginHorizontal: space.lg,
+    marginBottom: space.sm,
+    borderRadius: radius.field,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+  },
+  shortcutBannerText: { ...type.small },
+  shortcutBannerActions: { flexDirection: "row", alignItems: "center", gap: 7 },
+  shortcutBannerLink: { ...type.small, fontWeight: "500" },
   content: {
     padding: space.lg,
     paddingBottom: space.xxl,

@@ -93,27 +93,25 @@ Ha senso solo dopo `P2`: prometterlo senza un export funzionante è una bugia.
 
 ## Vendita — senza questi la conversione non parte
 
-### P5 · File `.shortcut` pronto · **oggi sono dieci passi a mano**
+### P5 · Comando rapido pronto · **fatto**
 
-Per attivare la funzione che si paga, oggi bisogna: generare un token, copiare
-un URL, uscire dall'app, aprire Comandi Rapidi, creare un'automazione,
-aggiungere "Ottieni contenuto URL", impostare POST, aggiungere l'intestazione
-`x-ingest-token`, cambiare il corpo in JSON e compilare **sei** coppie
-chiave/valore scegliendo la variabile giusta da un selettore in cui — lo dice
-`DA-FARE.md` — due voci si chiamano uguale e scambiarle manda l'importo come
-nome dell'esercente.
+Il comando rapido «Registra spesa» è costruito e condiviso via link iCloud
+(`lib/guide.ts` → `SHORTCUT_INSTALL_URL`), raggiungibile con un tocco da
+Impostazioni → Automazioni. Nessun token dentro: il campo dell'intestazione
+`x-ingest-token` è una variabile presa dall'input, non un valore scritto —
+chi lo installa usa comunque la propria automazione con la propria chiave.
 
-Dal punto di vista del cliente: *gli si chiede di fare lavoro di integrazione
-di sistema, e glielo si fa pagare*. Il trial gli si brucia nel setup.
+Non elimina tutto il lavoro manuale: Apple non permette di condividere
+un'**automazione** in nessun modo (solo i comandi rapidi normali hanno il
+pulsante Condividi), quindi resta da costruire quella — due azioni, contro
+i quindici passi originari del comando stesso. La guida in-app
+(`screens/GuideScreen.tsx`) copre entrambi i pezzi e, nel capitolo del
+comando, offre di saltare direttamente al capitolo dell'automazione per chi
+ha già installato il link.
 
-Serve un file `.shortcut` già costruito, distribuito via link iCloud, in cui
-l'utente incolla il token in un campo solo. Trenta secondi invece di dieci
-minuti.
-
-**È il singolo intervento con il maggior effetto sulla conversione.**
-
-**Verifica**: un utente che non ha mai visto Comandi Rapidi attiva
-l'automazione in meno di un minuto senza leggere istruzioni.
+**Verifica**: un utente che non ha mai visto Comandi Rapidi installa il
+comando con un tocco e completa l'automazione in pochi minuti seguendo la
+guida, senza uscire dall'app per cercare istruzioni altrove.
 
 ### P6 · Claim onesto sulla copertura · **oggi lascia intendere il 100%**
 

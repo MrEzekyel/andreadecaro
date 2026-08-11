@@ -89,24 +89,19 @@ predisposti in `lib/guideImages.ts`.
 
 ---
 
-## 🟡 Automazione iOS — ultimo pezzo in corso
+## ✅ Automazione iOS — comando rapido pronto e agganciato
 
-Il comando rapido condivisibile **«Registra spesa»** è la via che sostituisce
-le istruzioni testuali con un link iCloud da un tocco. La ricetta corretta
-(quella con Dizionario a chiavi esplicite, non il tipo Transazione che si
-perde attraversando "Esegui comando rapido") è quella che stai costruendo ora.
+Il comando rapido condivisibile **«Registra spesa»** è online e agganciato
+in Automazioni e nella guida in-app, con un pulsante "Installa il comando
+pronto" — chiuso `P5`. Nessun token dentro: il campo dell'intestazione è
+una variabile presa dall'input, quindi il link resta sicuro da tenere
+pubblico dentro l'app.
 
-Quando è pronto: dal comando rapido → **Condividi → Copia link iCloud** →
-mandamelo. Con quello aggancio il link alla schermata Automazioni dell'app al
-posto delle istruzioni attuali, e chiunque altro voglia usarla fa solo: apri
-il link, incolla il token, crea l'automazione a due azioni.
-
-Se vuoi rivedere la ricetta completa (i 10 passi del comando, incluso il
-recupero delle spese offline che oggi manca), è nella cronologia di questa
-chat — è troppo lunga per ripeterla qui, ma in sintesi: il passo critico è che
-il blocco **Se** controlli `Contenuti URL` **contiene** `"ok":true`, non
-*è vero*, altrimenti il controllo non distingue mai un invio riuscito da uno
-fallito.
+Resta comunque da costruire **l'automazione** che lo richiama, su ogni
+telefono che vuole usarla: Apple non permette di condividerla in nessun
+modo (solo i comandi rapidi normali hanno il pulsante Condividi), ma sono
+solo due azioni — «Dizionario» ed «Esegui comando rapido» — e la guida
+in-app le copre nel secondo capitolo.
 
 ---
 
