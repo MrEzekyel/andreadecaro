@@ -1,6 +1,6 @@
 # Product Marketing Context
 
-**Document version:** v1
+**Document version:** v2
 **Last updated:** 2026-08-11
 
 > ⚠️ Documento redatto sulle informazioni di prodotto disponibili, **senza
@@ -152,6 +152,9 @@ Prodotto B2C self-serve: nessuna catena di decisione, una sola persona che scari
 
 **Current metrics:** Nessuno — l'app non è ancora pubblicata su App Store. Distribuzione attuale solo via Expo Go, in fase di test interno.
 
+**Data di lancio target:** Pubblicazione App Store entro il **10 ottobre 2026**, lancio (inizio sponsorizzazione) **metà ottobre 2026** — finestra di 60 giorni decisa l'11 agosto 2026. Il piano dettagliato con le dipendenze settimana per settimana è in `.agents/marketing-plan.md`.
+
 ## Changelog
 *Newest first. One line per revision: what changed and why.*
+- v2 (2026-08-11) — Aggiunta la data di lancio target (10 ottobre pubblicazione, metà ottobre lancio) in Goals, decisa da Andrea con finestra di 60 giorni.
 - v1 (2026-08-11) — Documento iniziale, redatto da contesto di prodotto (README, PRODOTTO.md, decisioni di business già prese) senza customer research reale: sezioni target, differenziazione, objections e customer language sono ipotesi di lavoro marcate ⚠️, da rivedere con i primi utenti veri.

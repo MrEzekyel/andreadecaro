@@ -182,6 +182,13 @@ con i grafici — continua così, è il modo giusto).
 
 ## 🔴 Percorso verso l'App Store — ora serve davvero, non è più rimandabile
 
+**Obiettivo: pubblicazione entro il 10 ottobre 2026, lancio a metà ottobre**
+(deciso l'11 agosto, finestra di 60 giorni). Il collo di bottiglia è il primo
+anello: se l'iscrizione ad Apple Developer Program parte questa settimana la
+finestra è comoda, ogni settimana di ritardo su quel primo passo si mangia
+il margine. Il piano settimana per settimana, con quello che può andare
+storto, è in `.agents/marketing-plan.md`.
+
 Con il prezzo deciso (2 mesi gratis, poi 1,99 €/mese o 15 €/anno) questo
 percorso smette di essere "quando vorrai investire" e diventa un
 prerequisito: **un abbonamento consumato dentro un'app iOS deve passare da
