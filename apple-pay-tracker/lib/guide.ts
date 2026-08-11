@@ -59,7 +59,7 @@ export type GuideChapter = {
  * condiviso, quindi non c'è mai una chiave di qualcun altro in giro.
  */
 export const SHORTCUT_INSTALL_URL =
-  "https://www.icloud.com/shortcuts/ad8b80ff1c3b4ed28f5c50e493e37f9d";
+  "https://www.icloud.com/shortcuts/0814f81a51ea4b7e911247f79ace29b2";
 
 export const GUIDE: GuideChapter[] = [
   {
