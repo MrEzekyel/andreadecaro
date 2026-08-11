@@ -210,7 +210,8 @@ vedi `DA-FARE.md` per la sequenza. Fino ad allora il pulsante "Abbonati" in
 
 ## Fuori sprint
 
-- **P15** repository privato — decisione di Andrea, cinque minuti
+- **P15** repository privato — ✅ deciso (sì), migrazione a un repo dedicato
+  ancora da eseguire, su comando esplicito di Andrea
 - **P19** condivisione familiare. **Chiuso**: `README.md` ha una sezione
   "Cosa non fa, per scelta", tenuta separata dai limiti noti — quelli sono
   cose non ancora arrivate, questa è una cosa che non è in programma.

@@ -107,15 +107,16 @@ in-app le copre nel secondo capitolo.
 
 ## 🟡 Decisioni aperte
 
-### Repository pubblico o privato?
+### Repository privato — ✅ deciso, migrazione ancora da fare
 
-Il codice sta in `MrEzekyel/andreadecaro`, che oggi è **pubblico**. Non
-contiene segreti (le chiavi vere sono solo nel tuo `.env`, mai committato),
-ma è un'app di finanza personale — normalmente la si tiene privata.
+`MrEzekyel/andreadecaro` è oggi **pubblico** e ospita anche il tuo sito
+personale (CNAME, file del sito), non solo l'app: renderlo privato così
+com'è spegnerebbe anche quello se è pubblicato via GitHub Pages.
 
-Due strade: lasciare così, oppure sposto tutto in un repo dedicato e privato
-(consigliato). Costa poco deciderlo ora, molto di più deciderlo dopo che
-qualcuno l'ha già clonato.
+La migrazione vera è creare un repo **nuovo e dedicato**, spostarci
+`apple-pay-tracker/`, e da lì ripuntare il tuo `.git remote` locale.
+Nessun impatto su Supabase o EAS. La faccio quando mi dai il via libera
+esplicito — dimmelo quando vuoi partire.
 
 ### Prezzo e paywall — ✅ deciso
 

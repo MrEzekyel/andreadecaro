@@ -256,11 +256,17 @@ accedi con la password" sulla schermata di blocco, senza il quale un guasto
 del riconoscimento renderebbe i propri dati irraggiungibili se non
 reinstallando l'app.
 
-### P15 · Repository privato · **decisione aperta da mesi**
+### P15 · Repository privato · **deciso: sì, migrazione da eseguire**
 
 `MrEzekyel/andreadecaro` è pubblico. Il codice non contiene segreti, ma per un
-prodotto a pagamento di finanza personale è un segnale strano. `DA-FARE.md` lo
-elenca ancora come decisione aperta: va chiusa.
+prodotto a pagamento di finanza personale è un segnale strano.
+
+Non è un semplice cambio di visibilità: quel repo ospita anche il sito
+personale di Andrea (CNAME, file ASP.NET, foto), quindi renderlo privato
+spegnerebbe anche quello se pubblicato via GitHub Pages. La migrazione vera
+è creare un repo dedicato e spostarci `apple-pay-tracker/`, poi ripuntare il
+remote locale — nessun impatto su Supabase o EAS. Da eseguire su comando
+esplicito di Andrea, non di iniziativa.
 
 ---
 
