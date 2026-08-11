@@ -564,11 +564,29 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   ridimensionati a ~750px di larghezza prima di salvarli in
   `assets/guida/`: a piena risoluzione finirebbero interi dentro
   l'aggiornamento che ogni utente scarica.
-- Non tutti i passi hanno uno screenshot: `installa` e `chiave` sono
-  schermate della nostra app (non serve fotografarle, sono già davanti
-  all'utente), `seleziona-tutto`/`immediato`/`prova` non ne hanno ancora
-  uno. `GuideScreen` non mostra niente al posto dell'immagine mancante —
-  solo la didascalia — invece di un placeholder vuoto.
+- Non tutti i passi hanno uno screenshot: `installa` è una schermata della
+  nostra app (non serve fotografarla), `seleziona-tutto` resta solo
+  descritta per scelta di Andrea, `prova` non ne ha ancora uno. `chiave`
+  **non ha più** il pulsante "genera e copia" — quello si è spostato sul
+  passo `incolla`, l'unico posto in cui serve davvero: si genera la chiave
+  e la si incolla sulla stessa schermata, invece di doverla portare in
+  memoria per tre passi. `chiave` mostra solo un avviso che anticipa cosa
+  succederà. `GuideScreen` non mostra niente al posto dell'immagine
+  mancante — solo la didascalia — invece di un placeholder vuoto.
+- **L'altezza della foto segue il suo rapporto reale**
+  (`Image.resolveAssetSource(source).width/height`, calcolato per passo),
+  non un'altezza fissa: le prime foto caricate avevano proporzioni diverse
+  fra loro (una carta orizzontale contro schermate intere verticali), e un
+  riquadro fisso lasciava una cornice vuota enorme intorno a quelle più
+  larghe che alte — quello che Andrea ha visto come "il quadrato" da
+  togliere. Niente più bordo né sfondo intorno alla foto: è la foto stessa,
+  non una cornice che la contiene.
+- **Il permesso di iOS per l'automazione non ha uno screenshot vero**
+  (Andrea non ce l'ha): il passo `consenti` disegna un alert **simulato**
+  in codice (`step.action === "consent-illustration"` in
+  `GuideScreen.tsx`), con il blu di sistema di iOS invece dell'accento
+  dell'app — apposta, per far capire che non è una schermata nostra ma un
+  esempio di cosa potrebbe chiedere iOS.
 - Il progresso è salvato: questa procedura si fa passando avanti e indietro
   fra due app, e ricominciare da capo a ogni ritorno è il modo più rapido per
   farla abbandonare.

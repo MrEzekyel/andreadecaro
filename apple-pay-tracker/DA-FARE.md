@@ -70,9 +70,14 @@ Guida, e dallo stato vuoto della Home). Ogni passo è uno screenshot vero
 hai già mandato) più una riga di didascalia — non testo da leggere.
 
 **Fatti**: `apri`, `espandi`, `incolla`, `cerca`, `scegli-comando`,
-`immediato`. `installa` e `chiave` non servono, sono schermate della
-nostra app. `seleziona-tutto` resta **solo descritta** a testo, per tua
-scelta esplicita — non serve uno screenshot.
+`immediato`. `installa` non serve, è una schermata della nostra app.
+`seleziona-tutto` resta **solo descritta** a testo, per tua scelta
+esplicita. `chiave` non ha più il pulsante — si è spostato sul passo
+`incolla` — quindi resta anche lei solo testo. Il passo `consenti` (il
+permesso che iOS può chiedere all'automazione) non ha uno screenshot: ho
+disegnato un alert simulato al posto della foto, visto che non ne hai uno.
+Se in futuro ti capita di vedere quel permesso davvero, uno screenshot
+vero lo sostituirebbe volentieri.
 
 **Manca ancora** solo questo, facoltativo:
 

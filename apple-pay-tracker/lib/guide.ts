@@ -18,8 +18,9 @@ export type GuideStep = {
   /** Didascalia breve: una riga, non un paragrafo. Lo screenshot spiega. */
   caption: string;
   /** Azione richiesta all'utente dentro l'app: copiare un dato che serve ora,
-   * o aprire il link di installazione del comando. */
-  action?: "open-install" | "copy-token";
+   * aprire il link di installazione del comando, o mostrare la finestra di
+   * permesso di iOS simulata (nessuno screenshot vero disponibile). */
+  action?: "open-install" | "copy-token" | "consent-illustration";
   /** Punto in cui ci si sbaglia, se c'e'. Anche questo, breve. */
   warning?: string;
 };
@@ -58,10 +59,10 @@ export const GUIDE: GuideChapter[] = [
       },
       {
         id: "chiave",
-        title: "Genera e copia la tua chiave",
-        caption: "Si vede una volta sola: copiala, ti serve tra due passi.",
-        action: "copy-token",
-        warning: "Se la perdi, ne generi un'altra da Impostazioni → Automazioni.",
+        title: "Tra poco ti serve una chiave",
+        caption: "È la password che dice al server che la spesa è tua.",
+        warning:
+          "La generi e la copi più avanti, nel passo «Incolla la tua chiave» — si vede una volta sola.",
       },
       {
         id: "apri",
@@ -76,7 +77,8 @@ export const GUIDE: GuideChapter[] = [
       {
         id: "incolla",
         title: "Incolla la tua chiave",
-        caption: "In «Intestazioni», sostituisci INCOLLA TOKEN con la chiave copiata.",
+        caption: "Genera la chiave, poi sostituisci INCOLLA TOKEN con quella copiata.",
+        action: "copy-token",
         warning:
           "L'unico campo da toccare. Lasciato com'è, ogni spesa viene rifiutata.",
       },
@@ -106,6 +108,12 @@ export const GUIDE: GuideChapter[] = [
         title: "Falla partire da sola",
         caption: "Tocca «Automazioni» in alto, scegli «Esegui immediatamente» e lascia spenta la notifica.",
         warning: "Senza, dovresti confermare ogni pagamento a mano.",
+      },
+      {
+        id: "consenti",
+        title: "Se iOS chiede un permesso",
+        caption: "Tocca «Consenti»: senza, l'automazione si ferma e smette di inserire da sola.",
+        action: "consent-illustration",
       },
       {
         id: "prova",

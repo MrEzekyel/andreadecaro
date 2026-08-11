@@ -53,6 +53,15 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
     (item) => item.chapter.id === "automazione"
   );
 
+  // L'altezza della foto segue il suo rapporto vero (vedi sotto): senza,
+  // un'immagine più larga che alta finirebbe schiacciata dentro un
+  // riquadro pensato per uno screenshot intero, con vuoto sopra e sotto.
+  const shotSource = GUIDE_IMAGES[step.id];
+  const shotRatio = shotSource
+    ? Image.resolveAssetSource(shotSource).width /
+      Image.resolveAssetSource(shotSource).height
+    : 1;
+
   async function generaToken() {
     const { data, error } = await supabase.rpc("create_ingest_token", {
       p_label: "Inserisci pagamento",
@@ -132,17 +141,53 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
 
           {/* Lo screenshot vero è il passo, non un'aggiunta: la didascalia
               sotto è una riga sola apposta, per non tornare a un muro di
-              testo che nessuno legge mentre ha in mano Comandi Rapidi. */}
-          {GUIDE_IMAGES[step.id] && (
+              testo che nessuno legge mentre ha in mano Comandi Rapidi.
+              L'altezza segue il rapporto vero dell'immagine — una misura
+              fissa lascerebbe una cornice vuota su ogni foto che non è
+              esattamente quella proporzione, il "quadrato" che si vedeva
+              prima intorno alle foto più larghe che alte. */}
+          {shotSource && (
             <Image
-              source={GUIDE_IMAGES[step.id]}
-              style={[
-                styles.shot,
-                { backgroundColor: palette.surface, borderColor: palette.hairline },
-              ]}
-              resizeMode="contain"
+              source={shotSource}
+              style={[styles.shot, { aspectRatio: shotRatio }]}
+              resizeMode="cover"
               accessibilityLabel={`Schermata di esempio: ${step.title}`}
             />
+          )}
+
+          {/* Nessuno screenshot vero per il permesso di iOS: si simula
+              l'alert di sistema (blu di sistema, non l'accento dell'app,
+              apposta — deve leggersi come "questo non è nostro"). */}
+          {step.action === "consent-illustration" && (
+            <View
+              style={[
+                styles.mockDialog,
+                { backgroundColor: palette.surface2, borderColor: palette.hairline },
+              ]}
+            >
+              <Text style={[styles.mockDialogTitle, { color: palette.ink }]}>
+                "Clinck: Inserisci Pagamento" vuole accedere a Internet
+              </Text>
+              <View style={styles.mockDialogButtons}>
+                <View style={[styles.mockDialogDivider, { backgroundColor: palette.hairline }]} />
+                <View style={styles.mockDialogButtonRow}>
+                  <View style={styles.mockDialogButton}>
+                    <Text style={[styles.mockDialogButtonText, { color: palette.ink2 }]}>
+                      Non consentire
+                    </Text>
+                  </View>
+                  <View style={[styles.mockDialogSeparator, { backgroundColor: palette.hairline }]} />
+                  <View style={styles.mockDialogButton}>
+                    <Text style={[styles.mockDialogButtonText, styles.mockDialogButtonPrimary]}>
+                      Consenti
+                    </Text>
+                  </View>
+                </View>
+              </View>
+              <Text style={[styles.mockDialogNote, { color: palette.ink3 }]}>
+                Esempio — il testo vero di iOS può essere diverso
+              </Text>
+            </View>
           )}
 
           <Text style={[styles.caption, { color: palette.ink2 }]}>
@@ -260,10 +305,29 @@ const styles = StyleSheet.create({
   buttonText: { ...type.bodyMedium, fontSize: 14.5 },
   shot: {
     width: "100%",
-    height: 440,
+    borderRadius: radius.card,
+  },
+  mockDialog: {
     borderRadius: radius.card,
     borderWidth: 1,
+    padding: space.lg,
+    alignItems: "center",
+    gap: space.sm,
   },
+  mockDialogTitle: {
+    ...type.bodyMedium,
+    fontSize: 15,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  mockDialogButtons: { width: "100%", marginTop: space.xs },
+  mockDialogDivider: { height: StyleSheet.hairlineWidth, width: "100%" },
+  mockDialogButtonRow: { flexDirection: "row" },
+  mockDialogButton: { flex: 1, alignItems: "center", paddingVertical: 12 },
+  mockDialogSeparator: { width: StyleSheet.hairlineWidth },
+  mockDialogButtonText: { ...type.body, fontSize: 16 },
+  mockDialogButtonPrimary: { color: "#0A84FF", fontWeight: "600" },
+  mockDialogNote: { ...type.small, marginTop: 2 },
   warning: {
     flexDirection: "row",
     gap: 9,
