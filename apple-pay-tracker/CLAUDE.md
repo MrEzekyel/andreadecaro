@@ -580,19 +580,22 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   alte — quello che Andrea ha visto come "il quadrato" da togliere. Niente
   più bordo né sfondo intorno alla foto: è la foto stessa, non una cornice
   che la contiene.
-- **Il rapporto larghezza/altezza è scritto a mano in `guideImages.ts`**
-  (`GuideImage.ratio`), non calcolato a runtime con
-  `Image.resolveAssetSource`. Il primo tentativo lo calcolava così, ed è
-  finito peggio di prima: `Image` ignorava `width: "100%"` e mostrava la
-  foto alla sua larghezza nativa (750px, molto più della larghezza dello
-  schermo), tagliata a destra — visibile da Andrea su due passi diversi.
-  La causa esatta non è confermata (probabile un valore non valido
-  restituito da `resolveAssetSource` su questi file, o un ordine di
-  risoluzione di Yoga che non onora `width` percentuale insieme ad
-  `aspectRatio` calcolato più tardi), ma il punto è che quella funzione si
-  è rivelata inaffidabile qui: un numero scritto a mano (misurato con
-  `file nome.jpg`) non ha ambiguità. Se il file cambia, il rapporto va
-  ricalcolato a mano.
+- **La foto ha `width`/`height` numerici espliciti, misurati con
+  `onLayout`** — non `width: "100%"` né `aspectRatio`. Due tentativi prima
+  di questo si sono rivelati sbagliati: il rapporto calcolato a runtime con
+  `Image.resolveAssetSource` (primo tentativo) e poi il rapporto scritto a
+  mano in `GuideImage.ratio` (secondo tentativo, vedi `guideImages.ts`) —
+  in entrambi i casi `Image` ignorava il vincolo di larghezza e mostrava la
+  foto alla sua dimensione nativa (750px, molto più larga dello schermo),
+  tagliata a destra. Il numero scritto a mano in `guideImages.ts` non era
+  il problema: lo era passarlo a `Image` come `aspectRatio` invece che come
+  `height` già calcolato. Ora un `View` senza dimensioni proprie (si
+  allarga di default dentro il flex-column dello ScrollView) misura la sua
+  larghezza vera con `onLayout`, e quella larghezza — un numero, non una
+  percentuale — diventa `width` e `width / ratio` diventa `height` sulla
+  `Image`. Se in futuro la foto torna a sballarsi, il sospetto numero uno è
+  di nuovo `width: "%"` o `aspectRatio` su un `Image`, non il dato in
+  `guideImages.ts`.
 - **Il permesso di iOS per l'automazione non ha uno screenshot vero**
   (Andrea non ce l'ha): il passo `consenti` disegna un alert **simulato**
   in codice (`step.action === "consent-illustration"` in

@@ -25,6 +25,12 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
   const { palette } = useTheme();
   const [index, setIndex] = useState(0);
   const [tokenCopiato, setTokenCopiato] = useState(false);
+  // Larghezza vera disponibile per la foto, misurata con onLayout invece di
+  // fidarsi di "width: '100%'" insieme ad aspectRatio: quella combinazione
+  // ha mostrato le foto alla loro larghezza nativa (750px) invece che a
+  // quella dello schermo, tagliate a destra. Un numero misurato e passato
+  // come width/height espliciti non ha questa ambiguità.
+  const [shotWidth, setShotWidth] = useState(0);
   const scroller = useRef<ScrollView>(null);
 
   // Si riprende da dove si era rimasti: questa guida si fa passando avanti e
@@ -140,17 +146,23 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
           {/* Lo screenshot vero è il passo, non un'aggiunta: la didascalia
               sotto è una riga sola apposta, per non tornare a un muro di
               testo che nessuno legge mentre ha in mano Comandi Rapidi.
-              L'altezza segue il rapporto vero dell'immagine — una misura
-              fissa lascerebbe una cornice vuota su ogni foto che non è
-              esattamente quella proporzione, il "quadrato" che si vedeva
-              prima intorno alle foto più larghe che alte. */}
+              Width e height sono numeri espliciti calcolati dalla larghezza
+              misurata via onLayout, non percentuali: vedi il commento sopra
+              su shotWidth per il perché. */}
           {shot && (
-            <Image
-              source={shot.source}
-              style={[styles.shot, { aspectRatio: shot.ratio }]}
-              resizeMode="cover"
-              accessibilityLabel={`Schermata di esempio: ${step.title}`}
-            />
+            <View onLayout={(e) => setShotWidth(e.nativeEvent.layout.width)}>
+              {shotWidth > 0 && (
+                <Image
+                  source={shot.source}
+                  style={[
+                    styles.shot,
+                    { width: shotWidth, height: shotWidth / shot.ratio },
+                  ]}
+                  resizeMode="cover"
+                  accessibilityLabel={`Schermata di esempio: ${step.title}`}
+                />
+              )}
+            </View>
           )}
 
           {/* Nessuno screenshot vero per il permesso di iOS: si simula
@@ -302,7 +314,6 @@ const styles = StyleSheet.create({
   },
   buttonText: { ...type.bodyMedium, fontSize: 14.5 },
   shot: {
-    width: "100%",
     borderRadius: radius.card,
   },
   mockDialog: {
