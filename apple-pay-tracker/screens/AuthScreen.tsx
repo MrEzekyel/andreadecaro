@@ -290,7 +290,7 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
       ? "Scegli una nuova password"
       : recovering
         ? "Recupera l'accesso"
-        : "Apple Pay Tracker";
+        : "Clinck";
 
   const subtitle = attesaRegistrazione
     ? `Inserisci il codice che abbiamo mandato a ${email}.`

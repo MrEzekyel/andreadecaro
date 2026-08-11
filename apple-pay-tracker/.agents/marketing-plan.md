@@ -1,4 +1,4 @@
-# Apple Pay Tracker — Marketing Plan v1
+# Clinck — Marketing Plan v1
 
 **Prepared by:** Claude (sessione di sviluppo del prodotto)
 **Per:** Andrea, fondatore unico
@@ -672,7 +672,7 @@ riempitivo; sono semplicemente escluse per categoria.
 | 40 | Instagram Audience | Ora — coincide con i caroselli Meta Ads |
 | 35 | Community Marketing | Ora — community italiane finanza personale, §4 Move 5 |
 | 129 | Review Sites | Q2 — recensioni App Store reali, solo dopo avere utenti |
-| 11 | Competitor Comparison Pages | Q2 — "Apple Pay Tracker vs YNAB/Copilot", ha senso solo quando la pagina prodotto esiste e ha traffico da far atterrare |
+| 11 | Competitor Comparison Pages | Q2 — "Clinck vs YNAB/Copilot", ha senso solo quando la pagina prodotto esiste e ha traffico da far atterrare |
 | 74 | Article Quotes / HARO-equivalente italiano | Q3+ — richiede relazioni con giornalisti tech italiani, non ancora costruite |
 | 25-32 | Ads su altre piattaforme (Google, LinkedIn, Twitter, Reddit) | Skip per ora — vedi §10, mai un secondo paid prima di aver letto Meta |
 | 4 | Programmatic SEO | Skip — richiede volume di dati/template che non esiste a questa scala |
@@ -794,4 +794,4 @@ duplicarla qui.
 
 ---
 
-*Apple Pay Tracker — Marketing Plan v1. Preparato da Claude, 2026-08-11. Per revisione e discussione con Andrea — non ancora eseguito.*
+*Clinck — Marketing Plan v1. Preparato da Claude, 2026-08-11. Per revisione e discussione con Andrea — non ancora eseguito.*

@@ -1,4 +1,4 @@
-# Apple Pay Tracker
+# Clinck
 
 App mobile (Expo / React Native). **Ogni pagamento Apple Pay entra da solo e
 si categorizza in base all'esercente. Il resto lo aggiungi in tre secondi con
@@ -37,7 +37,7 @@ Supabase Edge Function "ingest-payment"
 Tabella payments (Postgres, RLS per utente)
         │  letta in realtime
         ▼
-App Apple Pay Tracker → spese, statistiche, limiti
+App Clinck → spese, statistiche, limiti
 ```
 
 La function accetta un pagamento da qualunque sorgente sappia fare una POST,

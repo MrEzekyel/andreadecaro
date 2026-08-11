@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Apple Pay Tracker",
-    "slug": "apple-pay-tracker",
+    "name": "Clinck",
+    "slug": "clinck",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.andreadecaro.applepaytracker"
+      "bundleIdentifier": "com.andreadecaro.clinck"
     },
     "android": {
       "adaptiveIcon": {

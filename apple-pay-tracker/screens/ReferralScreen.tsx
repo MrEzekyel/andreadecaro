@@ -58,7 +58,7 @@ export default function ReferralScreen({ onBack }: { onBack: () => void }) {
   async function share() {
     if (!code) return;
     await Share.share({
-      message: `Uso Apple Pay Tracker per tenere traccia delle spese in automatico. Registrati con il mio codice invito ${code}: hai 2 mesi gratis per provarlo.`,
+      message: `Uso Clinck per tenere traccia delle spese in automatico. Registrati con il mio codice invito ${code}: hai 2 mesi gratis per provarlo.`,
     });
   }
 
