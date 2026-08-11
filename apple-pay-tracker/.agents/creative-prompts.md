@@ -32,9 +32,9 @@ comporlo dentro una cornice iPhone nella scena descritta, senza modificarne il
 contenuto.
 
 Screenshot serviti, e dove vanno:
-1. **Home con una spesa appena registrata in cima alla lista** → A2, A6 slide 2, B2
-2. **Home o Statistiche con il grafico dell'andamento mensile** → A7
-3. **Investimenti** → B4
+1. **Home con una spesa appena registrata in cima alla lista** → A2, A6 slide 2, Sezione B slide 2
+2. **Home o Statistiche con il grafico dell'andamento mensile** → A7, Sezione B slide 3 (una delle due alternative)
+3. **Investimenti** → Sezione B slide 3 (l'altra alternativa)
 
 Ogni prompt qui sotto segnato **[UI reale]** presuppone lo screenshot allegato
 come immagine di riferimento. I prompt senza quel segno restano generazione
@@ -69,6 +69,16 @@ Brand color palette: warm orange #FF5E2C as dominant background/accent, warm van
 [Blocco stile] Solid orange #FF5E2C background. Two large numbers set side by side in vanilla #FFF6C0 light-weight sans-serif type: "95€" with a thin diagonal strike-through line, and next to it much larger "15€/anno". Small caption beneath in vanilla, smaller weight: "Stesso lavoro. Un decimo del prezzo." No logos of competitors, no icons — pure numeric typography as the hero.
 ```
 
+### A8 — Il gesto + CLINCK ✅ generata, approvata per la pagina IG
+```
+[Blocco stile] Solid orange #FF5E2C background, photorealistic close-up of a hand tapping an iPhone against a payment terminal, warm orange color grading, cropped tight and cinematic, shot from a low angle. Overlaid near the tap point, a small comic-style sound burst shape in vanilla outline containing the word "CLINCK". Below, vanilla #FFF6C0 light-weight sans-serif text: "Il momento in cui la tua spesa si registra da sola." Pure gesture and typography, no app UI visible.
+```
+
+### A9 — "2 mesi gratis" ✅ generata, approvata per la pagina IG
+```
+[Blocco stile] Solid orange #FF5E2C background. Enormous vanilla #FFF6C0 light-weight numeral "2" as the dominant visual element, filling most of the vertical space. Beneath it, smaller vanilla text: "mesi gratis per provarla." Small ink-on-vanilla caption pill at the very bottom: "poi 1,99€/mese." Minimal, numeral-led, no photography.
+```
+
 ### A5 — Investimenti inclusi
 ```
 [Blocco stile] Solid vanilla #FFF6C0 background. A minimal flat line-art icon in orange #FF5E2C of an ascending bar chart (matching the app icon style, four bars ascending left to right), centered, medium size. Below, ink #141413 light-weight headline: "Spese e investimenti. Un posto solo." Clean, generous white space, no additional graphic elements.
@@ -96,33 +106,41 @@ Brand color palette: warm orange #FF5E2C as dominant background/accent, warm van
 [Blocco stile] Solid orange #FF5E2C background. Large vanilla numeral "3" top-left, small and light-weight. Centered below, vanilla headline: "Tu vedi dove vanno i soldi." Simple flat line-art icon of an ascending bar chart in vanilla, small, placed below the text.
 ```
 
-## Sezione B — Concept per gli ads (Meta Ads — sceglierne UNO, non lanciarli insieme)
+## Sezione B — Carosello ads (sponsorizzate), 4 slide
 
-Il piano (`.agents/marketing-plan.md` §1, §4) è esplicito: con 100€ di budget
-serve **un creativo unico**, non una variante multipla — mescolare concept nel
-primo test renderebbe il risultato illeggibile.
+**Cambio rispetto alla versione precedente**: il concept "solo testo" (hook sul
+dolore) è stato scartato dopo prova — non funzionava. I due concept "gesto +
+CLINCK" e "2 mesi gratis" hanno invece reso bene, ma **per gli ads servono più
+dense**: chi scorre un annuncio a pagamento non ha ancora fiducia, e il
+prodotto vero deve vedersi, non solo il concept. Restano ottimi così come
+sono per la pagina organica (A8, A9) — per gli ads si costruisce un carosello
+a sé, che riusa gli stessi due ganci ma li affianca a prove vere del prodotto.
 
-### B1 — Hook sul dolore ("ho mollato tre app")
-```
-[Blocco stile] Solid vanilla #FFF6C0 background. Bold light-weight ink #141413 headline, large, taking most of the frame: "Hai scaricato tre app per tracciare le spese e le hai mollate tutte?" Small orange sans-serif line at the very bottom: "Questa si scrive da sola." No photography, pure typographic hook slide — designed to be the first slide of a carousel ad, must stop the scroll with text alone.
-```
+Struttura: gancio → prova densa → prova completa → prezzo/CTA. **Le slide 2 e
+3 richiedono gli screenshot del test account** (non ancora arrivati — vedi
+promemoria in cima al file).
 
-### B2 — Hook sul gesto (prima/dopo visivo) **[UI reale — screenshot 1, facoltativo]**
-```
-[Blocco stile] Solid orange #FF5E2C background, photorealistic close-up of a hand tapping an iPhone against a payment terminal, warm orange color grading, cropped tight and cinematic, shot from a low angle — the phone screen is angled away from camera, not showing app content. Below or beside this, a second small realistic iPhone frame containing the attached real app screenshot exactly as provided, not altered, positioned as if it's what happens a second later. Overlaid vanilla #FFF6C0 light-weight sans-serif text: "Il momento in cui la tua spesa si registra da sola." Small comic burst icon with "clinck" near the tap point. Designed as the first slide of a carousel ad. (If no screenshot is attached for this one, omit the second phone and keep it as pure gesture photography.)
-```
+### Slide 1 — Gancio (prezzo/trial)
+Riusa **A9** com'è — ha già reso bene, non serve rigenerarla per l'ads, la
+stessa immagine funziona da apertura del carosello.
 
-### B3 — Hook sul prezzo/trial
+### Slide 2 — Prova densa: gesto + UI reale **[UI reale — screenshot 1]**
 ```
-[Blocco stile] Solid orange #FF5E2C background. Enormous vanilla #FFF6C0 light-weight numeral "2" as the dominant visual element, filling most of the vertical space. Beneath it, smaller vanilla text: "mesi gratis per provarla." Small ink-on-vanilla caption pill at the very bottom: "poi 1,99€/mese." Minimal, numeral-led, no photography.
-```
-
-### B4 — Vetrina prodotto: investimenti **[UI reale — screenshot 3]**
-```
-[Blocco stile] Solid vanilla #FFF6C0 background. A realistic iPhone 15/16 frame, centered and large, containing the attached real app screenshot (Investimenti) exactly as provided, not altered or reinterpreted, shown straight-on. Ink #141413 light-weight caption above the phone: "Le tue spese. I tuoi investimenti. Un'app sola." App Store screenshot style — the phone is the hero, minimal additional graphic elements.
+[Blocco stile] Solid orange #FF5E2C background, photorealistic close-up of a hand tapping an iPhone against a payment terminal in the upper-left area, warm orange color grading, cinematic, the phone screen in this gesture angled away from camera. A small comic-style burst shape in vanilla outline containing "CLINCK" sits between the gesture and a second element: a realistic iPhone 15/16 frame, larger and positioned lower-right, containing the attached real app screenshot exactly as provided, not altered or reinterpreted, shown straight-on and sharp — as if this is what appears a second after the tap. Vanilla #FFF6C0 light-weight headline across the middle, layered behind the phone: "La tua spesa Apple Pay appare da sola." This slide is intentionally denser than the organic posts — two visual elements (gesture + real product) plus headline, not a single isolated focal point.
 ```
 
-## Prossimo passo
-Quando Andrea sceglie un concept fra B1/B2/B3, si producono le 2-4 slide
-successive del carosello nello stesso concept, coerenti con quella scelta —
-non prima, per non generare lavoro su varianti che non verranno usate.
+### Slide 3 — Prova completa: un'altra schermata reale **[UI reale — screenshot 2 o 3]**
+```
+[Blocco stile] Solid vanilla #FFF6C0 background. A realistic iPhone 15/16 frame, large and centered, containing the attached real app screenshot exactly as provided, not altered or reinterpreted, shown straight-on. Ink #141413 light-weight headline above the phone: "Spese e investimenti. Un'unica app." Small orange accent line beneath the phone as a graphic anchor. App Store screenshot style, product-forward — the real UI is the main proof point of this slide.
+```
+
+### Slide 4 — Prezzo e CTA
+```
+[Blocco stile] Solid orange #FF5E2C background. Vanilla #FFF6C0 light-weight headline, large, centered: "15€/anno, o 1,99€/mese." Smaller line beneath: "2 mesi gratis per iniziare." At the bottom, a simple text-only call to action in a vanilla pill shape with ink #141413 text: "Scaricala ora." No attempt to reproduce Apple's official "Download on the App Store" badge — plain text only, the real badge gets added separately by Andrea if needed, since it's a trademarked asset that shouldn't be AI-generated.
+```
+
+## Promemoria aperto
+Le slide 2 e 3 aspettano gli screenshot del test account (Home con spesa
+fresca, e uno fra andamento mensile/Investimenti) — vedi "UI reale, non
+generata" in cima al file per l'elenco completo e dove ogni screenshot va
+usato anche nella Sezione A.
