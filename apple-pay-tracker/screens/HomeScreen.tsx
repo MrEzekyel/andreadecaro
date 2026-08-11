@@ -28,8 +28,8 @@ import { useTheme } from "../lib/ThemeContext";
 import {
   compactAmount,
   formatAmount,
+  monthAbbr,
   monthName,
-  monthShort,
   monthTitle,
   percentChange,
   splitAmount,
@@ -356,7 +356,7 @@ export default function HomeScreen() {
   const spesaBars = useMemo<MonthBar[]>(
     () =>
       history.slice(-6).map((row) => ({
-        label: monthShort(new Date(`${row.month}T00:00:00`)),
+        label: monthAbbr(new Date(`${row.month}T00:00:00`)),
         value: row.spese,
       })),
     [history]
@@ -368,7 +368,7 @@ export default function HomeScreen() {
     return history
       .filter((row) => new Date(`${row.month}T00:00:00`).getFullYear() === year)
       .map((row) => ({
-        label: monthShort(new Date(`${row.month}T00:00:00`)),
+        label: monthAbbr(new Date(`${row.month}T00:00:00`)),
         value: row.introiti,
       }));
   }, [history]);
@@ -691,6 +691,27 @@ export default function HomeScreen() {
                       </View>
                     );
                   })}
+
+                {/* Senza questo avviso, un fallimento di rete su incomes o
+                    investments faceva sparire la scheda Flusso senza dire
+                    perche': sembrava un bug del grafico invece che una
+                    lettura fallita, e "tira giu' per aggiornare" non e' un
+                    gesto che viene in mente da soli davanti a uno spazio
+                    vuoto. */}
+                {balanceError && (
+                  <View style={[styles.alert, { backgroundColor: `${palette.warn}1f` }]}>
+                    <Icon name="triangle-alert" size={16} color={palette.warn} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.alertTitle, { color: palette.ink }]}>
+                        Flusso non disponibile
+                      </Text>
+                      <Text style={[styles.alertBody, { color: palette.ink2 }]}>
+                        Introiti e investimenti non si sono caricati. Tira giù
+                        per aggiornare.
+                      </Text>
+                    </View>
+                  </View>
+                )}
 
                 {/* Due domande diverse affiancate: dove sono finiti i soldi di
                     questo mese, e se questo mese e' pesante rispetto agli

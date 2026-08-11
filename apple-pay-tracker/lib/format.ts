@@ -64,6 +64,16 @@ export function monthShort(date: Date) {
 }
 
 /**
+ * "Lug" — solo il mese, senza anno. Per le etichette sotto le barre dei
+ * grafici mensili, dove lo spazio e' una manciata di pixel per colonna e
+ * l'anno non ci sta (e nella pratica e' quasi sempre lo stesso per tutte le
+ * barre visibili, quindi non manca).
+ */
+export function monthAbbr(date: Date) {
+  return capitalize(MONTHS_SHORT[date.getMonth()]);
+}
+
+/**
  * Data di una spesa come la si legge a colpo d'occhio: "Oggi 11:50",
  * "Ieri 11:50", altrimenti "12 ago 11:50".
  */
