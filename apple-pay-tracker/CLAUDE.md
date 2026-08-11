@@ -573,14 +573,26 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   memoria per tre passi. `chiave` mostra solo un avviso che anticipa cosa
   succederà. `GuideScreen` non mostra niente al posto dell'immagine
   mancante — solo la didascalia — invece di un placeholder vuoto.
-- **L'altezza della foto segue il suo rapporto reale**
-  (`Image.resolveAssetSource(source).width/height`, calcolato per passo),
-  non un'altezza fissa: le prime foto caricate avevano proporzioni diverse
-  fra loro (una carta orizzontale contro schermate intere verticali), e un
-  riquadro fisso lasciava una cornice vuota enorme intorno a quelle più
-  larghe che alte — quello che Andrea ha visto come "il quadrato" da
-  togliere. Niente più bordo né sfondo intorno alla foto: è la foto stessa,
-  non una cornice che la contiene.
+- **L'altezza della foto segue il suo rapporto reale**, non un'altezza
+  fissa: le prime foto caricate avevano proporzioni diverse fra loro (una
+  carta orizzontale contro schermate intere verticali), e un riquadro
+  fisso lasciava una cornice vuota enorme intorno a quelle più larghe che
+  alte — quello che Andrea ha visto come "il quadrato" da togliere. Niente
+  più bordo né sfondo intorno alla foto: è la foto stessa, non una cornice
+  che la contiene.
+- **Il rapporto larghezza/altezza è scritto a mano in `guideImages.ts`**
+  (`GuideImage.ratio`), non calcolato a runtime con
+  `Image.resolveAssetSource`. Il primo tentativo lo calcolava così, ed è
+  finito peggio di prima: `Image` ignorava `width: "100%"` e mostrava la
+  foto alla sua larghezza nativa (750px, molto più della larghezza dello
+  schermo), tagliata a destra — visibile da Andrea su due passi diversi.
+  La causa esatta non è confermata (probabile un valore non valido
+  restituito da `resolveAssetSource` su questi file, o un ordine di
+  risoluzione di Yoga che non onora `width` percentuale insieme ad
+  `aspectRatio` calcolato più tardi), ma il punto è che quella funzione si
+  è rivelata inaffidabile qui: un numero scritto a mano (misurato con
+  `file nome.jpg`) non ha ambiguità. Se il file cambia, il rapporto va
+  ricalcolato a mano.
 - **Il permesso di iOS per l'automazione non ha uno screenshot vero**
   (Andrea non ce l'ha): il passo `consenti` disegna un alert **simulato**
   in codice (`step.action === "consent-illustration"` in

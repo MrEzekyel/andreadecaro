@@ -53,14 +53,12 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
     (item) => item.chapter.id === "automazione"
   );
 
-  // L'altezza della foto segue il suo rapporto vero (vedi sotto): senza,
-  // un'immagine più larga che alta finirebbe schiacciata dentro un
-  // riquadro pensato per uno screenshot intero, con vuoto sopra e sotto.
-  const shotSource = GUIDE_IMAGES[step.id];
-  const shotRatio = shotSource
-    ? Image.resolveAssetSource(shotSource).width /
-      Image.resolveAssetSource(shotSource).height
-    : 1;
+  // Il rapporto vero della foto (vedi lib/guideImages.ts sul perché non è
+  // calcolato qui a runtime): senza, un'immagine più larga che alta
+  // finirebbe schiacciata dentro un riquadro pensato per uno screenshot
+  // intero, con vuoto sopra e sotto — o peggio, mostrata alla sua
+  // larghezza nativa invece che a quella dello schermo.
+  const shot = GUIDE_IMAGES[step.id];
 
   async function generaToken() {
     const { data, error } = await supabase.rpc("create_ingest_token", {
@@ -146,10 +144,10 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
               fissa lascerebbe una cornice vuota su ogni foto che non è
               esattamente quella proporzione, il "quadrato" che si vedeva
               prima intorno alle foto più larghe che alte. */}
-          {shotSource && (
+          {shot && (
             <Image
-              source={shotSource}
-              style={[styles.shot, { aspectRatio: shotRatio }]}
+              source={shot.source}
+              style={[styles.shot, { aspectRatio: shot.ratio }]}
               resizeMode="cover"
               accessibilityLabel={`Schermata di esempio: ${step.title}`}
             />
