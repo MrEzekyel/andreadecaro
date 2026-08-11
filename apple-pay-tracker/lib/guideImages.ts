@@ -18,13 +18,12 @@ import { ImageSourcePropType } from "react-native";
  * utente scarica a ogni apertura.
  */
 export const GUIDE_IMAGES: Record<string, ImageSourcePropType> = {
-  // merchant: require("../assets/guida/merchant.png"),
-  // amount: require("../assets/guida/amount.png"),
-  // token: require("../assets/guida/token.png"),
-  // richiesta: require("../assets/guida/richiesta.png"),
-  // se: require("../assets/guida/se.png"),
-  // salvataggio: require("../assets/guida/salvataggio.png"),
+  // installa: require("../assets/guida/installa.png"),
   // chiave: require("../assets/guida/chiave.png"),
-  // dizionario: require("../assets/guida/dizionario.png"),
-  // esegui: require("../assets/guida/esegui.png"),
+  // apri: require("../assets/guida/apri.png"),
+  // incolla: require("../assets/guida/incolla.png"),
+  // cerca: require("../assets/guida/cerca.png"),
+  // seleziona-tutto: require("../assets/guida/seleziona-tutto.png"),
+  // scegli-comando: require("../assets/guida/scegli-comando.png"),
+  // immediato: require("../assets/guida/immediato.png"),
 };

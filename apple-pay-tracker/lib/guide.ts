@@ -1,12 +1,12 @@
 /**
- * La guida per costruire l'automazione, passo per passo.
+ * La guida per collegare l'automazione, passo per passo.
  *
  * Sta qui come dati e non dentro la schermata perche' i passi cambiano
  * quando cambia iOS o la ricetta, e non deve servire toccare il layout per
  * correggere una parola.
  *
  * Il senso di questa guida: senza, il valore dell'app resta chiuso dietro
- * dieci minuti di Comandi Rapidi che nessuno indovina da solo. E' il punto
+ * dei passaggi di Comandi Rapidi che nessuno indovina da solo. E' il punto
  * in cui si perde la maggior parte delle persone, e non per colpa loro.
  */
 
@@ -31,8 +31,9 @@ export type GuideStep = {
   id: string;
   title: string;
   body: string;
-  /** Azione richiesta all'utente dentro l'app: copiare un dato che serve ora. */
-  action?: "copy-url" | "copy-token";
+  /** Azione richiesta all'utente dentro l'app: copiare un dato che serve ora,
+   * o aprire il link di installazione del comando. */
+  action?: "open-install" | "copy-token";
   blocks?: ActionBlock[];
   /** Avvertenza sul passo: il punto in cui ci si sbaglia. */
   warning?: string;
@@ -46,17 +47,16 @@ export type GuideChapter = {
 };
 
 /**
- * Il comando rapido «Registra spesa» già pronto, condivisibile via iCloud.
+ * Il comando rapido «Clinck: Inserisci pagamento» già pronto, condivisibile
+ * via iCloud: prende l'esercente, l'importo e la carta direttamente dalla
+ * transazione di Wallet e li manda al server. Non c'è nulla da costruire.
  *
- * Non contiene nessun token: il campo dell'intestazione `x-ingest-token` è
- * una variabile presa dall'input, non un valore scritto dentro — chi lo
- * installa userà comunque la propria automazione con la propria chiave, mai
- * quella di chi l'ha condiviso. È il motivo per cui questo link si può
- * pubblicare qui senza rischi.
- *
- * Installandolo si salta per intero il capitolo "Il comando rapido": resta
- * solo da costruire l'automazione, che Apple non permette di condividere in
- * nessun modo — quella tocca farla a ognuno.
+ * Il campo dell'intestazione `x-ingest-token` dentro «Ottieni contenuti di
+ * URL» contiene il testo segnaposto `INCOLLA TOKEN`, non un token vero: è
+ * per questo che si può pubblicare il link senza rischi. Chi lo installa
+ * riceve la propria copia locale del comando — modificarla (sostituire il
+ * segnaposto con la propria chiave) non tocca in nessun modo l'originale
+ * condiviso, quindi non c'è mai una chiave di qualcun altro in giro.
  */
 export const SHORTCUT_INSTALL_URL =
   "https://www.icloud.com/shortcuts/ad8b80ff1c3b4ed28f5c50e493e37f9d";
@@ -66,148 +66,46 @@ export const GUIDE: GuideChapter[] = [
     id: "comando",
     title: "Il comando rapido",
     subtitle:
-      "È il pezzo che parla con l'app. Si costruisce una volta e poi non si tocca più.",
+      "È il pezzo pronto che parla con l'app. Si installa e si collega alla tua chiave una volta sola.",
     steps: [
       {
-        id: "nuovo",
-        title: "Crea un comando rapido nuovo",
-        body: "Apri Comandi Rapidi, tocca + in alto a destra e chiamalo «Registra spesa». Il nome conta: è quello che sceglierai più avanti dall'automazione.",
+        id: "installa",
+        title: "Installa il comando pronto",
+        body: "Tocca il pulsante qui sotto: iOS mostra «Clinck: Inserisci pagamento», già impostato con l'indirizzo giusto e i dati della spesa collegati. Tocca «Aggiungi comando rapido» — non c'è nient'altro da configurare in questo passo.",
+        action: "open-install",
       },
       {
-        id: "input",
-        title: "Accetta qualsiasi tipo di input",
-        body: "Nelle informazioni del comando (l'icona ⓘ in basso), attiva «Mostra nel foglio di condivisione» e imposta il tipo di input su «Qualsiasi». Senza, l'automazione non riuscirà a passargli i dati della transazione.",
+        id: "chiave",
+        title: "Genera e copia la tua chiave",
+        body: "È la password che dice al server che quella spesa è tua. Si vede una volta sola: generala adesso e copiala — ti serve nel passo successivo.",
+        action: "copy-token",
+        warning:
+          "Se la perdi non è un dramma: ne generi un'altra e revochi la vecchia da Impostazioni → Automazioni.",
       },
       {
-        id: "merchant",
-        title: "Estrai il nome dell'esercente",
-        body: "Aggiungi l'azione «Ottieni valore dizionario». Come dizionario scegli la variabile «Input Comando rapido», e come chiave scrivi merchant.",
-        blocks: [
-          {
-            action: "Ottieni valore dizionario",
-            fields: [
-              { label: "Ottieni", value: "Valore" },
-              { label: "Chiave", value: "merchant" },
-              { label: "In", value: "Input Comando rapido", variable: true },
-            ],
-          },
-        ],
+        id: "apri",
+        title: "Apri il comando in modifica",
+        body: "Vai su Comandi Rapidi → Libreria, cerca «Clinck: Inserisci pagamento», tocca i tre puntini sulla card (o tienila premuta) e scegli «Modifica». Poi scorri fino all'azione «Ottieni contenuti di» e tocca la freccia accanto all'indirizzo per aprirne i dettagli.",
       },
       {
-        id: "amount",
-        title: "Estrai l'importo",
-        body: "Aggiungi una seconda «Ottieni valore dizionario», identica alla prima ma con chiave amount.",
-        blocks: [
-          {
-            action: "Ottieni valore dizionario",
-            fields: [
-              { label: "Ottieni", value: "Valore" },
-              { label: "Chiave", value: "amount" },
-              { label: "In", value: "Input Comando rapido", variable: true },
-            ],
-          },
-        ],
-      },
-      {
-        id: "token",
-        title: "Estrai la chiave",
-        body: "Aggiungi una terza «Ottieni valore dizionario», identica alle altre due ma con chiave token. È così che il comando riconosce di chi è la spesa: la chiave vera e propria la generi nel capitolo successivo, e arriva qui dentro un Dizionario passato dall'automazione — mai scritta dentro questo comando.",
-        blocks: [
-          {
-            action: "Ottieni valore dizionario",
-            fields: [
-              { label: "Ottieni", value: "Valore" },
-              { label: "Chiave", value: "token" },
-              { label: "In", value: "Input Comando rapido", variable: true },
-            ],
-          },
-        ],
-      },
-      {
-        id: "url",
-        title: "Copia l'indirizzo a cui mandare la spesa",
-        body: "Serve nel passo successivo. Toccalo qui sotto per copiarlo: è personale del tuo account, non condividerlo insieme al comando.",
-        action: "copy-url",
-      },
-      {
-        id: "richiesta",
-        title: "Aggiungi la chiamata al server",
-        body: "Aggiungi «Ottieni contenuti di URL» e incolla l'indirizzo copiato. Apri «Mostra altro» per trovare metodo, intestazioni e corpo della richiesta. I valori di token, merchant e amount sono le variabili dei tre passi precedenti, non testo scritto a mano — se scrivi la chiave a mano qui dentro, chiunque installi questo stesso comando da un link condiviso finirebbe per usare la tua.",
+        id: "incolla",
+        title: "Incolla la tua chiave",
+        body: "In «Intestazioni» trova il campo «x-ingest-token»: contiene il testo segnaposto INCOLLA TOKEN. Selezionalo e sostituiscilo con la chiave copiata al passo precedente. Il resto — indirizzo, importo, esercente, carta — è già collegato, non toccarlo.",
         blocks: [
           {
             action: "Ottieni contenuti di URL",
             fields: [
-              { label: "URL", value: "l'indirizzo copiato" },
               { label: "Metodo", value: "POST" },
-              {
-                label: "Intestazione",
-                value: "x-ingest-token = Valore dizionario (3º)",
-                variable: true,
-              },
-              { label: "Corpo richiesta", value: "JSON" },
-              { label: "merchant", value: "Valore dizionario (1º)", variable: true },
-              { label: "amount", value: "Valore dizionario (2º)", variable: true },
+              { label: "Intestazioni · x-ingest-token", value: "INCOLLA TOKEN → la tua chiave" },
+              { label: "amount", value: "Importo", variable: true },
+              { label: "merchant", value: "Esercente", variable: true },
+              { label: "card", value: "Carta o biglietto", variable: true },
               { label: "source", value: "shortcut" },
             ],
           },
         ],
-      },
-      {
-        id: "se",
-        title: "Controlla se è andata a buon fine",
-        body: "Aggiungi un blocco «Se» sul risultato di «Contenuti URL». La condizione deve essere «contiene» con valore \"ok\":true — virgolette comprese.",
-        blocks: [
-          {
-            action: "Se",
-            fields: [
-              { label: "Input", value: "Contenuti URL", variable: true },
-              { label: "Condizione", value: "contiene" },
-              { label: "Testo", value: '"ok":true' },
-            ],
-          },
-        ],
         warning:
-          "Non usare «presenta qualsiasi valore»: il server risponde con un testo anche quando fallisce, quindi quella condizione sarebbe sempre vera e non ti accorgeresti mai di una spesa persa.",
-      },
-      {
-        id: "salvataggio",
-        title: "Salva le spese che non partono",
-        body: "Dentro «Altrimenti» aggiungi un'azione «Testo» con il contenuto qui sotto, e poi «Aggiungi a file» su un file chiamato spese-non-inviate.txt in iCloud Drive. Attiva «Aggiungi nuova riga».",
-        blocks: [
-          {
-            action: "Altrimenti",
-            nested: [
-              {
-                action: "Testo",
-                fields: [
-                  {
-                    label: "Contenuto",
-                    value:
-                      '{"merchant":"‹esercente›","amount":"‹importo›","occurred_at":"‹data ISO 8601›"}',
-                    variable: true,
-                  },
-                ],
-              },
-              {
-                action: "Aggiungi a file",
-                fields: [
-                  { label: "File", value: "spese-non-inviate.txt" },
-                  { label: "Percorso", value: "iCloud Drive / Comandi Rapidi" },
-                  { label: "Aggiungi nuova riga", value: "attivo" },
-                ],
-              },
-            ],
-          },
-        ],
-        warning:
-          "L'importo va inserito come variabile, non riscritto a mano: dentro quel testo c'è anche la valuta, ed è da lì che l'app capisce che una spesa era in sterline invece che in euro.",
-      },
-      {
-        id: "avviso",
-        title: "Fatti avvisare quando qualcosa non va",
-        body: "Sempre dentro «Altrimenti», dopo il salvataggio, aggiungi «Mostra notifica» con un testo tipo: Spesa non registrata, recuperala dall'app. Poi chiudi il blocco.",
-        warning:
-          "Le spese finite nel file si reimportano da Impostazioni → Automazioni → Recupera spese non inviate. I doppioni vengono riconosciuti, quindi puoi reimportare lo stesso file quante volte vuoi.",
+          "È l'unico campo di tutto il comando che va toccato. Se lo lasci com'è, ogni chiamata al server viene rifiutata e la spesa non entra mai in app.",
       },
     ],
   },
@@ -215,61 +113,34 @@ export const GUIDE: GuideChapter[] = [
     id: "automazione",
     title: "L'automazione",
     subtitle:
-      "Due azioni soltanto: prende la transazione da Apple Pay e la passa al comando che hai appena creato.",
+      "Fa partire da sola il comando appena configurato a ogni pagamento Apple Pay.",
     steps: [
       {
-        id: "trigger",
+        id: "cerca",
         title: "Crea l'automazione",
-        body: "In Comandi Rapidi vai su Automazione → + → cerca «Transazione» (su iOS 26 si chiama «Wallet»). Scegli la carta o le carte che usi con Apple Pay.",
+        body: "Vai su Automazioni → + e cerca «Wallet» nella casella di ricerca in basso. Compare un solo risultato: toccalo.",
+      },
+      {
+        id: "seleziona-tutto",
+        title: "Lascia tutto selezionato",
+        body: "La schermata mostra le tue carte e le categorie di spesa, già tutte spuntate: è quello che serve, l'automazione deve vedere ogni pagamento Apple Pay. Tocca «Avanti» senza togliere nessuna spunta.",
+      },
+      {
+        id: "scegli-comando",
+        title: "Scegli il comando da eseguire",
+        body: "Cerca «Inserisci pagamento» tra i comandi rapidi suggeriti e selezionalo: è il comando che hai appena installato e configurato.",
       },
       {
         id: "immediato",
         title: "Falla partire da sola",
-        body: "Attiva «Esegui immediatamente» e lascia spenta la notifica di esecuzione. Senza «Esegui immediatamente» dovresti confermare ogni pagamento a mano, e l'automatismo perderebbe senso.",
-      },
-      {
-        id: "chiave",
-        title: "Genera la tua chiave",
-        body: "È la password che dice al server che quella spesa è tua. Si vede una volta sola: generala adesso, copiala, e incollala subito nel passo seguente. Serve anche se hai installato il comando già pronto dal link — è personale tua, il comando condiviso non ne contiene nessuna.",
-        action: "copy-token",
+        body: "In alto tocca «Automazioni» — si apre un menu con tre opzioni. Scegli «Esegui immediatamente» al posto di «Esegui dopo la conferma», di default, poi tocca «Fine».",
         warning:
-          "Se la perdi non è un dramma: ne generi un'altra e revochi la vecchia da Impostazioni → Automazioni.",
-      },
-      {
-        id: "dizionario",
-        title: "Prepara i dati da passare",
-        body: "Aggiungi un'azione «Dizionario» con tre voci: incolla la chiave copiata nel passo precedente per token, poi prendi merchant e amount dal selettore variabili della transazione.",
-        blocks: [
-          {
-            action: "Dizionario",
-            fields: [
-              { label: "token", value: "la chiave copiata" },
-              { label: "merchant", value: "Esercente", variable: true },
-              { label: "amount", value: "Importo", variable: true },
-            ],
-          },
-        ],
-        warning:
-          "Il tipo «Transazione» non sopravvive al passaggio verso un altro comando rapido, arriva dall'altra parte svuotato — ricostruire un dizionario con chiavi tue è l'unico modo perché i dati arrivino interi. E senza la voce token il comando «Registra spesa» non sa a chi appartiene la spesa: la richiesta viene rifiutata e la spesa finisce solo nel recupero locale, mai in app.",
-      },
-      {
-        id: "esegui",
-        title: "Chiama il comando rapido",
-        body: "Aggiungi «Esegui comando rapido», scegli «Registra spesa» e come input passa il Dizionario del passo precedente. Salva: da adesso ogni pagamento Apple Pay finisce nell'app da solo.",
-        blocks: [
-          {
-            action: "Esegui comando rapido",
-            fields: [
-              { label: "Comando", value: "Registra spesa" },
-              { label: "Input", value: "Dizionario", variable: true },
-            ],
-          },
-        ],
+          "Senza «Esegui immediatamente» dovresti confermare ogni pagamento a mano, e l'automatismo perderebbe senso.",
       },
       {
         id: "prova",
         title: "Provala",
-        body: "Fai un pagamento vero con Apple Pay, anche piccolo. Entro pochi secondi deve comparire in Home. Se non arriva, apri Comandi Rapidi → Automazione e controlla che «Esegui immediatamente» sia attivo.",
+        body: "Fai un pagamento vero con Apple Pay, anche piccolo. Entro pochi secondi deve comparire in Home.",
         warning:
           "L'automazione vede solo Apple Pay: contanti, bonifici, addebiti diretti e carte fisiche fuori da Wallet restano da aggiungere a mano o con Siri.",
       },

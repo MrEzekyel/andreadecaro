@@ -23,8 +23,9 @@ campagne ads. Dettagli tecnici in "Abbonamento e referral" più sotto.
 
 **Cosa è già costruito e pushato**, sprint 1-4 di `SPRINT.md` chiusi:
 fiducia (recupero password, export, errori onesti), attrito zero
-sull'automazione (guida passo-passo, comando rapido «Registra spesa» già
-pronto e condiviso via link — vedi "Guida alla configurazione" sotto),
+sull'automazione (guida passo-passo, comando rapido «Clinck: Inserisci
+pagamento» già pronto e condiviso via link — vedi "Guida alla
+configurazione" sotto),
 integrità del dato (multi-valuta, lettura offline ovunque), sicurezza e
 trasparenza (blocco Face ID, changelog in-app, non-obiettivi dichiarati nel
 README). Schema, enforcement e schermate del modello di business sono in
@@ -459,9 +460,12 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 - **Un'automazione iOS non si può condividere**: il pulsante Condividi esiste
   solo sui comandi rapidi normali, quindi un `.shortcut` dell'automazione non è
   generabile. Da qui la struttura: la logica sta in un comando rapido
-  condivisibile («Registra spesa») e l'automazione lo chiama in due azioni. È
-  anche il motivo per cui `P5` si può chiudere davvero — il pezzo complicato si
-  distribuisce con un link iCloud.
+  condivisibile («Clinck: Inserisci pagamento», che legge esercente, importo
+  e carta direttamente dalle proprietà della Transazione ricevuta come
+  input — nessuna estrazione manuale, nessun Dizionario intermedio) e
+  l'automazione si limita a scegliere quel comando come azione da eseguire
+  quando scatta il trigger Wallet. È anche il motivo per cui `P5` si può
+  chiudere davvero — il pezzo complicato si distribuisce con un link iCloud.
 - Il ramo di fallimento del comando rapido scrive la spesa in
   `spese-non-inviate.txt`, **una riga JSON per spesa**, identica al corpo che
   avrebbe mandato in rete. `lib/recoverPayments.ts` la rilegge da
@@ -511,22 +515,33 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   riproduzione di un'azione), `screens/GuideScreen.tsx`. Si arriva da
   Automazioni e dallo stato vuoto della Home — cioè dai due punti in cui si
   trova chi non ha ancora configurato niente.
-- **Il comando rapido «Registra spesa» è già pronto e condiviso** via link
-  iCloud (`SHORTCUT_INSTALL_URL` in `lib/guide.ts`, `P5` in `PRODOTTO.md`).
-  Sicuro da tenere pubblico dentro l'app perché **non contiene nessun
-  token**: il campo dell'intestazione `x-ingest-token` dentro «Ottieni
-  contenuti di URL» è una variabile presa dall'input, non un valore scritto
-  — verificato con Andrea prima di agganciarlo, perché un token hardcoded
-  in un link condiviso avrebbe fatto scrivere le spese di chiunque
-  sull'account di chi l'ha condiviso.
-- Installare il link **non basta**: sostituisce solo il capitolo "Il
-  comando rapido". L'**automazione** che lo richiama non è condivisibile in
-  nessun modo (Apple non dà il pulsante Condividi alle automazioni, solo ai
-  comandi rapidi normali) e va sempre costruita a mano — due azioni,
-  coperte dal secondo capitolo della guida. Per questo `GuideScreen` offre,
-  solo dentro il capitolo del comando, un modo di saltare direttamente al
-  capitolo dell'automazione (`automazioneIndex` in `GuideScreen.tsx`) per
-  chi ha già installato il link.
+- **Il comando rapido «Clinck: Inserisci pagamento» è già pronto e
+  condiviso** via link iCloud (`SHORTCUT_INSTALL_URL` in `lib/guide.ts`,
+  `P5` in `PRODOTTO.md`). Legge esercente, importo e carta **direttamente
+  dalle proprietà della Transazione** passata in input (`Esercente`,
+  `Importo`, `Carta o biglietto` nel selettore variabili) — verificato via
+  registrazione schermo di Andrea: il tipo Transazione sopravvive benissimo
+  al passaggio come input di un altro comando rapido quando è l'automazione
+  stessa a passarlo di default, non serve nessun'azione «Ottieni valore
+  dizionario» né un «Dizionario» intermedio per ricostruirlo.
+- Sicuro da tenere pubblico dentro l'app perché il campo dell'intestazione
+  `x-ingest-token` (dentro «Ottieni contenuti di URL») contiene solo il
+  testo segnaposto **`INCOLLA TOKEN`**, non un token vero. Installare il
+  link crea una **copia locale** del comando: modificare quella copia (per
+  incollarci la propria chiave) non tocca in nessun modo l'originale
+  condiviso su iCloud, quindi non c'è mai una chiave vera dentro un link
+  pubblicato.
+- Installare il link **non basta**: bisogna comunque incollare la propria
+  chiave al posto del segnaposto (Libreria → tre puntini sul comando →
+  Modifica → «Ottieni contenuti di» → intestazioni), e costruire
+  **l'automazione** che lo richiama — non condivisibile in nessun modo
+  (Apple non dà il pulsante Condividi alle automazioni, solo ai comandi
+  rapidi normali): cercare «Wallet», lasciare tutto selezionato e scegliere
+  questo comando come azione. Il primo capitolo della guida copre
+  l'installazione e la chiave, il secondo l'automazione. `GuideScreen`
+  offre, solo dentro il capitolo del comando, un modo di saltare
+  direttamente al capitolo dell'automazione (`automazioneIndex` in
+  `GuideScreen.tsx`) per chi ha già installato e configurato il link.
 - Le azioni sono **riprodotte schematicamente, non fotografate**: uno
   screenshot di iOS invecchia al primo aggiornamento che sposta un campo, e
   chi lo guarda non capisce più se sta sbagliando lui o se è la guida a
@@ -544,19 +559,18 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 - Il progresso è salvato: questa procedura si fa passando avanti e indietro
   fra due app, e ricominciare da capo a ogni ritorno è il modo più rapido per
   farla abbandonare.
-- **Il Dizionario dell'automazione (capitolo 2) deve contenere `token`,
-  `merchant` e `amount` — non solo gli ultimi due.** Chi installa il comando
-  già pronto dal link salta per intero il capitolo 1, quindi il capitolo 2 è
-  l'unico posto in cui vede il passo "Genera la tua chiave": se il Dizionario
-  non porta anche `token`, «Registra spesa» (che lo legge da lì, non da un
-  valore scritto al suo interno) risponde 401 a ogni chiamata e la spesa
-  finisce solo nel recupero locale, mai in app — bug reale, scoperto da
-  Andrea leggendo la guida a mente fredda dopo averla seguita. Per lo stesso
-  motivo il capitolo 1 costruisce «Registra spesa» leggendo anch'esso il
-  token da «Input Comando rapido» invece di scriverlo dentro l'azione
-  "Ottieni contenuti di URL": le due varianti (installata o costruita a
-  mano) devono restare identiche nell'architettura, altrimenti il capitolo 2
-  smette di valere per una delle due.
+- **La guida era stata riscritta una prima volta sulla base di un'architettura
+  sbagliata** (un Dizionario intermedio con `token`/`merchant`/`amount`
+  costruito dall'automazione), inventata per analogia senza aver mai visto il
+  comando vero funzionare. Andrea l'ha corretta mandando una registrazione
+  schermo della procedura reale: **nessun Dizionario, nessuna estrazione
+  manuale** — il comando pronto legge le proprietà della Transazione
+  direttamente, e l'unico passo davvero manuale è sostituire il segnaposto
+  `INCOLLA TOKEN` nell'intestazione con la propria chiave. Lezione per la
+  prossima volta: quando la ricostruzione di un flusso Comandi Rapidi non è
+  verificata su un dispositivo vero, dirlo esplicitamente invece di
+  presentarla come confermata — qui è stata scritta due volte prima di
+  essere giusta.
 
 ### Novità in-app
 

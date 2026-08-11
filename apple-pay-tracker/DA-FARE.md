@@ -68,20 +68,19 @@ L'app ha ora una **guida passo per passo** (Impostazioni → Automazioni →
 Guida, e dallo stato vuoto della Home). Ogni passo mostra il nome esatto
 dell'azione da cercare e i campi da riempire, riprodotti schematicamente.
 
-Mentre costruisci il comando rapido sul tuo iPhone, fai uno screenshot di
-questi passaggi — sono quelli dove si sbaglia:
+Mentre segui la procedura sul tuo iPhone, fai uno screenshot di questi
+passaggi — sono quelli dove si sbaglia:
 
 | File da salvare in `assets/guida/` | Cosa deve mostrare |
 | --- | --- |
-| `merchant.png` | L'azione "Ottieni valore dizionario" con chiave `merchant` |
-| `amount.png` | La stessa con chiave `amount` |
-| `token.png` | La stessa con chiave `token` |
-| `richiesta.png` | "Ottieni contenuti di URL" aperto, con metodo, intestazione (il valore preso come variabile, non scritto a mano) e corpo JSON |
-| `se.png` | Il blocco "Se" con la condizione *contiene* `"ok":true` |
-| `salvataggio.png` | "Aggiungi a file" con il file di recupero |
-| `chiave.png` | Il passo "Genera la tua chiave" nel capitolo dell'automazione |
-| `dizionario.png` | Il "Dizionario" dell'automazione con token, Esercente e Importo |
-| `esegui.png` | "Esegui comando rapido" con input il Dizionario |
+| `installa.png` | La schermata "Aggiungi comando rapido" di «Clinck: Inserisci pagamento» |
+| `chiave.png` | Il pulsante "Genera e copia la chiave" nell'app |
+| `apri.png` | Libreria → i tre puntini sulla card del comando → "Modifica" |
+| `incolla.png` | "Ottieni contenuti di" aperto, con il campo `x-ingest-token` (INCOLLA TOKEN sostituito dalla chiave) |
+| `cerca.png` | La ricerca "Wallet" in Automazioni con l'unico risultato |
+| `seleziona-tutto.png` | La schermata di carte e categorie, tutte già spuntate |
+| `scegli-comando.png` | La ricerca di "Inserisci pagamento" tra i comandi suggeriti |
+| `immediato.png` | Il menu con "Esegui immediatamente" al posto di "Esegui dopo la conferma" |
 
 Ritaglia la singola azione invece della schermata intera (si legge su un
 telefono) e ridimensiona a circa 750px di larghezza: uno screenshot a piena
@@ -93,17 +92,18 @@ predisposti in `lib/guideImages.ts`.
 
 ## ✅ Automazione iOS — comando rapido pronto e agganciato
 
-Il comando rapido condivisibile **«Registra spesa»** è online e agganciato
-in Automazioni e nella guida in-app, con un pulsante "Installa il comando
-pronto" — chiuso `P5`. Nessun token dentro: il campo dell'intestazione è
-una variabile presa dall'input, quindi il link resta sicuro da tenere
-pubblico dentro l'app.
+Il comando rapido condivisibile **«Clinck: Inserisci pagamento»** è online e
+agganciato in Automazioni e nella guida in-app, con un pulsante "Installa il
+comando pronto" — chiuso `P5`. Nessun token dentro: il campo
+dell'intestazione contiene solo il segnaposto `INCOLLA TOKEN`, quindi il
+link resta sicuro da tenere pubblico dentro l'app — ognuno lo sostituisce
+con la propria chiave sulla propria copia locale, dopo averlo installato.
 
 Resta comunque da costruire **l'automazione** che lo richiama, su ogni
 telefono che vuole usarla: Apple non permette di condividerla in nessun
-modo (solo i comandi rapidi normali hanno il pulsante Condividi), ma sono
-solo due azioni — «Dizionario» ed «Esegui comando rapido» — e la guida
-in-app le copre nel secondo capitolo.
+modo (solo i comandi rapidi normali hanno il pulsante Condividi). È una
+ricerca ("Wallet") più la scelta del comando da eseguire, e la guida
+in-app la copre nel secondo capitolo.
 
 ---
 

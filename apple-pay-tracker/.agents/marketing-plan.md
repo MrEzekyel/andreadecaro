@@ -166,7 +166,7 @@ content) che a questa scala non avrebbero ancora nulla su cui compondere.
 |---|---|---|
 | App funzionante, sprint 1-4 chiusi (fiducia, attrito zero, integrità del dato, sicurezza) | Fatto | Il prodotto regge la promessa che gli ads farebbero — non stiamo per vendere qualcosa di rotto |
 | Guida in-app passo-passo per l'automazione | Fatto | Riduce l'abbandono nel momento più critico (setup della Shortcut), che altrimenti vanificherebbe qualunque click pagato |
-| Comando rapido condivisibile «Registra spesa», link installabile con un tap | Fatto | Dimezza l'attrito rispetto ai 15 passi manuali — direttamente rilevante per la conversione del test ads |
+| Comando rapido condivisibile «Clinck: Inserisci pagamento», link installabile con un tap | Fatto | Dimezza l'attrito rispetto ai passi manuali — direttamente rilevante per la conversione del test ads |
 | Programma referral interno (5 amici confermati = 2 mesi extra) | Fatto, mai promosso negli ads per scelta esplicita | Leva di retention/passaparola organico dopo il lancio, non canale di acquisizione a pagamento |
 | Modello di prezzo deciso e implementato lato server | Fatto | Il pulsante "Abbonati" è pronto, manca solo RevenueCat per accettare il pagamento vero |
 | README onesto sui limiti di copertura | Fatto | Base di copy per gli ads: la stessa onestà va portata nel creativo, non solo nel prodotto |

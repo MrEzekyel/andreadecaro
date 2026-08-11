@@ -20,7 +20,6 @@ import { GUIDE_IMAGES } from "../lib/guideImages";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
 
-const INGEST_URL = `${process.env.EXPO_PUBLIC_SUPABASE_URL}/functions/v1/ingest-payment`;
 const PROGRESS_KEY = "guida-passo";
 
 export default function GuideScreen({ onBack }: { onBack: () => void }) {
@@ -55,14 +54,9 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
     (item) => item.chapter.id === "automazione"
   );
 
-  async function copiaUrl() {
-    await Clipboard.setStringAsync(INGEST_URL);
-    Alert.alert("Copiato", "L'indirizzo è negli appunti.");
-  }
-
   async function generaToken() {
     const { data, error } = await supabase.rpc("create_ingest_token", {
-      p_label: "Registra spesa",
+      p_label: "Inserisci pagamento",
     });
     if (error) {
       Alert.alert("Non è stato possibile generare la chiave", error.message);
@@ -139,23 +133,14 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
 
           <Text style={[styles.body, { color: palette.ink2 }]}>{step.body}</Text>
 
-          {step.action === "copy-url" && (
+          {step.action === "open-install" && (
             <TouchableOpacity
-              onPress={copiaUrl}
-              style={[
-                styles.dataBox,
-                { backgroundColor: palette.surface, borderColor: palette.hairline },
-              ]}
+              onPress={() => Linking.openURL(SHORTCUT_INSTALL_URL)}
+              style={[styles.button, { backgroundColor: palette.accent }]}
             >
-              <Text style={[styles.dataValue, { color: palette.ink }]} numberOfLines={2}>
-                {INGEST_URL}
+              <Text style={[styles.buttonText, { color: palette.onAccent }]}>
+                Apri il link e installa
               </Text>
-              <View style={styles.dataAction}>
-                <Icon name="copy" size={13} color={palette.accent} />
-                <Text style={[styles.dataActionText, { color: palette.accent }]}>
-                  Tocca per copiare
-                </Text>
-              </View>
             </TouchableOpacity>
           )}
 
@@ -267,10 +252,6 @@ const styles = StyleSheet.create({
   chapter: { ...type.small, fontWeight: "500", letterSpacing: 0.6 },
   stepTitle: { ...type.title, fontSize: 20, marginTop: -4 },
   body: { ...type.body, lineHeight: 22 },
-  dataBox: { borderRadius: radius.field, borderWidth: 1, padding: 12, gap: 7 },
-  dataValue: { ...type.caption, lineHeight: 17 },
-  dataAction: { flexDirection: "row", alignItems: "center", gap: 5 },
-  dataActionText: { ...type.small, fontWeight: "500" },
   button: {
     borderRadius: radius.button,
     paddingVertical: 13,

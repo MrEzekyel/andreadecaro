@@ -95,19 +95,21 @@ Ha senso solo dopo `P2`: prometterlo senza un export funzionante è una bugia.
 
 ### P5 · Comando rapido pronto · **fatto**
 
-Il comando rapido «Registra spesa» è costruito e condiviso via link iCloud
-(`lib/guide.ts` → `SHORTCUT_INSTALL_URL`), raggiungibile con un tocco da
-Impostazioni → Automazioni. Nessun token dentro: il campo dell'intestazione
-`x-ingest-token` è una variabile presa dall'input, non un valore scritto —
-chi lo installa usa comunque la propria automazione con la propria chiave.
+Il comando rapido «Clinck: Inserisci pagamento» è costruito e condiviso via
+link iCloud (`lib/guide.ts` → `SHORTCUT_INSTALL_URL`), raggiungibile con un
+tocco da Impostazioni → Automazioni. Nessun token dentro: il campo
+dell'intestazione `x-ingest-token` contiene solo il segnaposto `INCOLLA
+TOKEN` — chi lo installa lo sostituisce con la propria chiave sulla propria
+copia locale, senza toccare in nessun modo l'originale condiviso.
 
 Non elimina tutto il lavoro manuale: Apple non permette di condividere
 un'**automazione** in nessun modo (solo i comandi rapidi normali hanno il
-pulsante Condividi), quindi resta da costruire quella — due azioni, contro
-i quindici passi originari del comando stesso. La guida in-app
-(`screens/GuideScreen.tsx`) copre entrambi i pezzi e, nel capitolo del
-comando, offre di saltare direttamente al capitolo dell'automazione per chi
-ha già installato il link.
+pulsante Condividi), quindi resta da costruirla — cercare "Wallet" e
+scegliere il comando appena installato, contro i quindici passi originari
+del comando stesso. La guida in-app (`screens/GuideScreen.tsx`) copre
+entrambi i pezzi e, nel capitolo del comando, offre di saltare direttamente
+al capitolo dell'automazione per chi ha già installato e configurato il
+link.
 
 **Verifica**: un utente che non ha mai visto Comandi Rapidi installa il
 comando con un tocco e completa l'automazione in pochi minuti seguendo la
