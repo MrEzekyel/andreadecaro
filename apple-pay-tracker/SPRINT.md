@@ -61,7 +61,7 @@ riporta a un `redirectTo`, e in Expo Go l'URL dell'app cambia a ogni sessione:
 un deep link sarebbe fragile proprio nel momento in cui l'utente è già in
 difficoltà.
 
-Con il codice a sei cifre tutto resta dentro l'app:
+Con il codice a otto cifre tutto resta dentro l'app:
 
 1. `resetPasswordForEmail(email)` manda il codice
 2. `verifyOtp({ email, token, type: "recovery" })` apre la sessione

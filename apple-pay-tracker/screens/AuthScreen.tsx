@@ -157,14 +157,14 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
     // codice che non arrivera' mai: si usa la stessa cautela di `sendCode`.
     Alert.alert(
       "Controlla la posta",
-      `Se ${email} non è già registrata, riceverai un codice a sei cifre. Serve a confermare che l'indirizzo è tuo: senza, un domani non potresti recuperare la password.`
+      `Se ${email} non è già registrata, riceverai un codice a otto cifre. Serve a confermare che l'indirizzo è tuo: senza, un domani non potresti recuperare la password.`
     );
   }
 
   /** Conferma l'indirizzo con il codice ricevuto, e con quello entra. */
   async function confirmSignup() {
-    if (code.trim().length < 6) {
-      Alert.alert("Codice incompleto", "Inserisci le sei cifre che hai ricevuto.");
+    if (code.trim().length < 8) {
+      Alert.alert("Codice incompleto", "Inserisci le otto cifre che hai ricevuto.");
       return;
     }
 
@@ -218,13 +218,13 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
     setPendingCode("recovery");
     Alert.alert(
       "Controlla la posta",
-      `Se esiste un account per ${email}, fra pochi istanti riceverai un codice a sei cifre.`
+      `Se esiste un account per ${email}, fra pochi istanti riceverai un codice a otto cifre.`
     );
   }
 
   async function resetPassword() {
-    if (code.trim().length < 6) {
-      Alert.alert("Codice incompleto", "Inserisci le sei cifre che hai ricevuto.");
+    if (code.trim().length < 8) {
+      Alert.alert("Codice incompleto", "Inserisci le otto cifre che hai ricevuto.");
       return;
     }
     if (password.length < 6) {
@@ -366,12 +366,12 @@ export default function AuthScreen({ onRecoveringChange }: Props) {
           <TextInput
             value={code}
             onChangeText={setCode}
-            placeholder="Codice a sei cifre"
+            placeholder="Codice a otto cifre"
             placeholderTextColor={palette.ink3}
             autoCapitalize="none"
             autoComplete="one-time-code"
             keyboardType="number-pad"
-            maxLength={6}
+            maxLength={8}
             style={[
               styles.input,
               styles.code,

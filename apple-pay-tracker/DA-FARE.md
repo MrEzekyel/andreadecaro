@@ -25,7 +25,7 @@ Due file HTML pronti, nello stile dell'app (fondo caldo, accento argilla):
 - `supabase/templates/reset-password.html`
 
 L'app non usa **nessuna pagina web** per confermare l'email o recuperare la
-password — entrambe vanno a **codice a sei cifre**, verificato dentro l'app.
+password — entrambe vanno a **codice a otto cifre**, verificato dentro l'app.
 È una scelta voluta: in Expo Go l'URL dell'app cambia a ogni sessione, quindi
 un link di ritorno sarebbe fragile proprio quando l'utente è già in difficoltà.
 

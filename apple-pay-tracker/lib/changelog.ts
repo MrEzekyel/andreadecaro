@@ -47,7 +47,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     title: "I tuoi dati, sempre recuperabili",
     items: [
       "Esporta tutto in CSV da Impostazioni: spese, introiti, investimenti e divisioni, pronti per il foglio di calcolo.",
-      "Password dimenticata: si recupera con un codice a sei cifre, senza uscire dall'app.",
+      "Password dimenticata: si recupera con un codice a otto cifre, senza uscire dall'app.",
       "Le spese che l'automazione non riesce a mandare finiscono in un file e si reimportano da Impostazioni, senza doppioni.",
       "A fine mese l'app chiede una volta se il totale corrisponde all'estratto conto.",
       "Quando una schermata non riesce a leggere lo dice, invece di mostrare zero come se fosse un fatto.",
