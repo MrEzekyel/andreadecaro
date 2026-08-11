@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Clinck",
-    "slug": "clinck",
+    "slug": "apple-pay-tracker",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

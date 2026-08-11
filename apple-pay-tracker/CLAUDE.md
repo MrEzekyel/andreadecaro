@@ -724,6 +724,16 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 - Dopo ogni modifica: `npx tsc --noEmit` deve passare pulito prima del commit.
 - Non serve mai chiedere conferma per commit/push su questo branch: fa
   parte del flusso normale di lavoro qui.
+- **`app.json` → `slug` non è cosmetico**: il progetto EAS è registrato
+  lato server con `extra.eas.projectId` **e** lo slug associato a quel
+  progetto in quel momento — cambiare solo `slug` in locale (es. per far
+  seguire il rebranding "Clinck") rompe `eas update` con "Slug ... does
+  not match" (`expo.fyi/eas-project-id`), scoperto da Andrea lanciando
+  l'update. `name` (il nome visibile sotto l'icona) è indipendente e si
+  può cambiare liberamente; `slug` resta `apple-pay-tracker` finché
+  qualcuno non rinomina il progetto anche lato Expo (dashboard o
+  `eas project:info`), un passo volontario, non una conseguenza del
+  rebranding.
 
 ### Il messaggio da dare ad Andrea a fine turno
 
