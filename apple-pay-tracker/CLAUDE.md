@@ -5,6 +5,55 @@ Distribuzione oggi via EAS Update dentro Expo Go; con il modello di business
 deciso (vedi "Abbonamento e referral" sotto) l'Apple Developer Program e il
 passaggio a una build nativa non sono più rimandabili — vedi `DA-FARE.md`.
 
+## Stato del progetto — leggere prima di ripartire
+
+Punto di ripresa pensato per una sessione senza la cronologia della chat.
+Per il dettaglio punto per punto: `PRODOTTO.md` (i problemi, `P1`-`P20`),
+`SPRINT.md` (l'ordine di lavoro e cosa è chiuso), `DA-FARE.md` (le azioni
+che restano ad Andrea).
+
+**Modello di business — deciso, non più da discutere:**
+2 mesi di automazione gratis dalla registrazione, poi 1,99 €/mese o 15
+€/anno per continuarla. Si blocca **solo l'automazione**: il resto dell'app
+(storico, statistiche, spese manuali, export, investimenti) resta gratis
+per sempre. Referral interno: 5 amici che confermano il referral (primo
+pagamento automatico riuscito, non la sola registrazione) sbloccano 2 mesi
+extra a chi ha invitato — traguardo unico, non ripetibile, mai citato nelle
+campagne ads. Dettagli tecnici in "Abbonamento e referral" più sotto.
+
+**Cosa è già costruito e pushato**, sprint 1-4 di `SPRINT.md` sostanzialmente
+chiusi: fiducia (recupero password, export, errori onesti), attrito zero
+sull'automazione (guida passo-passo, Shortcut condivisibile), integrità del
+dato (multi-valuta, lettura offline ovunque), sicurezza e trasparenza
+(blocco Face ID, changelog in-app, non-obiettivi dichiarati nel README).
+Schema, enforcement e schermate del modello di business sono in produzione.
+
+**Cosa manca, e di chi è la mossa:**
+
+- *Andrea* — **dominio**: sblocca insieme i template email via SMTP (`P1`,
+  recupero password) e l'URL per la privacy policy (`P4`). Nessuno dei due
+  parte senza.
+- *Andrea* — **Apple Developer Program (99$/anno) + Small Business Program**
+  (commissione 15% invece di 30%): apre la catena RevenueCat → build nativa
+  EAS → TestFlight. Finché non parte, il modello di business non incassa
+  davvero — il pulsante "Abbonati" in `SubscriptionScreen` resta disattivato
+  apposta.
+- *Andrea* — **link iCloud del comando rapido «Registra spesa»** (`P5`): va
+  costruito seguendo la guida in-app e poi condiviso, per sostituire le
+  istruzioni testuali con un link da un tocco.
+- *Andrea* — **7 screenshot veri** per la guida alla Shortcut, elenco
+  preciso in `DA-FARE.md`. I posti sono già predisposti in
+  `lib/guideImages.ts`.
+- *Andrea* — **giro di test manuale** prima di far provare l'app ad altri
+  (checklist in `DA-FARE.md`), in particolare un pagamento vero con
+  l'automazione e il recupero password per intero.
+- *Andrea* — **decisione aperta**: repository pubblico o privato (`P15`).
+- *Qui* — integrazione RevenueCat quando la build nativa esiste; privacy
+  policy scritta quando c'è il dominio; **piano marketing**, prossimo
+  argomento, non ancora affrontato — dipende da quando la catena Apple
+  Developer Program → RevenueCat sarà avviata, perché senza IAP live non
+  c'è un funnel trial→pagamento da promuovere davvero.
+
 ## Stack
 
 - **Expo SDK 54**, React Native, TypeScript, nessun modulo nativo custom
@@ -602,11 +651,12 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   ha caricato". `components/ScreenBoundary.tsx` avvolge le sottopagine di
   Impostazioni e mostra il messaggio dell'errore, selezionabile, con
   "Riprova" e "Indietro".
-- Nessuna tabella è oggi nella publication `supabase_realtime`, quindi questi
-  canali si iscrivono e non ricevono mai niente: la spesa registrata dalla
-  Shortcut mentre l'app è aperta **non** compare da sola, serve il
-  tira-per-aggiornare. Va abilitata la publication su `payments` perché
-  quella promessa diventi vera.
+- `payments` è nella publication `supabase_realtime` (migration `0034`): la
+  spesa registrata dalla Shortcut compare da sola in Home ad app aperta,
+  senza tira-per-aggiornare. Solo `payments` e non le altre tabelle: è
+  l'unica che cambia per mano di qualcosa che non è l'app stessa (la Edge
+  Function chiamata dalla Shortcut) — tutto il resto lo scrive l'utente da
+  dentro, che sa già cosa ha appena fatto e ricarica da sé.
 
 ## Git e pubblicazione
 
