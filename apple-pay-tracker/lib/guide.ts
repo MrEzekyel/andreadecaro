@@ -5,44 +5,28 @@
  * quando cambia iOS o la ricetta, e non deve servire toccare il layout per
  * correggere una parola.
  *
- * Il senso di questa guida: senza, il valore dell'app resta chiuso dietro
- * dei passaggi di Comandi Rapidi che nessuno indovina da solo. E' il punto
- * in cui si perde la maggior parte delle persone, e non per colpa loro.
+ * Ogni passo e' pensato per stare su una schermata sola, con lo screenshot
+ * vero al centro e una riga di didascalia sotto — non un paragrafo da
+ * leggere. E' la lezione della prima versione, troppo testuale: chi segue
+ * una procedura tecnica sul telefono guarda l'immagine, non legge un pezzo
+ * di prosa mentre tiene in mano Comandi Rapidi con l'altra mano.
  */
-
-/** Una riga dentro la riproduzione di un'azione: campo e valore. */
-export type ActionField = {
-  label: string;
-  value: string;
-  /** Il valore e' una variabile scelta dal selettore, non testo digitato. */
-  variable?: boolean;
-};
-
-/** La riproduzione schematica di un'azione dei Comandi Rapidi. */
-export type ActionBlock = {
-  /** Nome esatto dell'azione da cercare, come lo scrive iOS. */
-  action: string;
-  fields?: ActionField[];
-  /** Blocchi annidati, per il contenuto di un "Se"/"Altrimenti". */
-  nested?: ActionBlock[];
-};
 
 export type GuideStep = {
   id: string;
   title: string;
-  body: string;
+  /** Didascalia breve: una riga, non un paragrafo. Lo screenshot spiega. */
+  caption: string;
   /** Azione richiesta all'utente dentro l'app: copiare un dato che serve ora,
    * o aprire il link di installazione del comando. */
   action?: "open-install" | "copy-token";
-  blocks?: ActionBlock[];
-  /** Avvertenza sul passo: il punto in cui ci si sbaglia. */
+  /** Punto in cui ci si sbaglia, se c'e'. Anche questo, breve. */
   warning?: string;
 };
 
 export type GuideChapter = {
   id: string;
   title: string;
-  subtitle: string;
   steps: GuideStep[];
 };
 
@@ -65,84 +49,70 @@ export const GUIDE: GuideChapter[] = [
   {
     id: "comando",
     title: "Il comando rapido",
-    subtitle:
-      "È il pezzo pronto che parla con l'app. Si installa e si collega alla tua chiave una volta sola.",
     steps: [
       {
         id: "installa",
         title: "Installa il comando pronto",
-        body: "Tocca il pulsante qui sotto: iOS mostra «Clinck: Inserisci pagamento», già impostato con l'indirizzo giusto e i dati della spesa collegati. Tocca «Aggiungi comando rapido» — non c'è nient'altro da configurare in questo passo.",
+        caption: "Tocca il pulsante, poi «Aggiungi comando rapido». Basta così.",
         action: "open-install",
       },
       {
         id: "chiave",
         title: "Genera e copia la tua chiave",
-        body: "È la password che dice al server che quella spesa è tua. Si vede una volta sola: generala adesso e copiala — ti serve nel passo successivo.",
+        caption: "Si vede una volta sola: copiala, ti serve tra due passi.",
         action: "copy-token",
-        warning:
-          "Se la perdi non è un dramma: ne generi un'altra e revochi la vecchia da Impostazioni → Automazioni.",
+        warning: "Se la perdi, ne generi un'altra da Impostazioni → Automazioni.",
       },
       {
         id: "apri",
         title: "Apri il comando in modifica",
-        body: "Vai su Comandi Rapidi → Libreria, cerca «Clinck: Inserisci pagamento», tocca i tre puntini sulla card (o tienila premuta) e scegli «Modifica». Poi scorri fino all'azione «Ottieni contenuti di» e tocca la freccia accanto all'indirizzo per aprirne i dettagli.",
+        caption: "Libreria → tre puntini sulla card → «Modifica».",
+      },
+      {
+        id: "espandi",
+        title: "Apri i dettagli della richiesta",
+        caption: "Scorri fino a «Ottieni contenuti di» e tocca la freccia.",
       },
       {
         id: "incolla",
         title: "Incolla la tua chiave",
-        body: "In «Intestazioni» trova il campo «x-ingest-token»: contiene il testo segnaposto INCOLLA TOKEN. Selezionalo e sostituiscilo con la chiave copiata al passo precedente. Il resto — indirizzo, importo, esercente, carta — è già collegato, non toccarlo.",
-        blocks: [
-          {
-            action: "Ottieni contenuti di URL",
-            fields: [
-              { label: "Metodo", value: "POST" },
-              { label: "Intestazioni · x-ingest-token", value: "INCOLLA TOKEN → la tua chiave" },
-              { label: "amount", value: "Importo", variable: true },
-              { label: "merchant", value: "Esercente", variable: true },
-              { label: "card", value: "Carta o biglietto", variable: true },
-              { label: "source", value: "shortcut" },
-            ],
-          },
-        ],
+        caption: "In «Intestazioni», sostituisci INCOLLA TOKEN con la chiave copiata.",
         warning:
-          "È l'unico campo di tutto il comando che va toccato. Se lo lasci com'è, ogni chiamata al server viene rifiutata e la spesa non entra mai in app.",
+          "L'unico campo da toccare. Lasciato com'è, ogni spesa viene rifiutata.",
       },
     ],
   },
   {
     id: "automazione",
     title: "L'automazione",
-    subtitle:
-      "Fa partire da sola il comando appena configurato a ogni pagamento Apple Pay.",
     steps: [
       {
         id: "cerca",
         title: "Crea l'automazione",
-        body: "Vai su Automazioni → + e cerca «Wallet» nella casella di ricerca in basso. Compare un solo risultato: toccalo.",
+        caption: "Automazioni → + → cerca «Wallet» → tocca l'unico risultato.",
       },
       {
         id: "seleziona-tutto",
         title: "Lascia tutto selezionato",
-        body: "La schermata mostra le tue carte e le categorie di spesa, già tutte spuntate: è quello che serve, l'automazione deve vedere ogni pagamento Apple Pay. Tocca «Avanti» senza togliere nessuna spunta.",
+        caption: "Carte e categorie sono già tutte spuntate: tocca «Avanti».",
       },
       {
         id: "scegli-comando",
         title: "Scegli il comando da eseguire",
-        body: "Cerca «Inserisci pagamento» tra i comandi rapidi suggeriti e selezionalo: è il comando che hai appena installato e configurato.",
+        caption: "In «I miei comandi rapidi», tocca «Clinck: Inserisci Pagamento».",
       },
       {
         id: "immediato",
         title: "Falla partire da sola",
-        body: "In alto tocca «Automazioni» — si apre un menu con tre opzioni. Scegli «Esegui immediatamente» al posto di «Esegui dopo la conferma», di default, poi tocca «Fine».",
-        warning:
-          "Senza «Esegui immediatamente» dovresti confermare ogni pagamento a mano, e l'automatismo perderebbe senso.",
+        caption: "Tocca «Automazioni» in alto e scegli «Esegui immediatamente».",
+        warning: "Senza, dovresti confermare ogni pagamento a mano.",
       },
       {
         id: "prova",
         title: "Provala",
-        body: "Fai un pagamento vero con Apple Pay, anche piccolo. Entro pochi secondi deve comparire in Home.",
+        caption: "Un pagamento vero con Apple Pay: entro pochi secondi è in Home.",
         warning:
-          "L'automazione vede solo Apple Pay: contanti, bonifici, addebiti diretti e carte fisiche fuori da Wallet restano da aggiungere a mano o con Siri.",
+          "Vede solo Apple Pay: contanti, bonifici e carte fuori da Wallet restano manuali.",
       },
     ],
   },

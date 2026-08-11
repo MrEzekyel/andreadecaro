@@ -1,4 +1,4 @@
-# Apple Pay Tracker
+# Clinck
 
 Tracker di spese personale per iOS. App Expo/React Native + backend Supabase.
 Distribuzione oggi via EAS Update dentro Expo Go; con il modello di business
@@ -514,10 +514,10 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 
 ### Guida alla configurazione
 
-- `lib/guide.ts` (i passi come **dati**), `components/ActionPreview.tsx` (la
-  riproduzione di un'azione), `screens/GuideScreen.tsx`. Si arriva da
-  Automazioni e dallo stato vuoto della Home — cioè dai due punti in cui si
-  trova chi non ha ancora configurato niente.
+- `lib/guide.ts` (i passi come **dati**), `lib/guideImages.ts` (gli
+  screenshot veri), `screens/GuideScreen.tsx`. Si arriva da Automazioni e
+  dallo stato vuoto della Home — cioè dai due punti in cui si trova chi non
+  ha ancora configurato niente.
 - **Il comando rapido «Clinck: Inserisci pagamento» è già pronto e
   condiviso** via link iCloud (`SHORTCUT_INSTALL_URL` in `lib/guide.ts`,
   `P5` in `PRODOTTO.md`). Legge esercente, importo e carta **direttamente
@@ -545,20 +545,30 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   offre, solo dentro il capitolo del comando, un modo di saltare
   direttamente al capitolo dell'automazione (`automazioneIndex` in
   `GuideScreen.tsx`) per chi ha già installato e configurato il link.
-- Le azioni sono **riprodotte schematicamente, non fotografate**: uno
-  screenshot di iOS invecchia al primo aggiornamento che sposta un campo, e
-  chi lo guarda non capisce più se sta sbagliando lui o se è la guida a
-  essere vecchia. Quello che non cambia — e che quindi conta — è il **nome
-  esatto** dell'azione da cercare e i campi da riempire.
-- I valori che vanno presi dal **selettore variabili** sono evidenziati in
-  accento: confonderli con testo digitato è l'errore più comune, e dirlo solo
-  a parole non basta.
-- `lib/guideImages.ts` accoglie gli screenshot veri quando ci saranno, uno per
-  `id` di passo. Si affiancano allo schema invece di sostituirlo. I `require`
-  devono restare **letterali**: Metro risolve le immagini a compilazione, un
-  percorso costruito a runtime non finisce nel bundle. Vanno ritagliati sulla
-  singola azione e ridimensionati (~750px): a piena risoluzione finirebbero
-  interi dentro l'aggiornamento che ogni utente scarica.
+- **Screenshot veri, non riproduzioni schematiche**: prima versione della
+  guida (`components/ActionPreview.tsx`, ora rimosso) ricostruiva ogni
+  azione a blocchetti di testo, pensando che uno screenshot invecchiasse
+  peggio di una descrizione. Andrea l'ha bocciata guardandola: "troppo
+  testuale, la gente si perde". Uno screenshot reale con una freccia che
+  indica dove toccare si legge in un secondo; un paragrafo che descrive la
+  stessa azione va letto mentre si tiene in mano Comandi Rapidi con l'altra
+  mano, ed è lì che si abbandona. Il costo (uno screenshot invecchia
+  quando iOS sposta un campo) è minore del beneficio.
+- Ogni `GuideStep` ha una `caption` di **una riga sola**, non un paragrafo:
+  lo screenshot in `lib/guideImages.ts` (uno per `id` di passo, spesso
+  fornito da Andrea già con una freccia rossa disegnata sopra) è il
+  contenuto vero del passo, la didascalia è solo il verbo e l'oggetto
+  ("Libreria → tre puntini → Modifica"). I `require` in `guideImages.ts`
+  devono restare **letterali**: Metro risolve le immagini a compilazione,
+  un percorso costruito a runtime non finisce nel bundle. Vanno
+  ridimensionati a ~750px di larghezza prima di salvarli in
+  `assets/guida/`: a piena risoluzione finirebbero interi dentro
+  l'aggiornamento che ogni utente scarica.
+- Non tutti i passi hanno uno screenshot: `installa` e `chiave` sono
+  schermate della nostra app (non serve fotografarle, sono già davanti
+  all'utente), `seleziona-tutto`/`immediato`/`prova` non ne hanno ancora
+  uno. `GuideScreen` non mostra niente al posto dell'immagine mancante —
+  solo la didascalia — invece di un placeholder vuoto.
 - Il progresso è salvato: questa procedura si fa passando avanti e indietro
   fra due app, e ricominciare da capo a ogni ritorno è il modo più rapido per
   farla abbandonare.

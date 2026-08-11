@@ -3,27 +3,25 @@ import { ImageSourcePropType } from "react-native";
 /**
  * Screenshot veri dell'iPhone, uno per passo della guida.
  *
- * La chiave e' l'`id` del passo in `lib/guide.ts`. Quello che manca non
- * rompe niente: il passo mostra solo la riproduzione schematica dell'azione,
- * che da sola basta a capire cosa fare.
+ * La chiave e' l'`id` del passo in `lib/guide.ts`. Sono il cuore della
+ * guida — non un'aggiunta facoltativa: la didascalia sotto e' volutamente
+ * corta, lo screenshot e' quello che spiega davvero cosa toccare.
  *
  * I `require` devono restare **letterali**: Metro risolve le immagini a
  * compilazione e un percorso costruito a runtime non verrebbe incluso nel
  * bundle.
  *
  * Prima di aggiungerne uno: ritagliare la sola azione invece della schermata
- * intera (si legge su un telefono, non su un monitor), ridimensionare a
- * ~750px di larghezza e salvare in PNG. Uno screenshot a piena risoluzione
- * pesa qualche megabyte, e finirebbe tutto dentro l'aggiornamento che ogni
- * utente scarica a ogni apertura.
+ * intera quando possibile, ridimensionare a ~750px di larghezza e salvare
+ * in `assets/guida/`. A piena risoluzione peserebbero qualche megabyte,
+ * e finirebbero tutti dentro l'aggiornamento che ogni utente scarica.
  */
 export const GUIDE_IMAGES: Record<string, ImageSourcePropType> = {
-  // installa: require("../assets/guida/installa.png"),
-  // chiave: require("../assets/guida/chiave.png"),
-  // apri: require("../assets/guida/apri.png"),
-  // incolla: require("../assets/guida/incolla.png"),
-  // cerca: require("../assets/guida/cerca.png"),
-  // seleziona-tutto: require("../assets/guida/seleziona-tutto.png"),
-  // scegli-comando: require("../assets/guida/scegli-comando.png"),
-  // immediato: require("../assets/guida/immediato.png"),
+  apri: require("../assets/guida/apri.jpg"),
+  espandi: require("../assets/guida/espandi.jpg"),
+  incolla: require("../assets/guida/incolla.jpg"),
+  cerca: require("../assets/guida/cerca.jpg"),
+  "scegli-comando": require("../assets/guida/scegli-comando.jpg"),
+  // installa, chiave: schermate della nostra app, non serve uno screenshot.
+  // seleziona-tutto, immediato, prova: mancano ancora.
 };

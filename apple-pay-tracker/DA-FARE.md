@@ -65,28 +65,27 @@ token valido) ma non hanno ragione di esistere ancora.
 ## 📸 Screenshot per la guida — quando costruisci la Shortcut
 
 L'app ha ora una **guida passo per passo** (Impostazioni → Automazioni →
-Guida, e dallo stato vuoto della Home). Ogni passo mostra il nome esatto
-dell'azione da cercare e i campi da riempire, riprodotti schematicamente.
+Guida, e dallo stato vuoto della Home). Ogni passo è uno screenshot vero
+(idealmente con una freccia rossa che indica dove toccare, come quelli che
+hai già mandato) più una riga di didascalia — non testo da leggere.
 
-Mentre segui la procedura sul tuo iPhone, fai uno screenshot di questi
-passaggi — sono quelli dove si sbaglia:
+**Fatti**: `apri`, `espandi`, `incolla`, `cerca`, `scegli-comando` (dalle
+foto che hai mandato l'11 agosto). `installa` e `chiave` non servono, sono
+schermate della nostra app.
+
+**Mancano ancora** questi tre — stesso stile delle altre, freccia rossa se
+aiuta a capire cosa toccare:
 
 | File da salvare in `assets/guida/` | Cosa deve mostrare |
 | --- | --- |
-| `installa.png` | La schermata "Aggiungi comando rapido" di «Clinck: Inserisci pagamento» |
-| `chiave.png` | Il pulsante "Genera e copia la chiave" nell'app |
-| `apri.png` | Libreria → i tre puntini sulla card del comando → "Modifica" |
-| `incolla.png` | "Ottieni contenuti di" aperto, con il campo `x-ingest-token` (INCOLLA TOKEN sostituito dalla chiave) |
-| `cerca.png` | La ricerca "Wallet" in Automazioni con l'unico risultato |
-| `seleziona-tutto.png` | La schermata di carte e categorie, tutte già spuntate |
-| `scegli-comando.png` | La ricerca di "Inserisci pagamento" tra i comandi suggeriti |
-| `immediato.png` | Il menu con "Esegui immediatamente" al posto di "Esegui dopo la conferma" |
+| `seleziona-tutto.jpg` | La schermata di carte e categorie, tutte già spuntate, con "Avanti" |
+| `immediato.jpg` | Il menu con "Esegui immediatamente" al posto di "Esegui dopo la conferma" |
+| `prova.jpg` | (facoltativo) La spesa comparsa in Home dopo un pagamento vero |
 
-Ritaglia la singola azione invece della schermata intera (si legge su un
-telefono) e ridimensiona a circa 750px di larghezza: uno screenshot a piena
-risoluzione pesa qualche megabyte, e finirebbe dentro l'aggiornamento che
-ogni utente scarica. Poi mandameli e li aggancio io — i posti sono già
-predisposti in `lib/guideImages.ts`.
+Ridimensiona a circa 750px di larghezza prima di mandarmeli — uno
+screenshot a piena risoluzione pesa qualche megabyte e finirebbe intero
+dentro l'aggiornamento che ogni utente scarica. Se preferisci mandarmeli a
+piena risoluzione ci penso io, come ho fatto con gli altri cinque.
 
 ---
 

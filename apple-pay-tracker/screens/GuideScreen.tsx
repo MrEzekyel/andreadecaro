@@ -11,7 +11,6 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { ActionPreview } from "../components/ActionPreview";
 import { Icon } from "../components/Icon";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useTheme } from "../lib/ThemeContext";
@@ -131,7 +130,24 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
             {step.title}
           </Text>
 
-          <Text style={[styles.body, { color: palette.ink2 }]}>{step.body}</Text>
+          {/* Lo screenshot vero è il passo, non un'aggiunta: la didascalia
+              sotto è una riga sola apposta, per non tornare a un muro di
+              testo che nessuno legge mentre ha in mano Comandi Rapidi. */}
+          {GUIDE_IMAGES[step.id] && (
+            <Image
+              source={GUIDE_IMAGES[step.id]}
+              style={[
+                styles.shot,
+                { backgroundColor: palette.surface, borderColor: palette.hairline },
+              ]}
+              resizeMode="contain"
+              accessibilityLabel={`Schermata di esempio: ${step.title}`}
+            />
+          )}
+
+          <Text style={[styles.caption, { color: palette.ink2 }]}>
+            {step.caption}
+          </Text>
 
           {step.action === "open-install" && (
             <TouchableOpacity
@@ -153,22 +169,6 @@ export default function GuideScreen({ onBack }: { onBack: () => void }) {
                 {tokenCopiato ? "Generane un'altra" : "Genera e copia la chiave"}
               </Text>
             </TouchableOpacity>
-          )}
-
-          {step.blocks?.map((block) => (
-            <ActionPreview key={block.action} block={block} />
-          ))}
-
-          {/* Lo screenshot vero quando c'e': si affianca alla riproduzione
-              schematica invece di sostituirla, perche' l'immagine invecchia
-              al primo aggiornamento di iOS e i nomi delle azioni no. */}
-          {GUIDE_IMAGES[step.id] && (
-            <Image
-              source={GUIDE_IMAGES[step.id]}
-              style={[styles.shot, { borderColor: palette.hairline }]}
-              resizeMode="contain"
-              accessibilityLabel={`Schermata di esempio: ${step.title}`}
-            />
           )}
 
           {step.warning && (
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
   },
   chapter: { ...type.small, fontWeight: "500", letterSpacing: 0.6 },
   stepTitle: { ...type.title, fontSize: 20, marginTop: -4 },
-  body: { ...type.body, lineHeight: 22 },
+  caption: { ...type.body, lineHeight: 21, textAlign: "center" },
   button: {
     borderRadius: radius.button,
     paddingVertical: 13,
@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   buttonText: { ...type.bodyMedium, fontSize: 14.5 },
   shot: {
     width: "100%",
-    height: 320,
+    height: 440,
     borderRadius: radius.card,
     borderWidth: 1,
   },
