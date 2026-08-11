@@ -116,69 +116,66 @@ export default function AutomationsScreen({ onBack, onOpenGuide }: Props) {
           con Siri.
         </Text>
 
-        {/* Prima di tutto il resto: chi arriva qui senza aver mai configurato
-            niente vede un URL e un token, che da soli non dicono cosa
-            farne. Due strade, dalla piu' rapida alla piu' esplicita. */}
+        {/* Un solo gesto primario. Prima qui c'erano tre pulsanti che si
+            contendevano l'occhio (installa, guida, genera token) e non si
+            capiva da dove cominciare: la guida ora contiene tutto —
+            installazione, chiave, automazione — quindi e' lei l'unico
+            ingresso. Il resto della schermata e' manutenzione. */}
         <TouchableOpacity
-          onPress={() => Linking.openURL(SHORTCUT_INSTALL_URL)}
-          style={[styles.install, { backgroundColor: palette.accent }]}
+          onPress={
+            onOpenGuide ?? (() => Linking.openURL(SHORTCUT_INSTALL_URL))
+          }
+          style={[styles.primary, { backgroundColor: palette.accent }]}
         >
-          <Icon name="download" size={17} color={palette.onAccent} />
+          <Icon name="book-open" size={17} color={palette.onAccent} />
           <View style={{ flex: 1 }}>
-            <Text style={[styles.installTitle, { color: palette.onAccent }]}>
-              Installa il comando pronto
+            <Text style={[styles.primaryTitle, { color: palette.onAccent }]}>
+              Configura l'automazione
             </Text>
-            <Text style={[styles.installBody, { color: palette.onAccent }]}>
-              Un tocco al posto di costruirlo — resta comunque da creare
-              l'automazione che lo richiama
+            <Text style={[styles.primaryBody, { color: palette.onAccent }]}>
+              Comando pronto da installare e chiave da collegare, passo per
+              passo — pochi minuti
             </Text>
           </View>
+          <Icon name="chevron-right" size={15} color={palette.onAccent} />
         </TouchableOpacity>
-
-        {onOpenGuide && (
-          <TouchableOpacity
-            onPress={onOpenGuide}
-            style={[
-              styles.guide,
-              { backgroundColor: palette.accentSoft },
-            ]}
-          >
-            <Icon name="book-open" size={17} color={palette.accent} />
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.guideTitle, { color: palette.ink }]}>
-                Guida passo per passo
-              </Text>
-              <Text style={[styles.guideBody, { color: palette.ink2 }]}>
-                Per costruirlo tu, o per capire come funziona
-              </Text>
-            </View>
-            <Icon name="chevron-right" size={15} color={palette.accent} />
-          </TouchableOpacity>
-        )}
 
         <Text style={[styles.label, { color: palette.ink3 }]}>
-          Collegamento Shortcut
+          Le tue chiavi
         </Text>
 
-        <TouchableOpacity
-          onPress={() => copy(INGEST_URL, "URL")}
-          style={[
-            styles.urlBox,
-            { backgroundColor: palette.surface, borderColor: palette.hairline },
-          ]}
-        >
-          <Text style={[styles.url, { color: palette.ink }]} numberOfLines={2}>
-            {INGEST_URL}
-          </Text>
-          <Text style={[styles.hint, { color: palette.ink3 }]}>
-            Tocca per copiare
-          </Text>
-        </TouchableOpacity>
+        {tokens.map((token) => (
+          <View key={token.id} style={styles.tokenRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.tokenLabel, { color: palette.ink }]}>
+                {token.label}
+                {token.revoked_at ? " · revocata" : ""}
+              </Text>
+              <Text style={[styles.tokenMeta, { color: palette.ink3 }]}>
+                ultimo uso{" "}
+                {token.last_used_at
+                  ? new Date(token.last_used_at).toLocaleDateString("it-IT")
+                  : "mai"}
+              </Text>
+            </View>
+            {!token.revoked_at && (
+              <TouchableOpacity onPress={() => revoke(token.id)}>
+                <Text style={[styles.revoke, { color: palette.over }]}>
+                  Revoca
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        ))}
+
+        {/* L'elenco dei token vuoto e "non sono riuscito a leggerli" portano a
+            due azioni opposte: generarne uno, o riprovare. */}
+        {error && <LoadError message={error} onRetry={loadTokens} />}
 
         {freshToken && (
           <View style={[styles.fresh, { backgroundColor: palette.accentSoft }]}>
             <Text style={[styles.freshLabel, { color: palette.accent }]}>
-              Nuovo token — copialo adesso
+              Nuova chiave — copiala adesso
             </Text>
             <Text style={[styles.freshToken, { color: palette.ink }]} selectable>
               {freshToken}
@@ -204,52 +201,42 @@ export default function AutomationsScreen({ onBack, onOpenGuide }: Props) {
           </View>
         )}
 
+        {/* Secondario apposta (niente fondo pieno): generare una chiave fuori
+            dalla guida serve solo a chi deve sostituirne una persa o
+            revocata, non e' il primo passo di nessuno. */}
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: palette.accent }]}
+          style={[styles.secondary, { borderColor: palette.hairline }]}
           onPress={generateToken}
         >
-          <Text style={[styles.buttonText, { color: palette.onAccent }]}>
-            Genera nuovo token
+          <Text style={[styles.secondaryText, { color: palette.ink }]}>
+            Genera una nuova chiave
           </Text>
         </TouchableOpacity>
 
-        {tokens.map((token) => (
-          <View key={token.id} style={styles.tokenRow}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.tokenLabel, { color: palette.ink }]}>
-                {token.label}
-                {token.revoked_at ? " · revocato" : ""}
-              </Text>
-              <Text style={[styles.tokenMeta, { color: palette.ink3 }]}>
-                ultimo uso{" "}
-                {token.last_used_at
-                  ? new Date(token.last_used_at).toLocaleDateString("it-IT")
-                  : "mai"}
-              </Text>
-            </View>
-            {!token.revoked_at && (
-              <TouchableOpacity onPress={() => revoke(token.id)}>
-                <Text style={[styles.revoke, { color: palette.over }]}>
-                  Revoca
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        ))}
-
-        {/* L'elenco dei token vuoto e "non sono riuscito a leggerli" portano a
-            due azioni opposte: generarne uno, o riprovare. */}
-        {error && <LoadError message={error} onRetry={loadTokens} />}
+        {!error && (
+          <Text style={[styles.note, { color: palette.ink3 }]}>
+            {activeTokens === 0
+              ? "Nessuna chiave ancora: la crei durante la configurazione guidata."
+              : "La chiave si vede una volta sola. Se la perdi, generane un'altra e revoca la vecchia."}
+          </Text>
+        )}
 
         <RecoverSheet onDone={loadTokens} />
 
-        {!error && (
-        <Text style={[styles.note, { color: palette.ink3 }]}>
-          {activeTokens === 0
-            ? "Genera un token e incollalo nell'intestazione x-ingest-token della Shortcut."
-            : "Il token si vede una volta sola. Se lo perdi, generane un altro e revoca il vecchio."}
+        {/* In fondo e piccolo di proposito: serve solo a chi si costruisce
+            il comando rapido da zero invece di installare quello pronto. */}
+        <Text style={[styles.label, { color: palette.ink3 }]}>
+          Se fai da te
         </Text>
-        )}
+        <TouchableOpacity onPress={() => copy(INGEST_URL, "URL")}>
+          <Text style={[styles.url, { color: palette.ink3 }]} numberOfLines={2}>
+            {INGEST_URL}
+          </Text>
+          <Text style={[styles.hint, { color: palette.ink3 }]}>
+            L'indirizzo a cui il comando manda le spese — tocca per copiarlo.
+            Serve solo se costruisci il comando da zero.
+          </Text>
+        </TouchableOpacity>
       </ScrollView>
     </View>
     </SwipeBack>
@@ -276,32 +263,18 @@ const styles = StyleSheet.create({
   },
   title: { ...type.title },
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.md },
-  label: { ...type.label },
-  install: {
+  label: { ...type.label, marginTop: space.sm },
+  primary: {
     flexDirection: "row",
     alignItems: "center",
     gap: 11,
     borderRadius: radius.card,
-    padding: 13,
+    padding: 14,
   },
-  installTitle: { ...type.bodyMedium, fontSize: 14 },
-  installBody: { ...type.small, lineHeight: 16, marginTop: 2, opacity: 0.9 },
-  guide: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 11,
-    borderRadius: radius.card,
-    padding: 13,
-  },
-  guideTitle: { ...type.bodyMedium, fontSize: 14 },
-  guideBody: { ...type.small, lineHeight: 16, marginTop: 2 },
-  urlBox: {
-    borderRadius: radius.field,
-    borderWidth: 1,
-    padding: 12,
-  },
+  primaryTitle: { ...type.bodyMedium, fontSize: 15 },
+  primaryBody: { ...type.small, lineHeight: 16, marginTop: 2, opacity: 0.9 },
   url: { ...type.caption },
-  hint: { ...type.small, fontSize: 10.5, marginTop: 5 },
+  hint: { ...type.small, fontSize: 10.5, lineHeight: 15, marginTop: 5 },
   fresh: { borderRadius: radius.card, padding: 14, gap: 9 },
   freshLabel: { ...type.small, fontWeight: "500" },
   freshToken: { ...type.caption, lineHeight: 18 },
@@ -312,12 +285,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   smallBtnText: { ...type.caption, fontWeight: "500" },
-  button: {
+  secondary: {
     borderRadius: radius.button,
-    paddingVertical: 13,
+    borderWidth: 1,
+    paddingVertical: 12,
     alignItems: "center",
   },
-  buttonText: { ...type.bodyMedium, fontSize: 14.5 },
+  secondaryText: { ...type.bodyMedium, fontSize: 14 },
   tokenRow: {
     flexDirection: "row",
     alignItems: "center",

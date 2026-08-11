@@ -137,6 +137,28 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   capire che il primo è la somma degli altri due. `StatTiles` affianca i
   numeri secondari in riquadri: un elenco verticale di coppie
   etichetta-valore si legge tutto o niente e nessun numero emerge.
+- L'hero della Home affianca allo speso il **"Restano X €"** (verde, o
+  "Oltre il limite" in rosso) quando esiste un limite mensile e si guarda
+  il mese corrente: è il numero con cui si decide ("posso permettermi
+  questa cena?"), non un derivato da calcolare a mente. È il "Free to
+  Spend" di Copilot Money, il riferimento del settore — confermato
+  guardando la concorrenza su richiesta di Andrea.
+- **"Prossimi addebiti" invece del peso percentuale dei ricorrenti**: la
+  vecchia barra ("6 pagamenti ricorrenti · 56%") era un numero che non
+  chiedeva niente a nessuno; le prossime 2-3 rate con la data relativa
+  ("fra 3 giorni") sono informazione su cui si agisce. Sezione propria in
+  Home (solo mese corrente — "fra 3 giorni" non significa niente
+  sfogliando marzo), non più annidata dentro Ripartizione dove spariva se
+  il mese non aveva spese. Il totale "al mese" resta calcolato sulle sole
+  rate mensili anche se l'elenco include settimanali e annuali.
+- **Una schermata di configurazione ha un solo gesto primario.** In
+  Automazioni c'erano tre pulsanti che si contendevano l'occhio (installa
+  il comando, guida, genera token) e Andrea l'ha bocciata: "non si capisce
+  dove si deve cliccare". Ora l'unico pulsante pieno è "Configura
+  l'automazione" (apre la guida, che contiene installazione + chiave +
+  automazione); generare una chiave è un'azione di manutenzione, bordata e
+  non piena; l'URL del server sta in fondo, piccolo, etichettato "Se fai
+  da te" — serve solo a chi si costruisce il comando da zero.
 
 ## Concetti chiave del dominio
 

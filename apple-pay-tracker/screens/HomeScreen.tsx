@@ -16,7 +16,7 @@ import { StaleNote } from "../components/StaleNote";
 import { LimitCard } from "../components/LimitCard";
 import { MonthYearPicker } from "../components/MonthYearPicker";
 import { PaymentRow } from "../components/PaymentRow";
-import { RecurringSummary } from "../components/RecurringSummary";
+import { RecurringSummary, UpcomingRule } from "../components/RecurringSummary";
 import { SavingsSummary } from "../components/SavingsSummary";
 import { TrendChart, TrendPoint } from "../components/TrendChart";
 import { useChangelog } from "../lib/changelog";
@@ -31,7 +31,7 @@ import {
   splitAmount,
 } from "../lib/format";
 import { categoryColor, radius, space, type } from "../lib/theme";
-import { Merchant } from "../lib/types";
+import { Merchant, RecurringRule } from "../lib/types";
 import { supabase } from "../lib/supabase";
 import { useLimits } from "../lib/useLimits";
 import {
@@ -61,21 +61,36 @@ export default function HomeScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const explorer = useExplorer(reload);
 
-  const [recurring, setRecurring] = useState({ count: 0, monthlyTotal: 0 });
+  const [recurring, setRecurring] = useState<{
+    count: number;
+    monthlyTotal: number;
+    upcoming: UpcomingRule[];
+  }>({ count: 0, monthlyTotal: 0, upcoming: [] });
 
   // Le rate configurate non dipendono dal mese guardato: cambiano solo
   // quando le regole cambiano, non quando si sfoglia il calendario.
+  // Si leggono tutte le regole attive (non solo le mensili) perche' i
+  // prossimi addebiti includono anche rate settimanali e annuali; il
+  // totale "al mese" resta calcolato sulle sole mensili, per non
+  // spacciare una rata annuale come un impegno di ogni mese.
   const loadRecurring = useCallback(async () => {
     const { data, error } = await supabase
       .from("recurring_rules")
-      .select("amount")
+      .select("id,label,amount,frequency,next_run_on")
       .eq("active", true)
-      .eq("frequency", "monthly");
+      .order("next_run_on", { ascending: true });
 
     if (error) return;
+    const rules = (data ?? []) as Pick<
+      RecurringRule,
+      "id" | "label" | "amount" | "frequency" | "next_run_on"
+    >[];
     setRecurring({
-      count: (data ?? []).length,
-      monthlyTotal: (data ?? []).reduce((sum, r) => sum + Number(r.amount), 0),
+      count: rules.length,
+      monthlyTotal: rules
+        .filter((r) => r.frequency === "monthly")
+        .reduce((sum, r) => sum + Number(r.amount), 0),
+      upcoming: rules.slice(0, 3),
     });
   }, []);
 
@@ -319,15 +334,45 @@ export default function HomeScreen() {
             {staleLabel && <StaleNote label={staleLabel} reason={staleReason} onRetry={onRefresh} />}
 
         <View>
-          <Text style={[styles.label, { color: palette.ink3 }]}>
-            {viewingCurrentMonth ? "Speso questo mese" : "Speso nel mese"}
-          </Text>
-          <Text style={[styles.hero, { color: palette.ink }]}>
-            {amount.whole}
-            <Text style={[styles.heroCents, { color: palette.ink3 }]}>
-              {amount.cents}
-            </Text>
-          </Text>
+          {/* Accanto allo speso, quanto si puo' ancora spendere: e' il numero
+              con cui si decide ("posso permettermi questa cena?"), non un
+              derivato da calcolare a mente sottraendo dal limite. Le app di
+              riferimento lo mettono al centro (il "Free to Spend" di
+              Copilot); qui affianca lo speso senza rubargli la scena. */}
+          <View style={styles.heroRow}>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.label, { color: palette.ink3 }]}>
+                {viewingCurrentMonth ? "Speso questo mese" : "Speso nel mese"}
+              </Text>
+              <Text style={[styles.hero, { color: palette.ink }]}>
+                {amount.whole}
+                <Text style={[styles.heroCents, { color: palette.ink3 }]}>
+                  {amount.cents}
+                </Text>
+              </Text>
+            </View>
+
+            {viewingCurrentMonth && monthlyOverall && (
+              <View style={styles.heroSide}>
+                <Text style={[styles.label, { color: palette.ink3 }]}>
+                  {monthlyOverall.remaining >= 0 ? "Restano" : "Oltre il limite"}
+                </Text>
+                <Text
+                  style={[
+                    styles.heroSideValue,
+                    {
+                      color:
+                        monthlyOverall.remaining >= 0
+                          ? palette.good
+                          : palette.over,
+                    },
+                  ]}
+                >
+                  {formatAmount(Math.abs(monthlyOverall.remaining))}
+                </Text>
+              </View>
+            )}
+          </View>
 
           <View style={styles.heroFoot}>
             <Text style={[styles.heroMeta, { color: palette.ink2 }]}>
@@ -478,6 +523,24 @@ export default function HomeScreen() {
           </View>
         )}
 
+        {/* Sezione propria, non piu' annidata dentro Ripartizione: le date
+            delle prossime rate esistono anche in un mese senza spese
+            categorizzate, e solo sul mese corrente — "fra 3 giorni" non
+            vuol dire niente sfogliando marzo. */}
+        {viewingCurrentMonth && recurring.upcoming.length > 0 && (
+          <View>
+            <Text style={[styles.label, { color: palette.ink3 }]}>
+              Prossimi addebiti
+            </Text>
+            <RecurringSummary
+              upcoming={recurring.upcoming}
+              count={recurring.count}
+              monthlyTotal={recurring.monthlyTotal}
+              onPress={() => openSettings("recurring")}
+            />
+          </View>
+        )}
+
         {slices.length > 0 && (
           <View>
             <Text style={[styles.label, { color: palette.ink3 }]}>
@@ -495,15 +558,6 @@ export default function HomeScreen() {
                 })
               }
             />
-
-            <View style={{ marginTop: space.lg }}>
-              <RecurringSummary
-                count={recurring.count}
-                monthlyTotal={recurring.monthlyTotal}
-                monthTotal={total}
-                onPress={() => openSettings("recurring")}
-              />
-            </View>
           </View>
         )}
 
@@ -577,6 +631,13 @@ const styles = StyleSheet.create({
   label: { ...type.label, marginBottom: space.sm },
   hero: { ...type.hero, fontVariant: ["tabular-nums"] },
   heroCents: { ...type.heroCents },
+  heroRow: { flexDirection: "row", alignItems: "flex-end", gap: space.md },
+  heroSide: { alignItems: "flex-end", paddingBottom: 6 },
+  heroSideValue: {
+    ...type.title,
+    fontSize: 21,
+    fontVariant: ["tabular-nums"],
+  },
   heroFoot: {
     flexDirection: "row",
     alignItems: "center",
