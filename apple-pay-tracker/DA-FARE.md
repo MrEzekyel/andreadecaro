@@ -69,23 +69,21 @@ Guida, e dallo stato vuoto della Home). Ogni passo è uno screenshot vero
 (idealmente con una freccia rossa che indica dove toccare, come quelli che
 hai già mandato) più una riga di didascalia — non testo da leggere.
 
-**Fatti**: `apri`, `espandi`, `incolla`, `cerca`, `scegli-comando` (dalle
-foto che hai mandato l'11 agosto). `installa` e `chiave` non servono, sono
-schermate della nostra app.
+**Fatti**: `apri`, `espandi`, `incolla`, `cerca`, `scegli-comando`,
+`immediato`. `installa` e `chiave` non servono, sono schermate della
+nostra app. `seleziona-tutto` resta **solo descritta** a testo, per tua
+scelta esplicita — non serve uno screenshot.
 
-**Mancano ancora** questi tre — stesso stile delle altre, freccia rossa se
-aiuta a capire cosa toccare:
+**Manca ancora** solo questo, facoltativo:
 
 | File da salvare in `assets/guida/` | Cosa deve mostrare |
 | --- | --- |
-| `seleziona-tutto.jpg` | La schermata di carte e categorie, tutte già spuntate, con "Avanti" |
-| `immediato.jpg` | Il menu con "Esegui immediatamente" al posto di "Esegui dopo la conferma" |
-| `prova.jpg` | (facoltativo) La spesa comparsa in Home dopo un pagamento vero |
+| `prova.jpg` | La spesa comparsa in Home dopo un pagamento vero |
 
-Ridimensiona a circa 750px di larghezza prima di mandarmeli — uno
+Ridimensiona a circa 750px di larghezza prima di mandarmelo — uno
 screenshot a piena risoluzione pesa qualche megabyte e finirebbe intero
-dentro l'aggiornamento che ogni utente scarica. Se preferisci mandarmeli a
-piena risoluzione ci penso io, come ho fatto con gli altri cinque.
+dentro l'aggiornamento che ogni utente scarica. Se preferisci mandarmelo a
+piena risoluzione ci penso io, come ho fatto con gli altri sei.
 
 ---
 

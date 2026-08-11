@@ -22,6 +22,8 @@ export const GUIDE_IMAGES: Record<string, ImageSourcePropType> = {
   incolla: require("../assets/guida/incolla.jpg"),
   cerca: require("../assets/guida/cerca.jpg"),
   "scegli-comando": require("../assets/guida/scegli-comando.jpg"),
+  immediato: require("../assets/guida/immediato.jpg"),
   // installa, chiave: schermate della nostra app, non serve uno screenshot.
-  // seleziona-tutto, immediato, prova: mancano ancora.
+  // seleziona-tutto: resta solo descritta, per scelta di Andrea.
+  // prova: manca ancora, facoltativa.
 };

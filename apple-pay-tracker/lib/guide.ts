@@ -104,7 +104,7 @@ export const GUIDE: GuideChapter[] = [
       {
         id: "immediato",
         title: "Falla partire da sola",
-        caption: "Tocca «Automazioni» in alto e scegli «Esegui immediatamente».",
+        caption: "Tocca «Automazioni» in alto, scegli «Esegui immediatamente» e lascia spenta la notifica.",
         warning: "Senza, dovresti confermare ogni pagamento a mano.",
       },
       {
