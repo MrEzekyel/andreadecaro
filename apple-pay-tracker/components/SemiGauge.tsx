@@ -1,6 +1,6 @@
 import React from "react";
 import { View } from "react-native";
-import Svg, { Circle, Line } from "react-native-svg";
+import Svg, { Circle, Line, Text as SvgText } from "react-native-svg";
 import { useTheme } from "../lib/ThemeContext";
 
 export type GaugeSegment = {
@@ -20,11 +20,17 @@ type Props = {
   /** Secondo anello concentrico piu' piccolo, per il confronto entrate/uscite. */
   inner?: Ring;
   /**
-   * Dove sarebbe l'indicatore spendendo lo stesso ogni giorno (0-1).
-   * Una tacca chiara sull'arco: se il pieno la supera si e' in anticipo.
+   * Tacca su una posizione dell'arco (0-1). Il significato lo decide chi
+   * chiama — in Home segna dove arrivano i costi fissi sul limite — quindi
+   * va sempre accompagnata da una voce in legenda che lo dica: una tacca
+   * senza nome viene letta a caso, e qui si e' gia' visto scambiarla per
+   * un'altra cosa.
    */
-  paceRatio?: number | null;
+  markRatio?: number | null;
+  markColor?: string;
   stroke?: number;
+  /** Valore di fondo scala, scritto sotto la punta destra dell'arco. */
+  endLabel?: string;
   /** Contenuto al centro dell'arco (importo, etichette). */
   children?: React.ReactNode;
 };
@@ -43,8 +49,10 @@ export function SemiGauge({
   width,
   outer,
   inner,
-  paceRatio,
+  markRatio,
+  markColor,
   stroke = 11,
+  endLabel,
   children,
 }: Props) {
   const { palette } = useTheme();
@@ -52,14 +60,37 @@ export function SemiGauge({
   const r = (width - stroke) / 2;
   const cx = width / 2;
   const cy = r + stroke / 2;
-  const height = cy + stroke / 2;
+  const footH = endLabel ? 13 : 0;
+  const height = cy + stroke / 2 + footH;
 
+  /**
+   * Il fondo dell'arco usa `hairline` e non `surface2`: in tema chiaro
+   * quest'ultimo (#f2f0e9) sta a un soffio dal fondo pagina (#f0eee6) e la
+   * parte non ancora spesa spariva, lasciando l'arco pieno senza un "su
+   * quanto". Un semicerchio a cui non si vede la fine non e' un semicerchio.
+   */
+  const trackColor = palette.hairline;
+
+  /**
+   * Gli archi di un anello, tutti con le punte tonde.
+   *
+   * Le punte tonde con piu' segmenti erano state escluse perche' la punta di
+   * uno si mangiava il confine con quello dopo. La soluzione non e'
+   * squadrarle ma impilarle: ogni segmento **rientra** sotto il precedente di
+   * quasi uno spessore, e viene disegnato **prima** di lui. Cosi' il primo
+   * finisce sopra tutti e la sua punta tonda chiude il confine invece di
+   * essere tagliata — e nessuno dei due estremi lascia lo spicchio di fondo
+   * scoperto che si vedeva quando due punte tonde si toccavano appena.
+   */
   const arcs = (ring: Ring, radius: number, width_: number) => {
     const circumference = 2 * Math.PI * radius;
     const half = circumference / 2;
-    let cursor = 0;
+    /** Il rientro, espresso nella stessa frazione di semicerchio dei tratti. */
+    const overlap = half > 0 ? width_ / half : 0;
 
-    return ring.segments.map((segment, index) => {
+    let cursor = 0;
+    const spans: { color: string; start: number; length: number }[] = [];
+    for (const segment of ring.segments) {
       const ratio =
         ring.max > 0 ? Math.max(Math.min(segment.value / ring.max, 1), 0) : 0;
       // Il cumulato si ferma a 1: oltre il massimo l'arco e' pieno e i
@@ -67,31 +98,38 @@ export function SemiGauge({
       const start = Math.min(cursor, 1);
       const length = Math.min(ratio, 1 - start);
       cursor = start + length;
-      if (length <= 0) return null;
+      if (length <= 0) continue;
+      spans.push({ color: segment.color, start, length });
+    }
 
-      return (
-        <Circle
-          key={`${radius}-${index}`}
-          cx={cx}
-          cy={cy}
-          r={radius}
-          stroke={segment.color}
-          strokeWidth={width_}
-          fill="none"
-          // Un solo segmento puo' avere le punte tonde; con piu' segmenti si
-          // sovrapporrebbero mangiandosi il confine fra una fonte e l'altra.
-          strokeLinecap={ring.segments.length === 1 ? "round" : "butt"}
-          strokeDasharray={`${half * length} ${circumference}`}
-          transform={`rotate(${180 + 180 * start} ${cx} ${cy})`}
-        />
-      );
-    });
+    return spans
+      .map(({ color, start, length }, index) => {
+        // Il rientro allunga il tratto all'indietro, non in avanti: la punta
+        // resta dov'e', ed e' la punta a dire il valore.
+        const back = index === 0 ? 0 : Math.min(overlap, start);
+        return (
+          <Circle
+            key={`${radius}-${index}`}
+            cx={cx}
+            cy={cy}
+            r={radius}
+            stroke={color}
+            strokeWidth={width_}
+            fill="none"
+            strokeLinecap="round"
+            strokeDasharray={`${half * (length + back)} ${circumference}`}
+            transform={`rotate(${180 + 180 * (start - back)} ${cx} ${cy})`}
+          />
+        );
+      })
+      .reverse();
   };
 
   const innerRadius = r - stroke - 5;
 
-  const paceAngle =
-    paceRatio != null ? ((180 + 180 * Math.min(Math.max(paceRatio, 0), 1)) * Math.PI) / 180
+  const markAngle =
+    markRatio != null
+      ? ((180 + 180 * Math.min(Math.max(markRatio, 0), 1)) * Math.PI) / 180
       : null;
 
   return (
@@ -102,7 +140,7 @@ export function SemiGauge({
           cx={cx}
           cy={cy}
           r={r}
-          stroke={palette.surface2}
+          stroke={trackColor}
           strokeWidth={stroke}
           fill="none"
           strokeLinecap="round"
@@ -117,7 +155,7 @@ export function SemiGauge({
               cx={cx}
               cy={cy}
               r={innerRadius}
-              stroke={palette.surface2}
+              stroke={trackColor}
               strokeWidth={stroke - 2}
               fill="none"
               strokeLinecap="round"
@@ -128,16 +166,30 @@ export function SemiGauge({
           </>
         )}
 
-        {paceAngle !== null && (
+        {markAngle !== null && (
           <Line
-            x1={cx + (r - stroke / 2 - 2) * Math.cos(paceAngle)}
-            y1={cy + (r - stroke / 2 - 2) * Math.sin(paceAngle)}
-            x2={cx + (r + stroke / 2 + 2) * Math.cos(paceAngle)}
-            y2={cy + (r + stroke / 2 + 2) * Math.sin(paceAngle)}
-            stroke={palette.ink}
-            strokeWidth={2}
+            x1={cx + (r - stroke / 2 - 2) * Math.cos(markAngle)}
+            y1={cy + (r - stroke / 2 - 2) * Math.sin(markAngle)}
+            x2={cx + (r + stroke / 2 + 2) * Math.cos(markAngle)}
+            y2={cy + (r + stroke / 2 + 2) * Math.sin(markAngle)}
+            stroke={markColor ?? palette.ink}
+            strokeWidth={2.5}
             strokeLinecap="round"
           />
+        )}
+
+        {/* Il fondo scala sotto la punta destra: senza, l'arco dice quanto si
+            e' riempito ma mai su quanto, e la frazione resta indovinata. */}
+        {endLabel && (
+          <SvgText
+            x={width}
+            y={cy + stroke / 2 + 10}
+            textAnchor="end"
+            fontSize={9.5}
+            fill={palette.ink3}
+          >
+            {endLabel}
+          </SvgText>
         )}
       </Svg>
 

@@ -7,7 +7,6 @@ export type SettingsPage =
   | "recurring"
   | "people"
   | "automations"
-  | "income"
   | "export"
   | "subscription"
   | "referral"
@@ -17,9 +16,17 @@ export type SettingsPage =
 type Nav = {
   /** Porta alla scheda Impostazioni gia' aperta su una sua sottopagina. */
   openSettings: (page: SettingsPage) => void;
+  /** Apre il foglio "Nuovo introito", lo stesso che apre il tasto centrale
+   *  della tabbar quando la scheda Movimenti e' su Entrate — gli introiti
+   *  non vivono piu' dentro Impostazioni, quindi "aggiungine uno" e'
+   *  un'azione diretta e non piu' una pagina da raggiungere. */
+  openAddIncome: () => void;
 };
 
-const NavContext = createContext<Nav>({ openSettings: () => {} });
+const NavContext = createContext<Nav>({
+  openSettings: () => {},
+  openAddIncome: () => {},
+});
 
 export const NavProvider = NavContext.Provider;
 

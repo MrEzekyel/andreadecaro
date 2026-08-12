@@ -14,6 +14,8 @@ import { compactAmount, formatAmount } from "../lib/format";
 import { type } from "../lib/theme";
 
 const WIDTH = 320;
+/** Fascia a sinistra per i valori dell'asse: senza, la scala resta indovinata. */
+const PAD_L = 30;
 const TOP = 16;
 const PLOT_H = 96;
 const BASE = TOP + PLOT_H;
@@ -25,6 +27,8 @@ export type BalancePoint = {
   value: number;
   /** Introito arrivato quel giorno, se c'e': disegna il gradino in salita. */
   income?: number;
+  /** Investito quel giorno: scende come una spesa, ma non e' speso. */
+  invested?: number;
 };
 
 type Props = {
@@ -36,12 +40,17 @@ type Props = {
 
 /**
  * Il saldo del mese giorno per giorno: sale quando entra qualcosa, scende a
- * ogni spesa.
+ * ogni spesa e a ogni investimento.
  *
  * E' l'andamento delle spese rovesciato, ed e' l'unico grafico che risponde a
  * "quanto mi e' rimasto" senza far fare sottrazioni: la linea **e'** quello
- * che resta. I gradini in salita sono gli introiti, etichettati con l'importo
- * perche' altrimenti sembrerebbero un errore di lettura del grafico.
+ * che resta. Gli investimenti scendono come le spese perche' quei soldi dal
+ * conto sono usciti davvero — tenerli fuori faceva dire alla linea che c'era
+ * piu' denaro disponibile di quanto ce ne fosse, che e' l'unico verso in cui
+ * un errore qui e' pericoloso.
+ *
+ * I gradini sono etichettati con l'importo: senza, una salita improvvisa
+ * sembrerebbe un errore di lettura del grafico.
  */
 export function BalanceChart({
   points,
@@ -62,7 +71,9 @@ export function BalanceChart({
   const floor = Math.min(...values, 0);
   const span = Math.max(peak - floor, 1);
 
-  const xOf = (day: number) => ((day - 1) / Math.max(days - 1, 1)) * WIDTH;
+  const plotW = WIDTH - PAD_L;
+  const xOf = (day: number) =>
+    PAD_L + ((day - 1) / Math.max(days - 1, 1)) * plotW;
   const yOf = (value: number) => BASE - ((value - floor) / span) * PLOT_H;
 
   const coords = points.map((p) => ({ ...p, x: xOf(p.day), y: yOf(p.value) }));
@@ -71,6 +82,9 @@ export function BalanceChart({
   const area = `${line} L ${last.x},${BASE} L ${coords[0].x},${BASE} Z`;
 
   const zeroY = floor < 0 ? yOf(0) : null;
+
+  /** Tre riferimenti sull'asse: fondo, meta' e cima della scala vera. */
+  const ticks = [floor, floor + span / 2, peak];
 
   return (
     <View>
@@ -82,18 +96,37 @@ export function BalanceChart({
           </LinearGradient>
         </Defs>
 
-        <Line
-          x1={0}
-          y1={BASE}
-          x2={WIDTH}
-          y2={BASE}
-          stroke={palette.hairline}
-          strokeWidth={1}
-        />
+        {ticks.map((tick, index) => (
+          <React.Fragment key={`t-${index}`}>
+            <Line
+              x1={PAD_L}
+              y1={yOf(tick)}
+              x2={WIDTH}
+              y2={yOf(tick)}
+              stroke={palette.hairline}
+              strokeWidth={1}
+              opacity={index === 0 ? 1 : 0.55}
+            />
+            <SvgText
+              x={PAD_L - 4}
+              // Il riferimento piu' basso sta sopra la sua riga e non sotto:
+              // sotto finirebbe addosso ai giorni dell'asse orizzontale.
+              y={index === 0 ? yOf(tick) - 3 : yOf(tick) + 3}
+              textAnchor="end"
+              fontSize={8}
+              fill={palette.ink3}
+            >
+              {/* `compactAmount(0)` e' vuoto apposta — sulle barre uno zero
+                  scritto e' rumore. Su un asse invece e' il riferimento che
+                  dice dove sta il fondo, e va scritto. */}
+              {tick === 0 ? "0" : compactAmount(tick)}
+            </SvgText>
+          </React.Fragment>
+        ))}
 
         {zeroY !== null && (
           <Line
-            x1={0}
+            x1={PAD_L}
             y1={zeroY}
             x2={WIDTH}
             y2={zeroY}
@@ -131,10 +164,27 @@ export function BalanceChart({
             </React.Fragment>
           ))}
 
+        {coords
+          .filter((c) => c.invested && c.invested > 0)
+          .map((c) => (
+            <React.Fragment key={`inv-${c.day}`}>
+              <Circle cx={c.x} cy={c.y} r={3.4} fill={palette.invest} />
+              <SvgText
+                x={Math.min(c.x + 4, WIDTH - 4)}
+                y={Math.min(c.y + 12, BASE - 2)}
+                textAnchor={c.x > WIDTH - 50 ? "end" : "start"}
+                fontSize={8}
+                fill={palette.invest}
+              >
+                {`−${compactAmount(c.invested as number)}`}
+              </SvgText>
+            </React.Fragment>
+          ))}
+
         <Circle cx={last.x} cy={last.y} r={5} fill={palette.ground} />
         <Circle cx={last.x} cy={last.y} r={3.4} fill={palette.good} />
 
-        <SvgText x={0} y={BASE + 11} fontSize={8} fill={palette.ink3}>
+        <SvgText x={PAD_L} y={BASE + 11} fontSize={8} fill={palette.ink3}>
           1
         </SvgText>
         <SvgText
@@ -153,6 +203,7 @@ export function BalanceChart({
         <Text style={{ color: palette.good, fontWeight: "600" }}>
           {formatAmount(last.value)}
         </Text>
+        , al netto di spese e investimenti
       </Text>
     </View>
   );

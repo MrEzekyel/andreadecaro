@@ -2,7 +2,7 @@ import React from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, { Line, Rect, Text as SvgText } from "react-native-svg";
 import { useTheme } from "../lib/ThemeContext";
-import { compactAmount } from "../lib/format";
+import { compactAmount, formatAmount } from "../lib/format";
 import { type } from "../lib/theme";
 
 export type MonthBar = {
@@ -17,11 +17,15 @@ type Props = {
   /** Larghezza del viewBox: la carta a meta' schermo ne usa una piu' stretta. */
   width?: number;
   height?: number;
-  /** Riga tratteggiata sulla media, con etichetta. */
-  showAverage?: boolean;
   /** Etichette dei mesi sotto le barre: si spengono quando lo spazio manca. */
   showLabels?: boolean;
 };
+
+/** Media dei mesi mostrati: si scrive accanto al titolo, non sul grafico. */
+export function monthBarsAverage(bars: MonthBar[]) {
+  if (bars.length === 0) return 0;
+  return bars.reduce((sum, b) => sum + b.value, 0) / bars.length;
+}
 
 /**
  * Un mese per barra, l'ultimo acceso.
@@ -36,7 +40,6 @@ export function MonthBars({
   color,
   width = 128,
   height = 76,
-  showAverage = true,
   showLabels = true,
 }: Props) {
   const { palette } = useTheme();
@@ -48,40 +51,21 @@ export function MonthBars({
   const peak = Math.max(...bars.map((b) => b.value), 1);
   const slot = width / bars.length;
   const barW = Math.min(slot * 0.62, 26);
-
-  const average =
-    bars.reduce((sum, b) => sum + b.value, 0) / Math.max(bars.length, 1);
-  const averageY = plotH - (average / peak) * (plotH - 10);
+  // Il valore sopra ogni barra vuole la sua fascia: senza, la barra piu' alta
+  // si prendeva tutta l'altezza e il numero finiva fuori dal viewBox.
+  const valueFont = width > 200 ? 8 : 6.4;
+  const headroom = valueFont + 5;
 
   return (
     <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
-      {showAverage && average > 0 && (
-        <>
-          <Line
-            x1={0}
-            y1={averageY}
-            x2={width}
-            y2={averageY}
-            stroke={color}
-            strokeWidth={1}
-            strokeDasharray="3 4"
-            opacity={0.55}
-          />
-          <SvgText
-            x={width}
-            y={Math.max(averageY - 3, 8)}
-            textAnchor="end"
-            fontSize={7.5}
-            fill={color}
-            opacity={0.85}
-          >
-            {`media ${compactAmount(average)} €`}
-          </SvgText>
-        </>
-      )}
-
+      {/* Niente riga della media qui sopra: era un riferimento che nessun mese
+          toccava e rubava lo spazio ai numeri veri, che sono quelli che
+          rispondono a "quanto". La media sta scritta accanto al titolo. */}
       {bars.map((bar, index) => {
-        const h = Math.max((bar.value / peak) * (plotH - 10), bar.value > 0 ? 2 : 0);
+        const h = Math.max(
+          (bar.value / peak) * (plotH - headroom),
+          bar.value > 0 ? 2 : 0
+        );
         const last = index === bars.length - 1;
         return (
           <Rect
@@ -91,8 +75,31 @@ export function MonthBars({
             width={barW}
             height={h}
             rx={2.5}
-            fill={last ? color : palette.surface2}
+            // `hairline` e non `surface2`: quest'ultimo sta a un soffio dal
+            // fondo pagina, e a piena larghezza (fuori da una carta) i mesi
+            // passati sparivano — restava la loro etichetta sospesa sul
+            // vuoto, che e' peggio di non disegnarli affatto.
+            fill={last ? color : palette.hairline}
           />
+        );
+      })}
+
+      {bars.map((bar, index) => {
+        if (bar.value <= 0) return null;
+        const h = Math.max((bar.value / peak) * (plotH - headroom), 2);
+        const last = index === bars.length - 1;
+        return (
+          <SvgText
+            key={`v-${bar.label}-${index}`}
+            x={index * slot + slot / 2}
+            y={plotH - h - 3.5}
+            textAnchor="middle"
+            fontSize={valueFont}
+            fontWeight={last ? "600" : "400"}
+            fill={last ? color : palette.ink3}
+          >
+            {compactAmount(bar.value)}
+          </SvgText>
         );
       })}
 
@@ -138,7 +145,7 @@ export function MonthBarsFooter({
   const total = bars.reduce((sum, b) => sum + b.value, 0);
   return (
     <Text style={[styles.footer, { color: palette.ink3 }]}>
-      {`Totale ${suffix} · ${compactAmount(total)} €`}
+      {`Totale ${suffix} · ${formatAmount(total)}`}
     </Text>
   );
 }

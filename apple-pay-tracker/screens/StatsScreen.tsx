@@ -17,6 +17,7 @@ import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { LetterToggle } from "../components/LetterToggle";
 import { MonthWheel } from "../components/MonthWheel";
+import { ScreenHeader } from "../components/ScreenHeader";
 import { TrendChart, TrendPoint } from "../components/TrendChart";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
@@ -826,7 +827,7 @@ export default function StatsScreen() {
         style={{ backgroundColor: palette.ground }}
         contentContainerStyle={styles.content}
       >
-        <Text style={[styles.title, { color: palette.ink }]}>Statistiche</Text>
+        <ScreenHeader title="Statistiche" />
         <LoadError message={error} onRetry={load} />
       </ScrollView>
     );
@@ -840,7 +841,7 @@ export default function StatsScreen() {
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
     >
-      <Text style={[styles.title, { color: palette.ink }]}>Statistiche</Text>
+      <ScreenHeader title="Statistiche" />
 
       {error && <LoadError message={error} onRetry={load} variant="inline" />}
 

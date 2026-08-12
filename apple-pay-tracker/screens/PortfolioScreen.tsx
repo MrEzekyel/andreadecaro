@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
+import { ScreenHeader } from "../components/ScreenHeader";
 import { ScrubChart } from "../components/ScrubChart";
 import { StaleNote } from "../components/StaleNote";
 import { StatTiles } from "../components/StatTiles";
@@ -199,7 +200,7 @@ export default function PortfolioScreen() {
         style={{ backgroundColor: palette.ground }}
         contentContainerStyle={styles.content}
       >
-        <Text style={[styles.title, { color: palette.ink }]}>Investimenti</Text>
+        <ScreenHeader title="Investimenti" />
         <LoadError message={error} onRetry={portfolio.reload} />
       </ScrollView>
     );
@@ -221,7 +222,7 @@ export default function PortfolioScreen() {
         />
       }
     >
-      <Text style={[styles.title, { color: palette.ink }]}>Investimenti</Text>
+      <ScreenHeader title="Investimenti" />
 
       {staleLabel && (
         <StaleNote

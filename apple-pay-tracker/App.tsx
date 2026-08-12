@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import type { Session } from "@supabase/supabase-js";
+import { AddIncomeSheet } from "./components/AddIncomeSheet";
 import { AddPaymentSheet } from "./components/AddPaymentSheet";
 import { Icon } from "./components/Icon";
 import { LockCover, LockScreen } from "./components/LockScreen";
@@ -19,21 +20,22 @@ import { NavProvider, SettingsPage } from "./lib/NavContext";
 import { ThemeProvider, useTheme } from "./lib/ThemeContext";
 import { supabase } from "./lib/supabase";
 import { radius, space, type } from "./lib/theme";
+import { MoneyMode } from "./lib/moneyMode";
 import AuthScreen, { RECOVERY_FLAG } from "./screens/AuthScreen";
 import HomeScreen from "./screens/HomeScreen";
-import PaymentsScreen from "./screens/PaymentsScreen";
+import MovementsScreen from "./screens/MovementsScreen";
 import PortfolioScreen from "./screens/PortfolioScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import StatsScreen from "./screens/StatsScreen";
 
-type Tab = "home" | "payments" | "stats" | "portfolio" | "settings";
+type Tab = "home" | "movements" | "stats" | "portfolio" | "settings";
 
 // Impostazioni non e' piu' una scheda: ci si arriva dall'ingranaggio in Home.
 // Le quattro schede restano tutte destinazioni che si guardano, non si
 // configurano.
 const TABS: { key: Tab; label: string; icon: string }[] = [
   { key: "home", label: "Home", icon: "house" },
-  { key: "payments", label: "Spese", icon: "list" },
+  { key: "movements", label: "Movimenti", icon: "arrow-left-right" },
   { key: "stats", label: "Statistiche", icon: "chart-pie" },
   { key: "portfolio", label: "Investimenti", icon: "trending-up" },
 ];
@@ -43,7 +45,13 @@ function Shell() {
   const { reload } = useData();
 
   const [tab, setTab] = useState<Tab>("home");
+  // Uscite/Entrate, condiviso fra Home e Movimenti invece che locale a
+  // ciascuna: e' lo stesso interruttore concettuale in entrambe le
+  // schermate, e il tasto centrale della tabbar deve saperlo leggere da
+  // qualunque delle due si stia guardando per decidere cosa aggiunge.
+  const [moneyMode, setMoneyMode] = useState<MoneyMode>("uscite");
   const [adding, setAdding] = useState(false);
+  const [addingIncome, setAddingIncome] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const [settingsPage, setSettingsPage] = useState<SettingsPage>("root");
   // Cambia a ogni richiesta di apertura, anche verso la stessa pagina: e' il
@@ -56,12 +64,25 @@ function Shell() {
     setTab("settings");
   }, []);
 
+  const openAddIncome = useCallback(() => setAddingIncome(true), []);
+
+  // Il tasto centrale segue quello che si sta guardando su Home o su
+  // Movimenti: su Entrate aggiunge un introito, altrimenti una spesa. Sulle
+  // altre schede (Statistiche, Investimenti) non c'e' un Uscite/Entrate da
+  // seguire, quindi resta il comportamento di sempre: aggiunge una spesa.
+  const addingIncomeTarget =
+    (tab === "home" || tab === "movements") && moneyMode === "entrate";
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.ground }]}>
-      <NavProvider value={{ openSettings }}>
+      <NavProvider value={{ openSettings, openAddIncome }}>
         <View style={styles.content} key={reloadKey}>
-          {tab === "home" && <HomeScreen />}
-          {tab === "payments" && <PaymentsScreen />}
+          {tab === "home" && (
+            <HomeScreen mode={moneyMode} onModeChange={setMoneyMode} />
+          )}
+          {tab === "movements" && (
+            <MovementsScreen mode={moneyMode} onModeChange={setMoneyMode} />
+          )}
           {tab === "stats" && <StatsScreen />}
           {tab === "portfolio" && <PortfolioScreen />}
           {tab === "settings" && (
@@ -85,9 +106,16 @@ function Shell() {
           ))}
 
           <TouchableOpacity
-            style={[styles.fab, { backgroundColor: palette.accent }]}
-            onPress={() => setAdding(true)}
-            accessibilityLabel="Aggiungi spesa"
+            style={[
+              styles.fab,
+              { backgroundColor: addingIncomeTarget ? palette.good : palette.accent },
+            ]}
+            onPress={() =>
+              addingIncomeTarget ? setAddingIncome(true) : setAdding(true)
+            }
+            accessibilityLabel={
+              addingIncomeTarget ? "Aggiungi introito" : "Aggiungi spesa"
+            }
           >
             <Icon name="plus" size={21} color={palette.onAccent} strokeWidth={1.9} />
           </TouchableOpacity>
@@ -106,6 +134,15 @@ function Shell() {
       <AddPaymentSheet
         visible={adding}
         onClose={() => setAdding(false)}
+        onSaved={() => {
+          reload();
+          setReloadKey((value) => value + 1);
+        }}
+      />
+
+      <AddIncomeSheet
+        visible={addingIncome}
+        onClose={() => setAddingIncome(false)}
         onSaved={() => {
           reload();
           setReloadKey((value) => value + 1);

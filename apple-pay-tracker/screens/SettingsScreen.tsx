@@ -28,7 +28,6 @@ import CategoriesScreen from "./CategoriesScreen";
 import ChangelogScreen from "./ChangelogScreen";
 import ExportScreen from "./ExportScreen";
 import GuideScreen from "./GuideScreen";
-import IncomeScreen from "./IncomeScreen";
 import LimitsScreen from "./LimitsScreen";
 import OwedScreen from "./OwedScreen";
 import RecurringScreen from "./RecurringScreen";
@@ -122,7 +121,6 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
       automations: (
         <AutomationsScreen onBack={back} onOpenGuide={() => setPage("guide")} />
       ),
-      income: <IncomeScreen onBack={back} />,
       export: <ExportScreen onBack={back} />,
       subscription: <SubscriptionScreen onBack={back} />,
       referral: <ReferralScreen onBack={back} />,
@@ -275,13 +273,6 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
           { backgroundColor: palette.surface, borderColor: palette.hairline },
         ]}
       >
-        <SettingRow
-          icon="wallet"
-          label="Introiti"
-          value="Gestisci"
-          onPress={() => setPage("income")}
-        />
-        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
         <SettingRow
           icon="file-down"
           label="Esporta i dati"

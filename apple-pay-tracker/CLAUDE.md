@@ -70,10 +70,14 @@ produzione.
   Expo Go. Il mese in Home si cambia con un selettore a foglio
   (`MonthYearPicker`, apertura al tocco), non più a swipe; in Statistiche il
   periodo si cambia sia con le frecce sia con lo swipe
-- Schede in basso: Home, Spese, Statistiche, Investimenti. **Impostazioni non
-  è una scheda**: ci si arriva dall'ingranaggio in alto a destra in Home
-  (`useNav().openSettings`), perché le schede sono destinazioni che si
-  guardano, non si configurano
+- Schede in basso: Home, Movimenti, Statistiche, Investimenti. **Impostazioni
+  non è una scheda**: ci si arriva dall'ingranaggio in alto a destra, uguale
+  su tutte e quattro (`components/ScreenHeader.tsx`, `useNav().openSettings`)
+  — Home lo disegna a mano perché porta anche il pallino delle novità, le
+  altre tre usano il componente condiviso. Mai sulle pagine di dettaglio
+  (dentro Movimenti, Statistiche, Investimenti): quelle hanno già un tasto
+  Indietro, e un secondo modo di uscire accanto confonderebbe quale dei due
+  riporta dove.
 
 ## Design system
 
@@ -137,48 +141,113 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   capire che il primo è la somma degli altri due. `StatTiles` affianca i
   numeri secondari in riquadri: un elenco verticale di coppie
   etichetta-valore si legge tutto o niente e nessun numero emerge.
-- **La Home ha due schede, «Uscite» ed «Entrate»** (segmented control sotto
-  il titolo del mese). Rispondono a domande opposte e messe in colonna una
-  dopo l'altra facevano scorrere mezza schermata per arrivare alla seconda.
-  Il mese scelto vale per entrambe: si sfoglia il calendario una volta sola.
+- **«Uscite» ed «Entrate» sono lo stesso interruttore in Home e in
+  Movimenti**, non due copie: `lib/moneyMode.ts` esporta il tipo `MoneyMode`,
+  e lo stato vive sollevato in `App.tsx` (non locale a nessuna delle due
+  schermate) perché il tasto centrale della tabbar deve poterlo leggere da
+  qualunque delle due schede si stia guardando, per decidere se aggiunge una
+  spesa o un introito — vedi "Il tasto centrale" più sotto. Cambiarlo in Home
+  cambia anche quello che si trova aprendo Movimenti, e viceversa. Il mese
+  scelto invece resta locale a ciascuna schermata: sono due elenchi, non la
+  stessa vista.
+- **Gli introiti non vivono più dentro Impostazioni.** Prima erano una
+  sottopagina (`IncomeScreen`, raggiunta da "Introiti → Gestisci"); ora sono
+  la metà «Entrate» della scheda Movimenti (`screens/MovementsScreen.tsx`,
+  sezione `IncomeList`), sullo stesso piano delle spese. Da lì si modifica o
+  elimina un introito toccando la sua riga (foglio locale, dentro
+  `MovementsScreen.tsx`); l'aggiunta invece è `components/AddIncomeSheet.tsx`,
+  gemello di `AddPaymentSheet` ma per gli introiti, aperto dal tasto centrale
+  della tabbar — mai una pagina propria, perché un elenco ha un solo gesto
+  primario e prima l'aggiunta e la navigazione se lo contendevano.
+- **Il tasto centrale della tabbar segue Uscite/Entrate.** Su Home o
+  Movimenti, se `moneyMode` è `"entrate"` il tasto è verde e apre
+  `AddIncomeSheet`; altrimenti è arancione (`palette.accent`) e apre
+  `AddPaymentSheet` — anche su Statistiche e Investimenti, dove non c'è un
+  Uscite/Entrate da seguire e il comportamento resta quello di sempre.
+  `useNav().openAddIncome` apre lo stesso foglio da qualsiasi punto
+  dell'app (es. lo stato vuoto di Entrate in Home), senza dover navigare.
 - **`components/SemiGauge.tsx` — il semicerchio, non l'anello.** Prima
   versione: anello a 270°, bocciata da Andrea («é gigantesco»). Un
   semicerchio dice le stesse tre cose (quanto, su quanto, se sei in
   anticipo grazie alla tacca del ritmo) in metà dell'altezza, e lo spazio
   liberato accanto porta i numeri che prima non c'erano: spesa media al
-  giorno, proiezione di fine mese, giorni rimasti. La proiezione va in
-  ambra quando supera il limite — è l'unico avviso che arriva *prima* di
-  sforare. Regge più segmenti per arco perché in «Entrate» l'arco esterno è
-  diviso per fonte di introito.
+  giorno, proiezione di fine mese, giorni rimasti. Regge più segmenti per
+  arco perché in «Entrate» l'arco esterno è diviso per fonte di introito.
+  - La traccia di fondo (il "su quanto" non ancora riempito) usa
+    `palette.hairline` e non `surface2`: in tema chiaro quest'ultimo sta a un
+    soffio dal fondo pagina e la parte non spesa spariva, lasciando l'arco
+    sempre pieno.
+  - `markRatio`/`markColor`/`endLabel` sono generici — il chiamante decide
+    cosa segnano — perché una tacca senza nome viene letta a caso: in Home è
+    già successo che una tacca del ritmo (dove saresti se spendessi lo
+    stesso ogni giorno) venisse scambiata per i costi fissi, per pura
+    coincidenza numerica. Oggi in Home la tacca segna davvero i costi fissi
+    (`fixedCostsTotal / gauge.limit`) ed è etichettata in una piccola
+    legenda sotto l'arco; `endLabel` scrive il fondo scala (il limite) sotto
+    la punta destra, perché un arco che dice quanto si è riempito ma mai su
+    quanto lascia la frazione indovinata.
+  - **Più segmenti con le punte tonde**, non più squadrate: ogni segmento
+    successivo *rientra* sotto il precedente di quasi uno spessore e viene
+    disegnato *prima* di lui, cosicché il primo finisce sopra e la sua punta
+    tonda chiude il confine invece di tagliarlo. Prima, con più di un
+    segmento, si passava tutti a `strokeLinecap="butt"` per evitare che le
+    punte tonde si mangiassero il confine — soluzione scartata perché
+    lasciava uno spicchio di fondo scoperto fra un segmento e l'altro.
 - **La proiezione di fine mese non moltiplica i costi fissi.** Sono già
   interi dentro `fixedCostsTotal` dal primo giorno: proiettarli
   moltiplicherebbe il mutuo per trenta. Si proietta solo la parte
   variabile (`fixedCostsTotal + variabile / giorniTrascorsi * giorniMese`).
+  Per lo stesso motivo "Al giorno" in Home mostra **due** valori: la spesa
+  media di sempre e quella al netto dei costi fissi (`statSub` sotto il
+  valore principale) — solo la seconda è quella su cui si può agire.
 - **`components/FlowCompare.tsx` — introiti contro uscite su una scala
-  sola.** Idea di Andrea, e risolve un difetto vero del diagramma di flusso
-  classico: con tre rami che partono da sinistra e finiscono tutti
-  allineati a destra, il divario fra quanto entra e quanto esce non si vede
+  sola, a barre dritte.** Idea di Andrea, e risolve un difetto vero del
+  diagramma di flusso classico: con rami che partono uguali e finiscono
+  tutti allineati, il divario fra quanto entra e quanto esce non si vede
   affatto. Qui la barra più lunga è quella che vince (introiti se il mese
-  chiude in positivo, uscite se in rosso) e l'altra si misura contro di
-  lei; l'investito riparte da dove finisce lo speso, quindi **la distanza
-  fra le due punte è quello che avanza** — uno spazio da guardare, non un
-  numero da leggere. Ha sostituito `SavingsSummary`, che diceva la stessa
-  cosa come sottrazione scritta a parole.
+  chiude in positivo, uscite se in rosso) e l'altra si misura contro di lei
+  sullo stesso fondo scala; l'investito (`palette.invest`, azzurro) riparte
+  da dove finisce lo speso, quindi **la distanza fra le due punte è quello
+  che avanza** — uno spazio da guardare, non un numero da leggere. Ha
+  sostituito `SavingsSummary`, che diceva la stessa cosa come sottrazione
+  scritta a parole.
+  - Sono state provate e scartate due varianti più decorative: un vero
+    Sankey a nastri (lì la grandezza sta nello *spessore*, non nella
+    lunghezza — il confronto che il componente esiste per mostrare
+    spariva) e un nastro con la piega verso una colonna sorgente (bello ma
+    la curva concentrata in un tratto fisso rendeva il disegno rigido, e
+    distribuita su tutta la lunghezza curvava diversamente due barre di
+    lunghezza diversa raccontando una differenza che non c'era). Restano
+    barre dritte con riempimento traslucido e una punta piena in fondo.
 - **`components/MonthBars.tsx`** risponde a «sto spendendo tanto?», che il
   totale del mese da solo non può: solo il confronto coi mesi già vissuti
-  lo dice. I mesi passati restano spenti, solo quello corrente prende il
-  colore pieno — è l'unico ancora in movimento. Le barre qui sono volute da
-  Andrea esplicitamente, dopo aver escluso i grafici a barre altrove.
+  lo dice. I mesi passati restano spenti (`palette.hairline`, non
+  `surface2` — stesso motivo della traccia di `SemiGauge`, altrimenti
+  sparivano su fondo chiaro), solo quello corrente prende il colore pieno.
+  Ogni barra porta il proprio valore scritto sopra (`compactAmount`); la
+  riga tratteggiata sulla media è stata tolta — nessun mese la toccava mai,
+  e rubava lo spazio ai valori veri — e la media, quando serve, si scrive
+  accanto al titolo (`monthBarsAverage`) invece che sul grafico.
 - **`components/BalanceChart.tsx` — l'andamento delle spese rovesciato.**
-  Nella scheda Entrate: parte da zero, sale a ogni introito (gradino
-  etichettato con l'importo, altrimenti sembra un errore di lettura) e
-  scende a ogni spesa. È l'unico grafico che risponde a «quanto mi resta»
-  senza far fare sottrazioni: la linea **è** quello che resta. L'asse
-  scende sotto zero solo se il saldo ci è andato davvero.
+  Nella scheda Entrate: parte da zero, sale a ogni introito (gradino verde
+  etichettato con l'importo) e scende a ogni spesa **e a ogni investimento**
+  (gradino azzurro, `−importo`) — gli investimenti erano stati dimenticati
+  in una prima versione, e la linea diceva che restava più denaro
+  disponibile di quanto ce ne fosse davvero, l'unico verso pericoloso di
+  sbagliare qui. È l'unico grafico che risponde a «quanto mi resta» senza
+  far fare sottrazioni: la linea **è** quello che resta. L'asse scende
+  sotto zero solo se il saldo ci è andato davvero, e porta tre riferimenti
+  di scala (fondo, metà, cima) scritti a sinistra — prima non ne aveva
+  nessuno.
 - **Le fonti di introito usano gradazioni di verde** (`INCOME_SHADES` in
   `HomeScreen.tsx`), non i colori delle categorie di spesa: devono restare
   leggibili come «entrata» a colpo d'occhio, e un rosa o un blu accanto al
   verde romperebbe quella lettura prima ancora di dire quale fonte è.
+- **`palette.invest` (azzurro) è il terzo colore del denaro**, dopo
+  `accent` (speso) e `good` (entrato/introiti): segna gli investimenti
+  ovunque compaiano accanto agli altri due — semicerchio Uscite ed Entrate
+  in Home, `FlowCompare`, `BalanceChart`. Mai riusato per altro, altrimenti
+  smetterebbe di leggersi come "investito" a colpo d'occhio.
 - Il semicerchio delle Uscite mostra **"restano X €"** dentro l'arco (o
   "oltre di X €" in rosso): è il numero con cui si decide ("posso
   permettermi questa cena?"), non un derivato da calcolare a mente. È il
@@ -868,9 +937,40 @@ eventualmente scartare le modifiche locali superate invece di lasciare i
 marcatori di conflitto (`<<<<<<<`) nel file — è già successo che
 finissero committati per sbaglio.
 
-## Xcode / Simulatore iOS (in corso)
+## Xcode / Simulatore iOS
 
-Andrea ha Xcode in installazione sul Mac per usare la beta di Claude Code
-desktop (build + simulatore iOS in sessione, solo macOS). Questa sessione
-remota non è quella: il simulatore si usa da una sessione locale di Claude
-Code sul suo Mac, puntata al clone locale del repo.
+Andrea sviluppa ora da una sessione **locale** di Claude Code sul suo Mac,
+puntata al clone locale del repo (non più la sessione cloud che ha scritto
+gran parte di questo file) — è lì che Xcode e il simulatore servono
+davvero, e sono installati e funzionanti.
+
+- Xcode va installato per intero (Mac App Store, o `.xip` da
+  developer.apple.com se l'App Store non lo trova) — i soli Command Line
+  Tools non bastano, non includono il Simulator.app né i runtime iOS.
+  `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer` dopo
+  l'installazione, poi aprire Xcode una volta per far scaricare la
+  piattaforma iOS da **Settings → Components** (o **Platforms** nelle
+  versioni più vecchie): `xcrun simctl list runtimes` vuoto è il segno che
+  manca quel passo.
+- `npx expo start --offline` e non il semplice `npx expo start`: il
+  progetto ha `extra.eas.projectId`/`updates.url` in `app.json`, quindi
+  senza essere loggati (`npx expo login`) il dev server prova un controllo
+  che chiede conferma interattiva e fallisce in background con
+  `CommandError: Input is required, but 'npx expo' is in non-interactive
+  mode` — il processo muore del tutto, non resta semplicemente in errore.
+  `--offline` salta quel controllo; in locale non serve comunque, EAS
+  Update è per la distribuzione, non per lo sviluppo.
+- Il primo avvio di un simulatore appena creato (dopo aver installato il
+  runtime) impiega uno o due minuti reali per il boot — non è bloccato,
+  mostra prima lo spinner poi il logo Apple con la barra di progresso.
+  Va aperto anche `Expo Go` la prima volta (`xcrun simctl openurl <udid>
+  "exp://127.0.0.1:8081"` lo scarica e installa da solo se manca).
+- Se Metro va in uno stato inconsistente dopo aver rinominato o rimosso un
+  file importato altrove (es. `Unable to resolve module` persistente anche
+  dopo aver corretto l'import), la cache di Metro resta sporca: riavviare
+  con `npx expo start --offline --clear` invece di limitarsi a un reload.
+- Lavorando in locale non serve **mai** `eas update` per vedere una
+  modifica: il dev server dà hot reload istantaneo via rete locale. Quel
+  comando (vedi "Il messaggio da dare ad Andrea a fine turno" sopra) resta
+  utile solo per portare una modifica sul telefono fisico da un'altra
+  sessione, non per lo sviluppo quotidiano sul Mac.

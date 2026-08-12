@@ -5,6 +5,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
 import { BalanceChart, BalancePoint } from "../components/BalanceChart";
@@ -13,7 +14,12 @@ import { useExplorer } from "../components/Explorer";
 import { FlowCompare } from "../components/FlowCompare";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
-import { MonthBar, MonthBars, MonthBarsFooter } from "../components/MonthBars";
+import {
+  MonthBar,
+  MonthBars,
+  MonthBarsFooter,
+  monthBarsAverage,
+} from "../components/MonthBars";
 import { MonthCheck } from "../components/MonthCheck";
 import { StaleNote } from "../components/StaleNote";
 import { MonthYearPicker } from "../components/MonthYearPicker";
@@ -23,10 +29,12 @@ import { SemiGauge } from "../components/SemiGauge";
 import { TrendChart, TrendPoint } from "../components/TrendChart";
 import { useChangelog } from "../lib/changelog";
 import { useData } from "../lib/DataContext";
+import { MoneyMode } from "../lib/moneyMode";
 import { useNav } from "../lib/NavContext";
 import { useTheme } from "../lib/ThemeContext";
 import {
   compactAmount,
+  dayLabel,
   formatAmount,
   monthAbbr,
   monthName,
@@ -63,6 +71,9 @@ type MonthTotal = {
 /** Introito del mese, con la data che serve al saldo giorno per giorno. */
 type IncomeRow = { amount: number; label: string; occurred_at: string };
 
+/** Acquisto eseguito nel mese: anche qui la data serve al saldo. */
+type InvestmentRow = { amount: number; occurred_at: string };
+
 /**
  * Gradazioni di verde per le fonti di introito.
  *
@@ -72,14 +83,25 @@ type IncomeRow = { amount: number; label: string; occurred_at: string };
  */
 const INCOME_SHADES = ["#16a34a", "#22c55e", "#4ade80", "#86efac", "#bbf7d0"];
 
-type Tab = "uscite" | "entrate";
+type Props = {
+  /** Uscite/Entrate: controllato dall'alto e non locale, perche' il tasto
+   *  centrale della tabbar deve sapere quale delle due sta guardando la
+   *  Home per decidere se aggiunge una spesa o un introito — la stessa
+   *  ragione per cui la scheda Movimenti lo riceve come prop. */
+  mode: MoneyMode;
+  onModeChange: (mode: MoneyMode) => void;
+};
 
-export default function HomeScreen() {
+export default function HomeScreen({ mode, onModeChange }: Props) {
   const { palette, dark } = useTheme();
   const { categoryById } = useData();
-  const { openSettings } = useNav();
+  const { openSettings, openAddIncome } = useNav();
+  const { width: windowWidth } = useWindowDimensions();
+  // Il semicerchio riempie la larghezza disponibile del contenuto invece di
+  // una misura fissa: su schermi piccoli non deve traboccare, su schermi
+  // grandi non deve restare piccolo in mezzo a spazio vuoto.
+  const gaugeWidth = Math.min(windowWidth - space.lg * 2, 340);
 
-  const [tab, setTab] = useState<Tab>("uscite");
   const [month, setMonth] = useState(() => new Date());
   const [pickerOpen, setPickerOpen] = useState(false);
   const { payments, total, previousTotal, error, staleLabel, staleReason, reload } =
@@ -149,7 +171,7 @@ export default function HomeScreen() {
   }, [loadMerchants]);
 
   const [incomes, setIncomes] = useState<IncomeRow[]>([]);
-  const [monthlyInvested, setMonthlyInvested] = useState(0);
+  const [investments, setInvestments] = useState<InvestmentRow[]>([]);
   // "Bilancio" e' una sottrazione fra tre numeri: se anche uno solo non
   // arriva, il risultato e' un importo inventato. Meglio non mostrare il
   // riquadro che mostrarlo sbagliato.
@@ -169,7 +191,7 @@ export default function HomeScreen() {
         .lt("occurred_at", end.toISOString()),
       supabase
         .from("investments")
-        .select("amount")
+        .select("amount,occurred_at")
         // "Investito questo mese" sono i soldi usciti dal conto per comprare:
         // vendite e dividendi sono denaro che rientra, e un ordine ancora da
         // eseguire non ha comprato niente.
@@ -184,10 +206,13 @@ export default function HomeScreen() {
     if (failed) return;
 
     setIncomes((incomeResult.data ?? []) as IncomeRow[]);
-    setMonthlyInvested(
-      (investResult.data ?? []).reduce((sum, r) => sum + Number(r.amount), 0)
-    );
+    setInvestments((investResult.data ?? []) as InvestmentRow[]);
   }, [month]);
+
+  const monthlyInvested = useMemo(
+    () => investments.reduce((sum, row) => sum + Number(row.amount), 0),
+    [investments]
+  );
 
   useEffect(() => {
     loadBalance();
@@ -323,10 +348,20 @@ export default function HomeScreen() {
     return points;
   }, [payments, daysInMonth, elapsedDays, isFixedCost, fixedCostsTotal]);
 
-  /** Saldo del mese: sale a ogni introito, scende a ogni spesa. */
+  /**
+   * Saldo del mese: sale a ogni introito, scende a ogni spesa e a ogni
+   * investimento.
+   *
+   * Gli investimenti vanno sottratti come le spese: sono soldi che dal conto
+   * sono usciti davvero, e lasciarli fuori faceva dire alla linea che restava
+   * piu' denaro di quanto ce ne fosse — l'unico verso in cui sbagliare qui e'
+   * pericoloso, perche' e' il numero con cui si decide se ci si puo'
+   * permettere qualcosa.
+   */
   const balanceSeries = useMemo<BalancePoint[]>(() => {
     const inPerDay = new Array(daysInMonth).fill(0);
     const outPerDay = new Array(daysInMonth).fill(0);
+    const investPerDay = new Array(daysInMonth).fill(0);
 
     for (const row of incomes) {
       const day = new Date(row.occurred_at).getDate();
@@ -338,19 +373,26 @@ export default function HomeScreen() {
         outPerDay[day - 1] += Number(payment.effective_amount);
       }
     }
+    for (const row of investments) {
+      const day = new Date(row.occurred_at).getDate();
+      if (day >= 1 && day <= daysInMonth) {
+        investPerDay[day - 1] += Number(row.amount);
+      }
+    }
 
     const points: BalancePoint[] = [];
     let running = 0;
     for (let i = 0; i < elapsedDays; i++) {
-      running += inPerDay[i] - outPerDay[i];
+      running += inPerDay[i] - outPerDay[i] - investPerDay[i];
       points.push({
         day: i + 1,
         value: running,
         income: inPerDay[i] > 0 ? inPerDay[i] : undefined,
+        invested: investPerDay[i] > 0 ? investPerDay[i] : undefined,
       });
     }
     return points;
-  }, [incomes, payments, daysInMonth, elapsedDays]);
+  }, [incomes, payments, investments, daysInMonth, elapsedDays]);
 
   /** Ultimi sei mesi di spesa, per la carta di confronto. */
   const spesaBars = useMemo<MonthBar[]>(
@@ -396,6 +438,24 @@ export default function HomeScreen() {
     : `su ${monthName(previousMonth)}`;
 
   const recent = payments.slice(0, 5);
+
+  /**
+   * Gli introiti del mese, uno per uno, come le ultime spese nelle Uscite.
+   * Il totale e le fonti dicono quanto e da dove, non *quando*: uno stipendio
+   * arrivato il 27 e uno arrivato il 3 fanno lo stesso anello e due mesi
+   * molto diversi da vivere.
+   */
+  const recentIncomes = useMemo(
+    () =>
+      [...incomes]
+        .sort(
+          (a, b) =>
+            new Date(b.occurred_at).getTime() - new Date(a.occurred_at).getTime()
+        )
+        .slice(0, 6),
+    [incomes]
+  );
+
   const amount = splitAmount(total);
 
   async function onRefresh() {
@@ -469,13 +529,13 @@ export default function HomeScreen() {
             tenerle in colonna una dopo l'altra faceva scorrere mezza Home
             per arrivare alla seconda. */}
         <View style={[styles.seg, { backgroundColor: palette.surface2 }]}>
-          {(["uscite", "entrate"] as Tab[]).map((value) => {
-            const on = tab === value;
+          {(["uscite", "entrate"] as MoneyMode[]).map((value) => {
+            const on = mode === value;
             return (
               <TouchableOpacity
                 key={value}
                 style={[styles.segItem, on && { backgroundColor: palette.ground }]}
-                onPress={() => setTab(value)}
+                onPress={() => onModeChange(value)}
                 accessibilityRole="button"
                 accessibilityState={{ selected: on }}
               >
@@ -514,48 +574,106 @@ export default function HomeScreen() {
                 veri, solo non di adesso. */}
             {staleLabel && <StaleNote label={staleLabel} reason={staleReason} onRetry={onRefresh} />}
 
-            {tab === "uscite" ? (
+            {mode === "uscite" ? (
               <>
                 {gauge !== null ? (
-                  // Il semicerchio dice quanto, su quanto e se sei in
-                  // anticipo; la colonna accanto usa lo spazio che l'anello
-                  // intero sprecava, con i numeri che prima non c'erano.
-                  <View style={styles.gaugeRow}>
-                    <SemiGauge
-                      width={150}
-                      outer={{
-                        segments: [{ value: total, color: palette.accent }],
-                        max: gauge.limit,
-                      }}
-                      paceRatio={elapsedDays / daysInMonth}
-                    >
-                      <Text style={[styles.gaugeValue, { color: palette.ink }]}>
-                        {amount.whole}
-                        <Text style={[styles.gaugeCents, { color: palette.ink3 }]}>
-                          {amount.cents}
-                        </Text>
-                      </Text>
-                      <Text
-                        style={[
-                          styles.gaugeNote,
-                          {
-                            color:
-                              gauge.status.remaining >= 0
-                                ? palette.good
-                                : palette.over,
-                          },
-                        ]}
+                  // Il semicerchio riempie la larghezza del contenuto invece
+                  // di stare stretto in una riga: dice le stesse tre cose di
+                  // prima ma occupa lo spazio che merita, e le statistiche
+                  // secondarie stanno sotto invece che di lato.
+                  <View style={styles.gaugeBlock}>
+                    <View style={styles.gaugeCenter}>
+                      <SemiGauge
+                        width={gaugeWidth}
+                        stroke={16}
+                        outer={{
+                          segments: [{ value: total, color: palette.accent }],
+                          max: gauge.limit,
+                        }}
+                        // L'investito sulla stessa scala del limite: sono
+                        // entrambi denaro uscito dal conto questo mese, e
+                        // affiancarli sullo stesso fondo scala e' l'unico modo
+                        // di confrontarli senza calcoli.
+                        inner={
+                          monthlyInvested > 0
+                            ? {
+                                segments: [
+                                  { value: monthlyInvested, color: palette.invest },
+                                ],
+                                max: gauge.limit,
+                              }
+                            : undefined
+                        }
+                        markRatio={
+                          fixedCostsTotal > 0
+                            ? fixedCostsTotal / gauge.limit
+                            : null
+                        }
+                        markColor={palette.ink}
+                        endLabel={formatAmount(gauge.limit)}
                       >
-                        {gauge.status.remaining >= 0
-                          ? `restano ${formatAmount(gauge.status.remaining)}`
-                          : `oltre di ${formatAmount(-gauge.status.remaining)}`}
-                      </Text>
-                    </SemiGauge>
+                        <Text style={[styles.gaugeValue, { color: palette.ink }]}>
+                          {amount.whole}
+                          <Text style={[styles.gaugeCents, { color: palette.ink3 }]}>
+                            {amount.cents}
+                          </Text>
+                        </Text>
+                        <Text
+                          style={[
+                            styles.gaugeNote,
+                            {
+                              color:
+                                gauge.status.remaining >= 0
+                                  ? palette.good
+                                  : palette.over,
+                            },
+                          ]}
+                        >
+                          {gauge.status.remaining >= 0
+                            ? `restano ${formatAmount(gauge.status.remaining)}`
+                            : `oltre di ${formatAmount(-gauge.status.remaining)}`}
+                        </Text>
+                      </SemiGauge>
+                    </View>
 
-                    <View style={styles.stats}>
+                    {/* Una tacca senza nome viene letta a caso — questa era
+                        gia' stata scambiata per i costi fissi mentre segnava
+                        il ritmo. Ora segna davvero i costi fissi, e lo dice. */}
+                    <View style={styles.gaugeKey}>
+                      {fixedCostsTotal > 0 && (
+                        <View style={styles.gaugeKeyItem}>
+                          <View
+                            style={[styles.keyTick, { backgroundColor: palette.ink }]}
+                          />
+                          <Text style={[styles.keyText, { color: palette.ink3 }]}>
+                            costi fissi {formatAmount(fixedCostsTotal)}
+                          </Text>
+                        </View>
+                      )}
+                      {monthlyInvested > 0 && (
+                        <View style={styles.gaugeKeyItem}>
+                          <View
+                            style={[styles.keyDot, { backgroundColor: palette.invest }]}
+                          />
+                          <Text style={[styles.keyText, { color: palette.ink3 }]}>
+                            investito {formatAmount(monthlyInvested)}
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+
+                    <View style={styles.statsRow}>
+                      {/* Due numeri e non uno: la media che include mutuo e
+                          rate dice quanto e' pesato il mese, quella senza dice
+                          quanto stai spendendo *tu* giorno per giorno — ed e'
+                          la seconda quella su cui si puo' agire. */}
                       <Stat
                         k="Al giorno"
                         v={`${compactAmount(total / Math.max(elapsedDays, 1))} €`}
+                        sub={`${compactAmount(
+                          Math.max(total - fixedCostsTotal, 0) /
+                            Math.max(elapsedDays, 1)
+                        )} € senza fissi`}
                       />
                       {projection !== null && (
                         <Stat
@@ -736,6 +854,9 @@ export default function HomeScreen() {
                         Sui mesi
                       </Text>
                       <MonthBars bars={spesaBars} color={palette.accent} />
+                      <Text style={[styles.cardFoot, { color: palette.ink3 }]}>
+                        media {formatAmount(monthBarsAverage(spesaBars))}
+                      </Text>
                     </View>
                   )}
                 </View>
@@ -847,8 +968,8 @@ export default function HomeScreen() {
                         spese gli hanno gia' dato. */}
                     <View style={{ alignItems: "center" }}>
                       <SemiGauge
-                        width={250}
-                        stroke={13}
+                        width={gaugeWidth}
+                        stroke={16}
                         outer={{
                           segments: incomeSources.map((source, index) => ({
                             value: source.amount,
@@ -856,8 +977,18 @@ export default function HomeScreen() {
                           })),
                           max: monthlyIncome,
                         }}
+                        // L'investito segue lo speso sullo stesso anello: sono
+                        // due morsi diversi allo stesso importo entrato, e
+                        // messi in fila la loro somma e' quanto e' gia'
+                        // uscito. Un terzo cerchio direbbe la stessa cosa
+                        // costringendo a confrontare due raggi.
                         inner={{
-                          segments: [{ value: total, color: palette.accent }],
+                          segments: [
+                            { value: total, color: palette.accent },
+                            ...(monthlyInvested > 0
+                              ? [{ value: monthlyInvested, color: palette.invest }]
+                              : []),
+                          ],
                           max: monthlyIncome,
                         }}
                       >
@@ -900,6 +1031,45 @@ export default function HomeScreen() {
                           </Text>
                         </View>
                       ))}
+
+                      {/* L'anello interno aveva due colori senza nome: la
+                          legenda elencava solo le fonti di introito, cioe'
+                          l'anello esterno, e chi guardava doveva indovinare
+                          cos'era il morso dentro. */}
+                      <View style={styles.legendRow}>
+                        <View
+                          style={[styles.legendDot, { backgroundColor: palette.accent }]}
+                        />
+                        <Text
+                          style={[styles.legendName, { color: palette.ink }]}
+                          numberOfLines={1}
+                        >
+                          Spese
+                        </Text>
+                        <Text style={[styles.legendVal, { color: palette.ink2 }]}>
+                          −{formatAmount(total)}
+                        </Text>
+                      </View>
+
+                      {monthlyInvested > 0 && (
+                        <View style={styles.legendRow}>
+                          <View
+                            style={[
+                              styles.legendDot,
+                              { backgroundColor: palette.invest },
+                            ]}
+                          />
+                          <Text
+                            style={[styles.legendName, { color: palette.ink }]}
+                            numberOfLines={1}
+                          >
+                            Investimenti
+                          </Text>
+                          <Text style={[styles.legendVal, { color: palette.ink2 }]}>
+                            −{formatAmount(monthlyInvested)}
+                          </Text>
+                        </View>
+                      )}
                     </View>
 
                     <View>
@@ -918,7 +1088,7 @@ export default function HomeScreen() {
                     </Text>
                     <TouchableOpacity
                       style={[styles.emptyAction, { borderColor: palette.hairline }]}
-                      onPress={() => openSettings("income")}
+                      onPress={openAddIncome}
                     >
                       <Icon name="plus" size={14} color={palette.accent} />
                       <Text style={[styles.emptyActionText, { color: palette.accent }]}>
@@ -930,9 +1100,17 @@ export default function HomeScreen() {
 
                 {introitiBars.length > 1 && (
                   <View>
-                    <Text style={[styles.label, { color: palette.ink3 }]}>
-                      Entrate mese per mese · {new Date().getFullYear()}
-                    </Text>
+                    {/* La media sta qui e non piu' come riga sul grafico: era
+                        un riferimento che nessun mese toccava, e occupava lo
+                        spazio dei valori veri sulle barre. */}
+                    <View style={styles.sectionHead}>
+                      <Text style={[styles.label, { color: palette.ink3 }]}>
+                        Entrate mese per mese · {new Date().getFullYear()}
+                      </Text>
+                      <Text style={[styles.sectionMeta, { color: palette.ink3 }]}>
+                        media {formatAmount(monthBarsAverage(introitiBars))}
+                      </Text>
+                    </View>
                     <MonthBars
                       bars={introitiBars}
                       color={palette.good}
@@ -943,6 +1121,35 @@ export default function HomeScreen() {
                       bars={introitiBars}
                       suffix={String(new Date().getFullYear())}
                     />
+                  </View>
+                )}
+
+                {recentIncomes.length > 0 && (
+                  <View>
+                    <Text style={[styles.label, { color: palette.ink3 }]}>
+                      Ultimi introiti
+                    </Text>
+                    {recentIncomes.map((income, index) => (
+                      <View
+                        key={`${income.occurred_at}-${income.label}-${index}`}
+                        style={[styles.incomeRow, { borderBottomColor: palette.hairline }]}
+                      >
+                        <View style={{ flex: 1 }}>
+                          <Text
+                            style={[styles.incomeName, { color: palette.ink }]}
+                            numberOfLines={1}
+                          >
+                            {income.label?.trim() || "Altro"}
+                          </Text>
+                          <Text style={[styles.incomeDate, { color: palette.ink3 }]}>
+                            {dayLabel(income.occurred_at)}
+                          </Text>
+                        </View>
+                        <Text style={[styles.incomeAmount, { color: palette.good }]}>
+                          +{formatAmount(Number(income.amount))}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
                 )}
               </>
@@ -964,12 +1171,25 @@ export default function HomeScreen() {
 }
 
 /** Numero secondario accanto al semicerchio: etichetta piccola, valore sopra. */
-function Stat({ k, v, tone }: { k: string; v: string; tone?: string }) {
+function Stat({
+  k,
+  v,
+  tone,
+  sub,
+}: {
+  k: string;
+  v: string;
+  tone?: string;
+  sub?: string;
+}) {
   const { palette } = useTheme();
   return (
     <View>
       <Text style={[styles.statKey, { color: palette.ink3 }]}>{k}</Text>
       <Text style={[styles.statValue, { color: tone ?? palette.ink }]}>{v}</Text>
+      {sub && (
+        <Text style={[styles.statSub, { color: palette.ink3 }]}>{sub}</Text>
+      )}
     </View>
   );
 }
@@ -1002,22 +1222,38 @@ const styles = StyleSheet.create({
   },
   segText: { ...type.bodyMedium, fontSize: 13 },
 
-  gaugeRow: { flexDirection: "row", alignItems: "center", gap: space.lg },
+  gaugeBlock: { gap: space.xl },
+  gaugeCenter: { alignItems: "center" },
   gaugeValue: {
     ...type.title,
-    fontSize: 26,
+    fontSize: 38,
     fontWeight: "500",
-    letterSpacing: -0.7,
+    letterSpacing: -1,
     fontVariant: ["tabular-nums"],
   },
-  gaugeCents: { fontSize: 16, fontWeight: "400" },
+  gaugeCents: { fontSize: 22, fontWeight: "400" },
   gaugeNote: {
-    ...type.small,
+    ...type.body,
     fontWeight: "500",
-    marginTop: 2,
+    marginTop: 4,
     fontVariant: ["tabular-nums"],
   },
-  stats: { flex: 1, gap: 12 },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: space.sm,
+  },
+  gaugeKey: {
+    flexDirection: "row",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: space.lg,
+    marginTop: -space.md,
+  },
+  gaugeKeyItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  keyTick: { width: 2.5, height: 11, borderRadius: 2 },
+  keyDot: { width: 7, height: 7, borderRadius: 4 },
+  keyText: { ...type.small, fontSize: 10.5, fontVariant: ["tabular-nums"] },
   statKey: {
     fontSize: 9.5,
     fontWeight: "600",
@@ -1030,6 +1266,25 @@ const styles = StyleSheet.create({
     marginTop: 1,
     fontVariant: ["tabular-nums"],
   },
+  statSub: { fontSize: 10, marginTop: 1, fontVariant: ["tabular-nums"] },
+
+  sectionHead: {
+    flexDirection: "row",
+    alignItems: "baseline",
+    justifyContent: "space-between",
+  },
+  sectionMeta: { ...type.small, fontVariant: ["tabular-nums"] },
+
+  incomeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    paddingVertical: 11,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  incomeName: { ...type.bodyMedium },
+  incomeDate: { ...type.small, marginTop: 2 },
+  incomeAmount: { ...type.amount, fontVariant: ["tabular-nums"] },
 
   halfRow: { flexDirection: "row", gap: space.md },
   card: {
@@ -1039,6 +1294,7 @@ const styles = StyleSheet.create({
     padding: 12,
   },
   cardLabel: { ...type.label, fontSize: 9.5, marginBottom: 9 },
+  cardFoot: { fontSize: 9.5, marginTop: 6, fontVariant: ["tabular-nums"] },
 
   legend: { gap: 9, marginTop: -space.sm },
   legendRow: { flexDirection: "row", alignItems: "center", gap: 9 },
