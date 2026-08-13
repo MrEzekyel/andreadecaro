@@ -110,17 +110,28 @@ function verifica(prezzi: Serie, riferimenti: { on_date: string; close_eur: numb
   };
 }
 
-Deno.serve(async () => {
+Deno.serve(async (req) => {
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
 
-  const { data: assets, error } = await supabase
+  // Il cron notturno non passa nessun parametro e gira su tutti gli asset,
+  // come sempre. `?asset_id=` e' il caso in piu': l'app lo chiama subito
+  // dopo aver creato un asset a prezzo pubblico, perche' senza uno storico
+  // non c'e' un prezzo a cui agganciare il primo investimento manuale che
+  // l'utente sta per registrare — altrimenti bisognerebbe aspettare la
+  // prossima notte per poter dire "ho comprato questo oggi".
+  const assetId = new URL(req.url).searchParams.get("asset_id");
+
+  let query = supabase
     .from("assets")
     .select("id, name, price_symbol, quote_currency")
     .eq("price_source", "yahoo")
     .eq("archived", false);
+  if (assetId) query = query.eq("id", assetId);
+
+  const { data: assets, error } = await query;
 
   if (error) {
     return new Response(JSON.stringify({ errore: error.message }), {

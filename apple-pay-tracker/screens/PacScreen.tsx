@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { AddAssetSheet } from "../components/AddAssetSheet";
 import { Icon } from "../components/Icon";
 import { Sheet } from "../components/Sheet";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
@@ -57,6 +58,7 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
   const { palette, dark } = useTheme();
 
   const [sheet, setSheet] = useState(false);
+  const [addingAsset, setAddingAsset] = useState(false);
   const [editing, setEditing] = useState<InvestmentRule | null>(null);
   const [assetId, setAssetId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
@@ -294,6 +296,18 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
               </TouchableOpacity>
             );
           })}
+
+          <TouchableOpacity
+            onPress={() => setAddingAsset(true)}
+            style={[styles.chip, { backgroundColor: palette.surface2 }]}
+          >
+            <View style={styles.chipNewInner}>
+              <Icon name="plus" size={13} color={palette.accent} />
+              <Text style={[styles.chipLabel, { color: palette.accent }]}>
+                Nuovo
+              </Text>
+            </View>
+          </TouchableOpacity>
         </View>
 
         <Text style={[styles.field, { color: palette.ink3 }]}>Importo</Text>
@@ -375,6 +389,16 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
           </Text>
         </TouchableOpacity>
       </Sheet>
+
+      <AddAssetSheet
+        visible={addingAsset}
+        onClose={() => setAddingAsset(false)}
+        assets={assets}
+        onCreated={(asset) => {
+          onSaved();
+          setAssetId(asset.id);
+        }}
+      />
     </SwipeBack>
   );
 }
@@ -479,6 +503,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   chipLabel: { ...type.small, fontWeight: "500" },
+  chipNewInner: { flexDirection: "row", alignItems: "center", gap: 4 },
   input: {
     borderRadius: radius.field,
     borderWidth: 1,

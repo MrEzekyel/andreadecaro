@@ -8,7 +8,7 @@ import React, {
 } from "react";
 import { firstError } from "./loadError";
 import { supabase } from "./supabase";
-import { Category, Merchant, Payment, Person } from "./types";
+import { Category, Instrument, Merchant, Payment, Person } from "./types";
 
 type DataContextValue = {
   categories: Category[];
@@ -17,6 +17,14 @@ type DataContextValue = {
   personById: (id: string | null) => Person | undefined;
   merchants: Merchant[];
   merchantById: (id: string | null) => Merchant | undefined;
+  /**
+   * La lista curata di strumenti (migrazione 0040). Caricata a parte e non
+   * dentro `firstError`: e' un acceleratore per la ricerca in fase di
+   * creazione asset, non un dato su cui si regge il resto dell'app — un suo
+   * fallimento non deve poter bloccare categorie, persone ed esercenti, che
+   * servono ovunque.
+   */
+  instruments: Instrument[];
   /**
    * Il nome da mostrare in un elenco: l'insegna se la spesa viene da un punto
    * vendita di un gruppo, altrimenti il nome della spesa cosi' com'e'.
@@ -72,19 +80,22 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
   const [categories, setCategories] = useState<Category[]>([]);
   const [people, setPeople] = useState<Person[]>([]);
   const [merchants, setMerchants] = useState<Merchant[]>([]);
+  const [instruments, setInstruments] = useState<Instrument[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
-    const [categoriesResult, peopleResult, merchantsResult] = await Promise.all([
-      supabase.from("categories").select("*").order("sort_order"),
-      supabase.from("people").select("*").order("name"),
-      // Paginato: gli esercenti crescono di una riga per ogni posto nuovo in
-      // cui si paga, e PostgREST tronca a 1000 righe **senza dare errore**.
-      // Oltre quella soglia il selettore smetterebbe di proporre gli esercenti
-      // piu' vecchi senza che niente lo segnali.
-      readAllMerchants(),
-    ]);
+    const [categoriesResult, peopleResult, merchantsResult, instrumentsResult] =
+      await Promise.all([
+        supabase.from("categories").select("*").order("sort_order"),
+        supabase.from("people").select("*").order("name"),
+        // Paginato: gli esercenti crescono di una riga per ogni posto nuovo in
+        // cui si paga, e PostgREST tronca a 1000 righe **senza dare errore**.
+        // Oltre quella soglia il selettore smetterebbe di proporre gli esercenti
+        // piu' vecchi senza che niente lo segnali.
+        readAllMerchants(),
+        supabase.from("instruments").select("*").order("sort_order"),
+      ]);
 
     const failure = firstError(categoriesResult, peopleResult, merchantsResult);
     setError(failure);
@@ -95,6 +106,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       setCategories((categoriesResult.data ?? []) as Category[]);
       setPeople((peopleResult.data ?? []) as Person[]);
       setMerchants((merchantsResult.data ?? []) as Merchant[]);
+    }
+    // Fuori da `firstError`: un fallimento qui non deve tenere l'app intera
+    // in errore per una lista che serve solo mentre si crea un asset.
+    if (!instrumentsResult.error) {
+      setInstruments((instrumentsResult.data ?? []) as Instrument[]);
     }
     setLoading(false);
   }, []);
@@ -157,6 +173,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       personById,
       merchants,
       merchantById,
+      instruments,
       brandLabel,
       reload,
       loading,
@@ -169,6 +186,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
       personById,
       merchants,
       merchantById,
+      instruments,
       brandLabel,
       reload,
       loading,

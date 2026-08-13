@@ -606,6 +606,65 @@ che non sono sue, ed è la superficie più delicata dell'app.
 - Lo storico viene dall'**esportazione operazioni di Trade Republic** (CSV con
   data, ISIN, quote, prezzo). `investments.external_id` tiene l'id operazione
   del broker, così si può riesportare e reimportare senza duplicare.
+
+### Creare asset e investimenti a mano
+
+Fino a qui `assets` si popolava solo scrivendo direttamente sul database:
+nessuna schermata creava un asset, e `investments` nasceva solo da un piano
+di accumulo o da un import backend. `AddAssetSheet` e `AddInvestmentSheet`
+chiudono quel buco.
+
+- **La ricerca dello strumento è ibrida e per nome, mai per ISIN** — la
+  maggior parte di chi investe non sa dove trovarlo. `instruments`
+  (migrazione 0040) è una lista curata di ~22 strumenti comuni fra chi
+  investe da un broker italiano, letta direttamente dal client (piccola,
+  nessuna RPC). Quando non trova niente, `InstrumentPicker` passa a Yahoo
+  Finance (`search-instruments?q=`, Edge Function). Se nemmeno quello basta,
+  l'utente inserisce nome e simbolo a mano.
+- **Nessun ISIN è scritto in `instruments`.** Ogni riga è stata verificata
+  dal vivo contro il ticker Yahoo prima di scrivere la migrazione (Bash era
+  bloccato da un 429 di Yahoo sull'IP del sandbox — la verifica è passata da
+  una Edge Function scratch, stessa uscita di rete dell'app in produzione).
+  Un ISIN scritto a memoria sarebbe un dato finanziario falso con l'aria di
+  essere vero: peggio di non averlo. La ricerca è quindi solo su nome e
+  simbolo.
+- **Un asset non si salva mai senza una verifica dal vivo del simbolo**
+  (`search-instruments?probe=`, in `lib/instruments.ts` →
+  `probeInstrument`), anche per un risultato della lista curata: un ticker
+  giusto ieri può essere delistato oggi, e un asset creato sulla fiducia
+  smetterebbe di aggiornarsi in silenzio — visibile solo mesi dopo come "il
+  grafico è fermo". Per i fondi private market non c'è ricerca né probe:
+  nessuna fonte automatica esiste per un ELTIF (vedi sopra), quindi nascono
+  già a valorizzazione manuale.
+- **`sync-prices` accetta `?asset_id=` oltre alla chiamata senza parametri
+  del cron.** Un asset appena creato non ha ancora nessuna riga in
+  `asset_prices` (il cron notturno non è ancora passato), e senza uno
+  storico non c'è un prezzo a cui agganciare il primo investimento manuale
+  nella stessa sessione in cui è nato l'asset. `AddAssetSheet` chiama questo
+  endpoint scoped subito dopo l'insert, prima di restituire l'asset a chi
+  l'ha creato. Verificato che la chiamata senza parametri (il cron) continua
+  a processare tutti gli asset come prima.
+- **Un acquisto o una vendita manuali non si salvano mai senza un prezzo.**
+  `buildPositions()` somma l'importo di un'operazione `settled` alle quote
+  possedute solo se porta `quantity`: senza, l'importo finirebbe comunque nel
+  capitale versato ma le quote resterebbero a zero, e `closed = quantity <
+  1e-9` farebbe apparire la posizione **chiusa** nonostante il denaro sia
+  uscito — una perdita del 100% inventata, il verso più pericoloso di
+  sbagliare qui. Per questo `AddInvestmentSheet` cerca sempre un prezzo alla
+  data scelta (`asset_prices`, il più recente non successivo) prima di
+  salvare un buy/sell, e blocca il salvataggio se non lo trova, invece di
+  inventare quote da un prezzo che non conosce. I dividendi non hanno questo
+  vincolo: non toccano `quantity`.
+- **Il tasto centrale della tabbar, su Investimenti, è azzurro
+  (`palette.invest`) e apre "Nuovo investimento"**, non più "Nuova spesa":
+  prima seguiva il comportamento di sempre anche lì, ed era un errore
+  categoriale aprire un foglio di spesa dalla scheda Investimenti, non solo
+  un default poco specifico. Il foglio vive dentro `PortfolioScreen`
+  (l'unico posto che ha già gli asset caricati via `usePortfolio`), aperto
+  da `App.tsx` tramite un contatore (`investmentNonce`, stesso schema di
+  `settingsNonce`) e non da un booleano, così il tasto lo riapre anche da
+  una sotto-pagina (dettaglio asset, PAC) senza dover tornare alla radice.
+
 ### Export dei dati
 
 - `screens/ExportScreen.tsx` (Impostazioni → Esporta i dati) produce **un CSV

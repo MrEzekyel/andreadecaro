@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { AddInvestmentSheet } from "../components/AddInvestmentSheet";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { ScreenHeader } from "../components/ScreenHeader";
@@ -78,7 +79,14 @@ function RangePicker({
   );
 }
 
-export default function PortfolioScreen() {
+type Props = {
+  /** Cambia ogni volta che il tasto centrale della tabbar chiede un nuovo
+   *  investimento mentre si e' gia' su questa scheda — lo stesso schema di
+   *  `settingsNonce` in App.tsx. */
+  addNonce?: number;
+};
+
+export default function PortfolioScreen({ addNonce }: Props) {
   const { palette } = useTheme();
   const portfolio = usePortfolio();
   const { positions, totals, series, xirr, rules, loading, error, staleLabel } =
@@ -93,6 +101,21 @@ export default function PortfolioScreen() {
   const [openAsset, setOpenAsset] = useState<Position | null>(null);
   const [openGroup, setOpenGroup] = useState<AssetGroup | null>(null);
   const [page, setPage] = useState<"root" | "analysis" | "pac">("root");
+  const [addingInvestment, setAddingInvestment] = useState(false);
+
+  // Il tasto "+" della tabbar apre questo foglio da qualunque pagina interna
+  // (dettaglio asset, PAC, analisi) senza dover prima tornare alla radice.
+  // Un confronto col valore precedente, non solo "e' definito": il nonce
+  // arriva sempre valorizzato (0 al primo render), e senza questo confronto
+  // il foglio si aprirebbe da solo ogni volta che si arriva sulla scheda
+  // Investimenti, non solo quando si preme il tasto.
+  const previousAddNonce = React.useRef(addNonce);
+  useEffect(() => {
+    if (addNonce !== undefined && addNonce !== previousAddNonce.current) {
+      setAddingInvestment(true);
+    }
+    previousAddNonce.current = addNonce;
+  }, [addNonce]);
 
   const visible = useMemo(() => sliceSeries(series, range), [series, range]);
   const points = useMemo(
@@ -130,24 +153,40 @@ export default function PortfolioScreen() {
   const amount = splitAmount(heroValue);
   const gainColor = heroGain >= 0 ? palette.good : palette.over;
 
+  // Renderizzato una volta sola, a prescindere da quale sotto-pagina e'
+  // aperta: il tasto "+" della tabbar deve poter aprirlo anche dal dettaglio
+  // di un asset o dai piani di accumulo, non solo dalla radice.
+  const addSheet = (
+    <AddInvestmentSheet
+      visible={addingInvestment}
+      onClose={() => setAddingInvestment(false)}
+      onSaved={portfolio.reload}
+      assets={portfolio.assets}
+      reloadAssets={portfolio.reload}
+    />
+  );
+
   if (openAsset) {
     return (
-      <AssetDetailScreen
-        position={openAsset}
-        investments={portfolio.investments.filter(
-          (op) => op.asset_id === openAsset.asset.id
-        )}
-        onBack={() => setOpenAsset(null)}
-        onSaved={async () => {
-          const fresh = await portfolio.reload();
-          // `null` quando la ricarica non e' riuscita: si tiene la posizione
-          // che l'utente ha davanti invece di svuotare la schermata.
-          const updated = fresh?.positions.find(
-            (p) => p.asset.id === openAsset.asset.id
-          );
-          if (updated) setOpenAsset(updated);
-        }}
-      />
+      <>
+        <AssetDetailScreen
+          position={openAsset}
+          investments={portfolio.investments.filter(
+            (op) => op.asset_id === openAsset.asset.id
+          )}
+          onBack={() => setOpenAsset(null)}
+          onSaved={async () => {
+            const fresh = await portfolio.reload();
+            // `null` quando la ricarica non e' riuscita: si tiene la posizione
+            // che l'utente ha davanti invece di svuotare la schermata.
+            const updated = fresh?.positions.find(
+              (p) => p.asset.id === openAsset.asset.id
+            );
+            if (updated) setOpenAsset(updated);
+          }}
+        />
+        {addSheet}
+      </>
     );
   }
 
@@ -157,36 +196,45 @@ export default function PortfolioScreen() {
 
   if (gruppoAperto) {
     return (
-      <GroupDetailScreen
-        group={gruppoAperto}
-        assets={portfolio.assets}
-        investments={portfolio.investments}
-        onOpenAsset={setOpenAsset}
-        onBack={() => setOpenGroup(null)}
-      />
+      <>
+        <GroupDetailScreen
+          group={gruppoAperto}
+          assets={portfolio.assets}
+          investments={portfolio.investments}
+          onOpenAsset={setOpenAsset}
+          onBack={() => setOpenGroup(null)}
+        />
+        {addSheet}
+      </>
     );
   }
 
   if (page === "analysis") {
     return (
-      <AnalysisScreen
-        positions={open}
-        groups={groups}
-        total={totals.value}
-        onOpenAsset={setOpenAsset}
-        onBack={() => setPage("root")}
-      />
+      <>
+        <AnalysisScreen
+          positions={open}
+          groups={groups}
+          total={totals.value}
+          onOpenAsset={setOpenAsset}
+          onBack={() => setPage("root")}
+        />
+        {addSheet}
+      </>
     );
   }
 
   if (page === "pac") {
     return (
-      <PacScreen
-        rules={rules}
-        assets={portfolio.assets}
-        onBack={() => setPage("root")}
-        onSaved={portfolio.reload}
-      />
+      <>
+        <PacScreen
+          rules={rules}
+          assets={portfolio.assets}
+          onBack={() => setPage("root")}
+          onSaved={portfolio.reload}
+        />
+        {addSheet}
+      </>
     );
   }
 
@@ -196,17 +244,21 @@ export default function PortfolioScreen() {
   // il portafoglio direbbe "0,00 €" — e allora l'errore prende tutto il posto.
   if (error && positions.length === 0) {
     return (
-      <ScrollView
-        style={{ backgroundColor: palette.ground }}
-        contentContainerStyle={styles.content}
-      >
-        <ScreenHeader title="Investimenti" />
-        <LoadError message={error} onRetry={portfolio.reload} />
-      </ScrollView>
+      <>
+        <ScrollView
+          style={{ backgroundColor: palette.ground }}
+          contentContainerStyle={styles.content}
+        >
+          <ScreenHeader title="Investimenti" />
+          <LoadError message={error} onRetry={portfolio.reload} />
+        </ScrollView>
+        {addSheet}
+      </>
     );
   }
 
   return (
+    <>
     <ScrollView
       style={{ backgroundColor: palette.ground }}
       contentContainerStyle={styles.content}
@@ -381,6 +433,8 @@ export default function PortfolioScreen() {
         </View>
       )}
     </ScrollView>
+    {addSheet}
+    </>
   );
 }
 

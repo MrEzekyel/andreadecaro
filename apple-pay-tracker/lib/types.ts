@@ -218,6 +218,28 @@ export type AssetPrice = {
   source: "yahoo" | "manual" | "fill";
 };
 
+/**
+ * Uno strumento della lista curata (migrazione 0040): un acceleratore per la
+ * ricerca "per nome" nella creazione di un asset, non un catalogo completo.
+ * Quando la ricerca qui non trova niente, l'app passa a Yahoo Finance
+ * (`lib/instruments.ts` → `searchInstrumentsOnline`).
+ */
+export type Instrument = {
+  symbol: string;
+  name: string;
+  currency: string;
+  asset_group: "conto_titoli" | "crypto";
+  sort_order: number;
+};
+
+/** Un candidato trovato su Yahoo Finance: da verificare prima di salvarlo. */
+export type InstrumentCandidate = {
+  symbol: string;
+  name: string;
+  currency: string | null;
+  exchange: string | null;
+};
+
 export type Investment = {
   id: string;
   user_id: string;

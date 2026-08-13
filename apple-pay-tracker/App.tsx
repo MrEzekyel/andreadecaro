@@ -53,6 +53,11 @@ function Shell() {
   const [moneyMode, setMoneyMode] = useState<MoneyMode>("uscite");
   const [adding, setAdding] = useState(false);
   const [addingIncome, setAddingIncome] = useState(false);
+  // Il tasto centrale, quando si e' su Investimenti, non apre un foglio qui:
+  // lo fa aprire dentro `PortfolioScreen`, che e' l'unico posto che ha gia'
+  // gli asset caricati (`usePortfolio`). Cambia a ogni pressione, mai
+  // `undefined`, cosi' lo schermo lo distingue da "non ho ancora premuto".
+  const [investmentNonce, setInvestmentNonce] = useState(0);
   const [reloadKey, setReloadKey] = useState(0);
   const [settingsPage, setSettingsPage] = useState<SettingsPage>("root");
   // Cambia a ogni richiesta di apertura, anche verso la stessa pagina: e' il
@@ -68,11 +73,15 @@ function Shell() {
   const openAddIncome = useCallback(() => setAddingIncome(true), []);
 
   // Il tasto centrale segue quello che si sta guardando su Home o su
-  // Movimenti: su Entrate aggiunge un introito, altrimenti una spesa. Sulle
-  // altre schede (Statistiche, Investimenti) non c'e' un Uscite/Entrate da
-  // seguire, quindi resta il comportamento di sempre: aggiunge una spesa.
+  // Movimenti: su Entrate aggiunge un introito, altrimenti una spesa. Su
+  // Statistiche non c'e' un Uscite/Entrate da seguire, resta il
+  // comportamento di sempre (aggiunge una spesa). Su Investimenti seguiva lo
+  // stesso comportamento fino a quando l'inserimento manuale non e'
+  // esistito: aprire "Nuova spesa" da quella scheda era un errore
+  // categoriale, non solo un default poco specifico.
   const addingIncomeTarget =
     (tab === "home" || tab === "movements") && moneyMode === "entrate";
+  const addingInvestmentTarget = tab === "portfolio";
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.ground }]}>
@@ -85,7 +94,7 @@ function Shell() {
             <MovementsScreen mode={moneyMode} onModeChange={setMoneyMode} />
           )}
           {tab === "stats" && <StatsScreen />}
-          {tab === "portfolio" && <PortfolioScreen />}
+          {tab === "portfolio" && <PortfolioScreen addNonce={investmentNonce} />}
           {tab === "settings" && (
             <SettingsScreen initialPage={settingsPage} openNonce={settingsNonce} />
           )}
@@ -109,13 +118,25 @@ function Shell() {
           <TouchableOpacity
             style={[
               styles.fab,
-              { backgroundColor: addingIncomeTarget ? palette.good : palette.accent },
+              {
+                backgroundColor: addingInvestmentTarget
+                  ? palette.invest
+                  : addingIncomeTarget
+                    ? palette.good
+                    : palette.accent,
+              },
             ]}
-            onPress={() =>
-              addingIncomeTarget ? setAddingIncome(true) : setAdding(true)
-            }
+            onPress={() => {
+              if (addingInvestmentTarget) setInvestmentNonce((v) => v + 1);
+              else if (addingIncomeTarget) setAddingIncome(true);
+              else setAdding(true);
+            }}
             accessibilityLabel={
-              addingIncomeTarget ? "Aggiungi introito" : "Aggiungi spesa"
+              addingInvestmentTarget
+                ? "Aggiungi investimento"
+                : addingIncomeTarget
+                  ? "Aggiungi introito"
+                  : "Aggiungi spesa"
             }
           >
             <Icon name="plus" size={21} color={palette.onAccent} strokeWidth={1.9} />
