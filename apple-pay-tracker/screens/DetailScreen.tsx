@@ -72,7 +72,21 @@ const SCOPE_OPTIONS = [
 
 export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
   const { palette, dark } = useTheme();
-  const { categoryById } = useData();
+  const { categoryById, merchants, merchantById } = useData();
+
+  /**
+   * L'insegna aperta e tutti i suoi punti vendita.
+   *
+   * Aprendo "McDonald's" ci si aspetta di vedere quanto si e' speso da
+   * McDonald's, non solo nell'unico punto vendita che porta esattamente quel
+   * nome: senza questo, il totale del gruppo sarebbe sistematicamente in
+   * difetto e non ci sarebbe niente a segnalarlo.
+   */
+  const merchantFamily = useMemo(() => {
+    if (target.kind !== "merchant") return [];
+    const brandId = merchantById(target.id)?.parent_id ?? target.id;
+    return [brandId, ...merchants.filter((m) => m.parent_id === brandId).map((m) => m.id)];
+  }, [target, merchants, merchantById]);
 
   const [payments, setPayments] = useState<Payment[]>([]);
   const [merchant, setMerchant] = useState<Merchant | null>(null);
@@ -101,7 +115,7 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
       .order("occurred_at", { ascending: false });
 
     if (target.kind === "merchant") {
-      query = query.eq("merchant_id", target.id);
+      query = query.in("merchant_id", merchantFamily);
     } else if (target.id === null) {
       // Le spese senza categoria si filtrano con IS NULL, non con "= null".
       query = query.is("category_id", null);
@@ -150,7 +164,7 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
     setMerchantNames(
       new Map((allMerchants ?? []).map((m) => [m.id, m.display_name]))
     );
-  }, [target]);
+  }, [target, merchantFamily]);
 
   useEffect(() => {
     load();
@@ -232,10 +246,11 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
       ) {
         continue;
       }
-      totals.set(
-        row.merchant_id,
-        (totals.get(row.merchant_id) ?? 0) + Number(row.effective_amount)
-      );
+      // Il confronto e' fra insegne: lasciare i punti vendita separati
+      // spezzerebbe in tre fette una che dovrebbe essere una sola, e
+      // l'insegna aperta risulterebbe piu' piccola delle sue concorrenti.
+      const key = merchantById(row.merchant_id)?.parent_id ?? row.merchant_id;
+      totals.set(key, (totals.get(key) ?? 0) + Number(row.effective_amount));
     }
 
     return Array.from(totals.entries())
@@ -245,7 +260,7 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
         name: merchantNames.get(merchantId) ?? "Sconosciuto",
       }))
       .sort((a, b) => b.total - a.total);
-  }, [siblingRows, merchantNames, shareScope, shareMonth]);
+  }, [siblingRows, merchantNames, merchantById, shareScope, shareMonth]);
 
   const accent =
     target.kind === "category"
@@ -506,6 +521,9 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
                   payment={payment}
                   category={categoryById(payment.category_id)}
                   onPress={() => onOpenPayment(payment)}
+                  // Dentro un'insegna il nome preciso e' l'unica cosa che
+                  // distingue una riga dall'altra.
+                  exactName={target.kind === "merchant"}
                 />
               ))}
             </View>

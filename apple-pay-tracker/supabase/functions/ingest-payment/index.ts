@@ -429,49 +429,30 @@ Deno.serve(async (req) => {
   }
 
   // ── Esercente ─────────────────────────────────────────────────────────────
-  // Cerca l'esercente gia' noto, altrimenti lo crea. La riga porta con se'
-  // la categoria scelta dall'utente, se l'ha gia' corretta in passato.
+  // `resolve_merchant()` (migrazione 0036) trova l'esercente o lo crea, e lo
+  // attacca alla sua insegna: "McDonald's Dragona" e "McDonald's Infernetto"
+  // finiscono sotto "McDonald's" invece di restare due voci scollegate.
+  //
+  // La stessa funzione la chiamano il foglio "Nuova spesa" e il recupero da
+  // file. Prima la logica stava in tre copie, e tre copie di una regola di
+  // raggruppamento non possono che divergere: il risultato sarebbe stato un
+  // gruppo diverso a seconda di *da dove* e' entrata la spesa. La gestione
+  // del 23505 sparisce con loro, perche' ora sta dentro la funzione (`on
+  // conflict do update`).
   let merchantId: string | null = null;
   let categoryId: string | null = null;
 
-  const { data: existingMerchant } = await supabase
-    .from("merchants")
-    .select("id, category_id")
-    .eq("user_id", userId)
-    .eq("normalized_name", merchantNormalized)
-    .maybeSingle();
+  const { data: resolved, error: resolveError } = await supabase
+    .rpc("resolve_merchant", { p_user_id: userId, p_name: merchantRaw });
 
-  if (existingMerchant) {
-    merchantId = existingMerchant.id;
-    categoryId = existingMerchant.category_id;
+  if (resolveError) {
+    // Senza esercente la spesa entra lo stesso: perderla sarebbe peggio, e
+    // resta collegabile in seguito dal nome grezzo.
+    console.error("resolve_merchant failed", resolveError);
   } else {
-    const { data: created, error: merchantError } = await supabase
-      .from("merchants")
-      .insert({
-        user_id: userId,
-        normalized_name: merchantNormalized,
-        display_name: merchantRaw,
-      })
-      .select("id, category_id")
-      .single();
-
-    // Una richiesta concorrente puo' aver creato lo stesso esercente:
-    // in quel caso rileggo la riga vincente invece di fallire.
-    if (merchantError?.code === "23505") {
-      const { data: raced } = await supabase
-        .from("merchants")
-        .select("id, category_id")
-        .eq("user_id", userId)
-        .eq("normalized_name", merchantNormalized)
-        .maybeSingle();
-      merchantId = raced?.id ?? null;
-      categoryId = raced?.category_id ?? null;
-    } else if (merchantError) {
-      console.error("merchant upsert failed", merchantError);
-    } else {
-      merchantId = created.id;
-      categoryId = created.category_id;
-    }
+    const row = (resolved ?? [])[0];
+    merchantId = row?.merchant_id ?? null;
+    categoryId = row?.effective_category_id ?? null;
   }
 
   // ── Categoria ─────────────────────────────────────────────────────────────

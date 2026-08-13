@@ -1,5 +1,6 @@
 import React from "react";
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount } from "../lib/format";
 import { categoryColor, radius, tint, type } from "../lib/theme";
@@ -10,10 +11,24 @@ type Props = {
   payment: Payment;
   category: Category | undefined;
   onPress: () => void;
+  /**
+   * Mostra il punto vendita invece dell'insegna.
+   *
+   * Serve dentro il dettaglio di un'insegna, dove ogni riga porterebbe
+   * altrimenti lo stesso nome ripetuto: li' l'unica cosa che distingue una
+   * spesa dall'altra e' proprio in quale McDonald's si e' stati.
+   */
+  exactName?: boolean;
 };
 
-export function PaymentRow({ payment, category, onPress }: Props) {
+export function PaymentRow({ payment, category, onPress, exactName }: Props) {
   const { palette, dark } = useTheme();
+  const { brandLabel } = useData();
+
+  // In elenco si legge l'insegna: "McDonald's" tre volte in una settimana
+  // dice qualcosa, "McDonald's Cristoforo Col" ripetuto con tre code diverse
+  // fa sembrare tre posti differenti.
+  const name = exactName ? payment.merchant_name : brandLabel(payment);
 
   const color = category
     ? categoryColor(category.color, dark)
@@ -28,7 +43,7 @@ export function PaymentRow({ payment, category, onPress }: Props) {
       style={styles.row}
       onPress={onPress}
       accessibilityRole="button"
-      accessibilityLabel={`${payment.merchant_name}, ${formatAmount(
+      accessibilityLabel={`${name}, ${formatAmount(
         payment.amount
       )}, ${categoryName}`}
     >
@@ -42,7 +57,7 @@ export function PaymentRow({ payment, category, onPress }: Props) {
             style={[styles.name, { color: palette.ink }]}
             numberOfLines={1}
           >
-            {payment.merchant_name}
+            {name}
           </Text>
           {isRecurring && (
             <Icon

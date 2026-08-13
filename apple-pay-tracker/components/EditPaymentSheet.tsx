@@ -15,10 +15,12 @@ import { useTheme } from "../lib/ThemeContext";
 import { formatDate } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
+import { resolveMerchant } from "../lib/merchants";
 import { Payment } from "../lib/types";
 import { CardPicker } from "./CardPicker";
 import { CategoryPicker } from "./CategoryPicker";
 import { Icon } from "./Icon";
+import { MerchantPicker } from "./MerchantPicker";
 import { Sheet } from "./Sheet";
 import {
   computeSplit,
@@ -51,7 +53,25 @@ export function EditPaymentSheet({
   focusSplit,
 }: Props) {
   const { palette, dark } = useTheme();
-  const { categoryById } = useData();
+  const { categoryById, merchants, merchantById, reload: reloadData } = useData();
+
+  /**
+   * L'insegna e tutti i suoi punti vendita.
+   *
+   * "Applica anche alle altre spese" e "ricorda" devono valere sul gruppo:
+   * chi corregge la categoria di un McDonald's intende tutti i McDonald's, e
+   * farlo valere solo per quello di Cristoforo Colombo vorrebbe dire
+   * ripetere la stessa correzione a ogni citta'.
+   */
+  function familyOf(merchantId: string | null): string[] {
+    if (!merchantId) return [];
+    const merchant = merchantById(merchantId);
+    const brandId = merchant?.parent_id ?? merchantId;
+    const children = merchants
+      .filter((m) => m.parent_id === brandId)
+      .map((m) => m.id);
+    return [brandId, ...children];
+  }
 
   const [merchant, setMerchant] = useState("");
   const [amount, setAmount] = useState("");
@@ -127,10 +147,11 @@ export function EditPaymentSheet({
         if (!cancelled) setSiblingCount(0);
         return;
       }
+      const family = familyOf(payment.merchant_id);
       const { count } = await supabase
         .from("payments")
         .select("id", { count: "exact", head: true })
-        .eq("merchant_id", payment.merchant_id)
+        .in("merchant_id", family)
         .neq("id", payment.id);
 
       if (!cancelled) setSiblingCount(count ?? 0);
@@ -170,10 +191,25 @@ export function EditPaymentSheet({
 
     setSaving(true);
 
+    // Cambiare il nome deve **spostare** la spesa, non solo riscriverne
+    // l'etichetta: prima l'aggiornamento toccava il solo `merchant_name`, e
+    // correggere un nome storpiato lasciava la spesa attaccata all'esercente
+    // sbagliato — visibile solo in "dove spendo di piu'", mesi dopo.
+    const nameChanged = merchant.trim() !== payment.merchant_name;
+    const { data: session } = nameChanged
+      ? await supabase.auth.getSession()
+      : { data: { session: null } };
+    const resolved =
+      nameChanged && session.session?.user.id
+        ? await resolveMerchant(session.session.user.id, merchant)
+        : null;
+    const targetMerchantId = resolved?.merchant_id ?? payment.merchant_id;
+
     const { error } = await supabase
       .from("payments")
       .update({
         merchant_name: merchant.trim(),
+        ...(resolved ? { merchant_id: resolved.merchant_id } : {}),
         amount: parsedAmount,
         category_id: categoryId,
         note: note.trim() || null,
@@ -228,12 +264,14 @@ export function EditPaymentSheet({
 
     // Le due scelte sono indipendenti: si possono volere entrambe, una sola,
     // o nessuna.
-    if (categoryChanged && payment.merchant_id) {
+    if (categoryChanged && targetMerchantId) {
+      const family = familyOf(targetMerchantId);
+
       if (applyToAll && siblingCount > 0) {
         const { error: bulkError } = await supabase
           .from("payments")
           .update({ category_id: categoryId })
-          .eq("merchant_id", payment.merchant_id)
+          .in("merchant_id", family)
           .neq("id", payment.id);
 
         if (bulkError) {
@@ -249,10 +287,13 @@ export function EditPaymentSheet({
       }
 
       if (remember) {
+        // Sull'insegna, non sul singolo punto vendita: cosi' vale anche per
+        // i negozi dello stesso gruppo in cui non si e' ancora mai stati.
+        const brandId = merchantById(targetMerchantId)?.parent_id ?? targetMerchantId;
         const { error: merchantError } = await supabase
           .from("merchants")
           .update({ category_id: categoryId })
-          .eq("id", payment.merchant_id);
+          .eq("id", brandId);
 
         if (merchantError) {
           setSaving(false);
@@ -268,6 +309,7 @@ export function EditPaymentSheet({
     }
 
     setSaving(false);
+    reloadData();
     onSaved();
     onClose();
   }
@@ -298,24 +340,20 @@ export function EditPaymentSheet({
   const newCategoryName = categoryById(categoryId)?.name ?? "Nessuna categoria";
   const showAsk = categoryChanged && !!payment?.merchant_id;
 
+  // Quando l'esercente fa parte di un'insegna la casella tocca tutti i suoi
+  // punti vendita: dire "questo esercente" sarebbe falso, e chi spunta la
+  // casella non saprebbe di star cambiando anche gli altri.
+  const family = familyOf(payment?.merchant_id ?? null);
+  const brandName =
+    family.length > 1 ? merchantById(family[0])?.display_name : undefined;
+
   return (
     <Sheet visible={visible} onClose={onClose} title="Modifica spesa">
       <View>
         <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
           Esercente
         </Text>
-        <TextInput
-          value={merchant}
-          onChangeText={setMerchant}
-          style={[
-            styles.input,
-            {
-              backgroundColor: palette.surface,
-              borderColor: palette.hairline,
-              color: palette.ink,
-            },
-          ]}
-        />
+        <MerchantPicker value={merchant} onChange={setMerchant} />
       </View>
 
       <View>
@@ -423,7 +461,11 @@ export function EditPaymentSheet({
             <Checkbox
               checked={applyToAll}
               onToggle={() => setApplyToAll((v) => !v)}
-              label={`Applica anche alle altre ${siblingCount} spese di questo esercente`}
+              label={
+                brandName
+                  ? `Applica anche alle altre ${siblingCount} spese di ${brandName}`
+                  : `Applica anche alle altre ${siblingCount} spese di questo esercente`
+              }
             />
           )}
 

@@ -14,8 +14,11 @@ import { useTheme } from "../lib/ThemeContext";
 import { formatDate } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
+import { useData } from "../lib/DataContext";
+import { resolveMerchant } from "../lib/merchants";
 import { CardPicker } from "./CardPicker";
 import { CategoryPicker } from "./CategoryPicker";
+import { MerchantPicker } from "./MerchantPicker";
 import { Sheet } from "./Sheet";
 
 type Props = {
@@ -30,17 +33,18 @@ function parseAmountInput(value: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-function normalizeName(value: string) {
-  return value.trim().toLowerCase().replace(/\s+/g, " ");
-}
-
 export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
   const { palette } = useTheme();
+  const { reload: reloadData } = useData();
 
   const [merchant, setMerchant] = useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
+  // Una categoria scelta a mano non deve essere sovrascritta scegliendo poi
+  // l'esercente dall'elenco: `null` da solo non distingue "non ho scelto" da
+  // "ho scelto Nessuna".
+  const [categoryTouched, setCategoryTouched] = useState(false);
   const [card, setCard] = useState("");
   const [occurredAt, setOccurredAt] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
@@ -51,47 +55,9 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
     setAmount("");
     setNote("");
     setCategoryId(null);
+    setCategoryTouched(false);
     setCard("");
     setOccurredAt(new Date());
-  }
-
-  /**
-   * Trova l'esercente o lo crea, cosi' anche le spese inserite a mano
-   * finiscono nei totali per esercente e possono ereditare la categoria
-   * ricordata in passato.
-   */
-  async function resolveMerchant(userId: string, displayName: string) {
-    const normalized = normalizeName(displayName);
-
-    const { data: existing } = await supabase
-      .from("merchants")
-      .select("id, category_id")
-      .eq("normalized_name", normalized)
-      .maybeSingle();
-
-    if (existing) return existing;
-
-    const { data: created, error } = await supabase
-      .from("merchants")
-      .insert({
-        user_id: userId,
-        normalized_name: normalized,
-        display_name: displayName.trim(),
-      })
-      .select("id, category_id")
-      .single();
-
-    if (error) {
-      // Se e' stato creato nel frattempo, rileggo la riga vincente.
-      const { data: raced } = await supabase
-        .from("merchants")
-        .select("id, category_id")
-        .eq("normalized_name", normalized)
-        .maybeSingle();
-      return raced ?? null;
-    }
-
-    return created;
   }
 
   async function save() {
@@ -115,17 +81,17 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
       return;
     }
 
-    const merchantRow = await resolveMerchant(userId, merchant);
+    const resolved = await resolveMerchant(userId, merchant);
 
     const { error } = await supabase.from("payments").insert({
       user_id: userId,
       amount: parsedAmount,
       merchant_raw: merchant.trim(),
       merchant_name: merchant.trim(),
-      merchant_id: merchantRow?.id ?? null,
+      merchant_id: resolved?.merchant_id ?? null,
       // Se non scegli una categoria, eredita quella gia' ricordata
-      // per questo esercente.
-      category_id: categoryId ?? merchantRow?.category_id ?? null,
+      // per questo esercente — o per la sua insegna.
+      category_id: categoryId ?? resolved?.effective_category_id ?? null,
       occurred_at: occurredAt.toISOString(),
       note: note.trim() || null,
       card_name: card.trim() || null,
@@ -139,6 +105,9 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
       return;
     }
 
+    // Un esercente nuovo deve comparire fra i suggerimenti del foglio
+    // successivo senza chiudere e riaprire l'app.
+    reloadData();
     reset();
     onSaved();
     onClose();
@@ -150,19 +119,12 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
         <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
           Esercente
         </Text>
-        <TextInput
+        <MerchantPicker
           value={merchant}
-          onChangeText={setMerchant}
-          placeholder="Es. Esselunga"
-          placeholderTextColor={palette.ink3}
-          style={[
-            styles.input,
-            {
-              backgroundColor: palette.surface,
-              borderColor: palette.hairline,
-              color: palette.ink,
-            },
-          ]}
+          onChange={setMerchant}
+          onPick={(_picked, categoryId) => {
+            if (!categoryTouched) setCategoryId(categoryId);
+          }}
         />
       </View>
 
@@ -217,7 +179,13 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
         <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
           Categoria
         </Text>
-        <CategoryPicker value={categoryId} onChange={setCategoryId} />
+        <CategoryPicker
+          value={categoryId}
+          onChange={(next) => {
+            setCategoryTouched(true);
+            setCategoryId(next);
+          }}
+        />
       </View>
 
       <View>

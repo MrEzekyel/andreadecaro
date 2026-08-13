@@ -15,9 +15,29 @@ export type Merchant = {
   normalized_name: string;
   display_name: string;
   category_id: string | null;
+  /**
+   * L'insegna a cui appartiene questo punto vendita, se ce n'e' una.
+   *
+   * "McDonald's Cristoforo Col" punta a "McDonald's". L'albero e' profondo
+   * uno per costruzione (trigger `merchants_keep_flat`): un brand di un brand
+   * renderebbe ogni somma dipendente da quante volte si risale.
+   */
+  parent_id: string | null;
   /** Escluso dalle classifiche, ma non dai totali. */
   excluded_from_stats: boolean;
   created_at: string;
+};
+
+/** Quello che `resolve_merchant()` restituisce: la riga piu' il suo contesto. */
+export type ResolvedMerchant = {
+  merchant_id: string;
+  brand_id: string | null;
+  merchant_name: string;
+  /** Il nome da mostrare negli elenchi: l'insegna, non il punto vendita. */
+  brand_name: string;
+  /** Del punto vendita se ce l'ha, altrimenti quella dell'insegna. */
+  effective_category_id: string | null;
+  effective_excluded: boolean;
 };
 
 export type Payment = {

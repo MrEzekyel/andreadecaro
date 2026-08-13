@@ -42,7 +42,7 @@ import {
 import { firstError } from "../lib/loadError";
 import { supabase } from "../lib/supabase";
 import { categoryColor, radius, space, tint, type } from "../lib/theme";
-import { Merchant, Payment } from "../lib/types";
+import { Payment } from "../lib/types";
 import { useLimits } from "../lib/useLimits";
 
 const PERIOD_LABEL: Record<PeriodKind, string> = {
@@ -96,9 +96,49 @@ const DONUT_SCOPE_OPTIONS = [
   { value: "all" as const, letter: "A", label: "Tutto lo storico" },
 ];
 
+/**
+ * "Dove spendo di piu'", per insegna e non per punto vendita.
+ *
+ * È qui che il difetto si vedeva davvero: tre McDonald's in tre quartieri
+ * facevano tre righe da 12 euro invece di una da 36, e nessuna delle tre
+ * entrava in classifica. Il totale del mese era giusto, la classifica no —
+ * il tipo di errore che non si nota perche' ogni riga presa da sola e' vera.
+ */
+function rankByBrand(
+  payments: Payment[],
+  merchantById: (id: string | null) => { id: string; parent_id: string | null; display_name: string } | undefined,
+  limit: number
+) {
+  const map = new Map<string, { amount: number; count: number }>();
+
+  for (const payment of payments) {
+    if (!payment.merchant_id) continue;
+    const merchant = merchantById(payment.merchant_id);
+    const key = merchant?.parent_id ?? payment.merchant_id;
+    const current = map.get(key);
+    map.set(key, {
+      amount: (current?.amount ?? 0) + Number(payment.effective_amount),
+      count: (current?.count ?? 0) + 1,
+    });
+  }
+
+  return Array.from(map.entries())
+    .map(([id, value]) => ({
+      id,
+      ...value,
+      name: merchantById(id)?.display_name ?? "Sconosciuto",
+    }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, limit);
+}
+
 export default function StatsScreen() {
   const { palette, dark } = useTheme();
-  const { categoryById } = useData();
+  // Gli esercenti arrivano da `DataContext`: la lettura di prima non era
+  // paginata, e oltre le 1000 righe PostgREST tronca **senza errore** —
+  // gli esercenti oltre il millesimo sarebbero spariti dalle classifiche
+  // mostrando numeri piu' bassi del vero, senza niente che lo segnalasse.
+  const { categoryById, merchants, merchantById } = useData();
   const { monthlyOverall, reload: reloadLimits } = useLimits();
 
   const [kind, setKind] = useState<PeriodKind>("month");
@@ -111,7 +151,6 @@ export default function StatsScreen() {
   /** Introiti e investimenti servono solo come importo+data, per i risparmi. */
   const [incomes, setIncomes] = useState<Dated[]>([]);
   const [investments, setInvestments] = useState<Dated[]>([]);
-  const [merchants, setMerchants] = useState<Merchant[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [grain, setGrain] = useState<Grain>("month");
@@ -166,7 +205,6 @@ export default function StatsScreen() {
       paymentsResult,
       historyResult,
       categoryHistoryResult,
-      merchantsResult,
       incomesResult,
       investmentsResult,
     ] = await Promise.all([
@@ -185,7 +223,6 @@ export default function StatsScreen() {
       // a un mese qualunque da quando esiste il primo movimento, o a tutto
       // lo storico in blocco.
       supabase.from("payments").select("*").order("occurred_at"),
-      supabase.from("merchants").select("*"),
       supabase
         .from("incomes")
         .select("amount, occurred_at")
@@ -204,7 +241,6 @@ export default function StatsScreen() {
       paymentsResult,
       historyResult,
       categoryHistoryResult,
-      merchantsResult,
       incomesResult,
       investmentsResult
     );
@@ -214,7 +250,6 @@ export default function StatsScreen() {
     setPayments((paymentsResult.data ?? []) as Payment[]);
     setHistory((historyResult.data ?? []) as Payment[]);
     setCategoryHistory((categoryHistoryResult.data ?? []) as Payment[]);
-    setMerchants((merchantsResult.data ?? []) as Merchant[]);
     setIncomes((incomesResult.data ?? []) as Dated[]);
     setInvestments((investmentsResult.data ?? []) as Dated[]);
   }, [period]);
@@ -228,10 +263,20 @@ export default function StatsScreen() {
   // Una spesa e' esclusa dalle classifiche se lo e' lei o il suo esercente:
   // la stessa regola che prima viveva nella vista `rankable_payments`, ora
   // qui perche' il toggle deve poterla accendere o spegnere a piacere.
-  const excludedMerchantIds = useMemo(
-    () => new Set(merchants.filter((m) => m.excluded_from_stats).map((m) => m.id)),
-    [merchants]
-  );
+  const excludedMerchantIds = useMemo(() => {
+    const excluded = new Set(
+      merchants.filter((m) => m.excluded_from_stats).map((m) => m.id)
+    );
+    // Escludere un'insegna esclude i suoi punti vendita: marcare "McDonald's"
+    // come non rappresentativo e vedersi comunque in classifica quello di
+    // Cristoforo Colombo sarebbe la stessa impostazione che non funziona.
+    for (const merchant of merchants) {
+      if (merchant.parent_id && excluded.has(merchant.parent_id)) {
+        excluded.add(merchant.id);
+      }
+    }
+    return excluded;
+  }, [merchants]);
 
   const isFixedCost = useCallback(
     (payment: Payment) =>
@@ -413,25 +458,10 @@ export default function StatsScreen() {
     [byCategory, categoryById, dark, palette.uncategorized]
   );
 
-  const byMerchant = useMemo(() => {
-    const map = new Map<string, { amount: number; count: number }>();
-    for (const payment of rankable) {
-      if (!payment.merchant_id) continue;
-      const current = map.get(payment.merchant_id);
-      map.set(payment.merchant_id, {
-        amount: (current?.amount ?? 0) + Number(payment.effective_amount),
-        count: (current?.count ?? 0) + 1,
-      });
-    }
-    return Array.from(map.entries())
-      .map(([id, value]) => ({
-        id,
-        ...value,
-        name: merchants.find((m) => m.id === id)?.display_name ?? "Sconosciuto",
-      }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 8);
-  }, [rankable, merchants]);
+  const byMerchant = useMemo(
+    () => rankByBrand(rankable, merchantById, 8),
+    [rankable, merchantById]
+  );
 
   // Le classifiche rispettano il filtro di categoria; i totali no, perche'
   // il numero grande in cima deve restare il totale del periodo.
@@ -457,25 +487,10 @@ export default function StatsScreen() {
       .slice(0, 5);
   }, [rankable]);
 
-  const topMerchants = useMemo(() => {
-    const map = new Map<string, { amount: number; count: number }>();
-    for (const payment of rankedPool) {
-      if (!payment.merchant_id) continue;
-      const current = map.get(payment.merchant_id);
-      map.set(payment.merchant_id, {
-        amount: (current?.amount ?? 0) + Number(payment.effective_amount),
-        count: (current?.count ?? 0) + 1,
-      });
-    }
-    return Array.from(map.entries())
-      .map(([id, value]) => ({
-        id,
-        ...value,
-        name: merchants.find((m) => m.id === id)?.display_name ?? "Sconosciuto",
-      }))
-      .sort((a, b) => b.amount - a.amount)
-      .slice(0, 5);
-  }, [rankedPool, merchants]);
+  const topMerchants = useMemo(
+    () => rankByBrand(rankedPool, merchantById, 5),
+    [rankedPool, merchantById]
+  );
 
   /** Storico filtrato come le classifiche, per i grafici a colonne. */
   const historyPool = useMemo(() => {

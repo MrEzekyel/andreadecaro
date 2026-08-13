@@ -128,7 +128,7 @@ export default function MovementsScreen({ mode, onModeChange }: Props) {
  *  li mostra ormai la testata condivisa sopra. */
 function ExpensesList({ month }: { month: Date }) {
   const { palette, dark } = useTheme();
-  const { categories, categoryById } = useData();
+  const { categories, categoryById, brandLabel } = useData();
   const { payments, error, staleLabel, staleReason, reload } = usePayments(month);
   const [refreshing, setRefreshing] = useState(false);
   const explorer = useExplorer(reload);
@@ -139,7 +139,14 @@ function ExpensesList({ month }: { month: Date }) {
   const filtered = useMemo(() => {
     const needle = query.trim().toLowerCase();
     return payments.filter((payment) => {
-      if (needle && !payment.merchant_name.toLowerCase().includes(needle)) {
+      // Si cerca sia sul nome scritto sulla spesa sia sull'insegna: la riga
+      // mostra l'insegna, e cercare esattamente la parola che si sta leggendo
+      // a schermo non deve poter dare zero risultati.
+      if (
+        needle &&
+        !payment.merchant_name.toLowerCase().includes(needle) &&
+        !brandLabel(payment).toLowerCase().includes(needle)
+      ) {
         return false;
       }
       if (filterCategory !== null && payment.category_id !== filterCategory) {
@@ -147,7 +154,7 @@ function ExpensesList({ month }: { month: Date }) {
       }
       return true;
     });
-  }, [payments, query, filterCategory]);
+  }, [payments, query, filterCategory, brandLabel]);
 
   const sections = useMemo(() => {
     const groups: { title: string; total: number; data: Payment[] }[] = [];

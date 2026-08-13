@@ -33,9 +33,14 @@ produzione.
 
 **Cosa manca, e di chi è la mossa:**
 
-- *Andrea* — **dominio**: sblocca insieme i template email via SMTP (`P1`,
-  recupero password) e l'URL per la privacy policy (`P4`). Nessuno dei due
-  parte senza.
+- **Dominio: `clinck.it`**, già registrato — con SMTP custom collegato a
+  Supabase, dato che il codice email di primo accesso arriva regolarmente.
+  Il recupero password (`P1`) invece a volte non arriva: da verificare se è
+  un problema del template "Reset Password" specifico (serve `{{ .Token }}`
+  anche lì, non solo nel template di conferma registrazione — vedi "Accesso"
+  più sotto) o un caso isolato. *Andrea* sta ripetendo il test.
+- *Qui* — privacy policy da scrivere e pubblicare su `clinck.it` (`P4`), ora
+  che il dominio c'è.
 - *Andrea* — **Apple Developer Program (99$/anno) + Small Business Program**
   (commissione 15% invece di 30%): apre la catena RevenueCat → build nativa
   EAS → TestFlight. Finché non parte, il modello di business non incassa
@@ -48,11 +53,10 @@ produzione.
   (checklist in `DA-FARE.md`), in particolare un pagamento vero con
   l'automazione e il recupero password per intero.
 - *Andrea* — **decisione aperta**: repository pubblico o privato (`P15`).
-- *Qui* — integrazione RevenueCat quando la build nativa esiste; privacy
-  policy scritta quando c'è il dominio; **piano marketing**, prossimo
-  argomento, non ancora affrontato — dipende da quando la catena Apple
-  Developer Program → RevenueCat sarà avviata, perché senza IAP live non
-  c'è un funnel trial→pagamento da promuovere davvero.
+- *Qui* — integrazione RevenueCat quando la build nativa esiste; **piano
+  marketing**, prossimo argomento, non ancora affrontato — dipende da
+  quando la catena Apple Developer Program → RevenueCat sarà avviata, perché
+  senza IAP live non c'è un funnel trial→pagamento da promuovere davvero.
 
 ## Stack
 
@@ -310,6 +314,42 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   complessivo disegnato su questo grafico, l'unico presente: se in futuro se
   ne disegnasse più di uno sulla stessa linea, servirebbe una regola unica
   invece di decidere caso per caso.
+- **`merchants.parent_id` = l'insegna.** "McDonald's Dragona" e "McDonald's
+  Infernetto" erano due righe scollegate: due voci in "dove spendo di più",
+  due categorie da correggere, e nessuna schermata lo segnalava perché ogni
+  riga presa da sola sembrava giusta. Ora la seconda punta alla prima tramite
+  un livello **solo** di raggruppamento (trigger `merchants_keep_flat`): un
+  brand di un brand renderebbe ogni somma dipendente da quante volte si
+  risale, e la prima query che dimenticasse un livello darebbe un totale
+  plausibile e sbagliato.
+  - La regola sta in `merchant_common_prefix()`: prefisso di **parole
+    intere** (su caratteri, "Conad" e "Conforama" condividerebbero "Con"),
+    e una parola sola vale come insegna solo se è lunga almeno 4 lettere,
+    non è un numero e non è un nome di categoria merceologica
+    (`merchant_generic_word`). Quest'ultima lista è la parte che conta: il
+    pericolo non è mancare un raggruppamento, è **unire cose diverse** —
+    "Farmacia Rossi" e "Farmacia Verdi" condividono un prefisso di otto
+    lettere e non sono la stessa farmacia. Verificato sui 97 esercenti reali:
+    due raggruppamenti, entrambi giusti, zero falsi positivi; i tre `Bar ...`
+    restano separati e `UCI Cinemas` non finisce con `Uci Recupero`.
+  - **`resolve_merchant()` è l'unico posto in cui un esercente nasce.** Prima
+    la stessa logica stava in tre copie (foglio "Nuova spesa", recupero da
+    file, Edge Function di ingestione): tre copie di una regola di
+    raggruppamento non possono che divergere, e una divergenza qui non dà
+    errori — crea gruppi diversi a seconda di *da dove* è entrata la spesa,
+    e ci si accorge del problema mesi dopo guardando le classifiche.
+  - **Il brand non si scrive in `payments.merchant_name`**: quel campo resta
+    il nome com'è arrivato quel giorno. L'insegna si risolve a schermo
+    (`useData().brandLabel`), altrimenti il giorno in cui un raggruppamento
+    cambia le spese vecchie mostrerebbero il nome di un gruppo che non esiste
+    più. In elenco si legge l'insegna, nel dettaglio della singola spesa il
+    punto vendita preciso, e dentro il dettaglio di un'insegna le righe
+    tornano al nome preciso (`PaymentRow exactName`) — lì è l'unica cosa che
+    distingue una riga dall'altra.
+  - Categoria ed esclusione dalle classifiche si leggono con
+    `coalesce(punto vendita, insegna)`, e "ricorda per i prossimi pagamenti"
+    scrive **sull'insegna**: così vale anche per i negozi dello stesso gruppo
+    in cui non si è ancora mai stati.
 - `recurring_rules` → `materialize_recurring()` genera le spese ricorrenti
   ogni notte via pg_cron (mutuo, abbonamenti).
 - `monthly_totals(p_months)` (migration `0035`) aggrega spese, introiti e

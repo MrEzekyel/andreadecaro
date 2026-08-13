@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -49,7 +49,19 @@ export default function TransactionDetailScreen({
   onOpenMerchant,
 }: Props) {
   const { palette, dark } = useTheme();
-  const { categoryById, personById } = useData();
+  const { categoryById, personById, brandLabel, merchants, merchantById } = useData();
+
+  /** L'insegna della spesa aperta, se il punto vendita ne ha una. */
+  const brand = useMemo(() => {
+    const merchant = initial.merchant_id ? merchantById(initial.merchant_id) : undefined;
+    return merchant?.parent_id ? merchantById(merchant.parent_id) : undefined;
+  }, [initial.merchant_id, merchantById]);
+
+  const merchantFamily = useMemo(() => {
+    if (!initial.merchant_id) return [];
+    const brandId = merchantById(initial.merchant_id)?.parent_id ?? initial.merchant_id;
+    return [brandId, ...merchants.filter((m) => m.parent_id === brandId).map((m) => m.id)];
+  }, [initial.merchant_id, merchants, merchantById]);
 
   const [payment, setPayment] = useState(initial);
   const [editing, setEditing] = useState(false);
@@ -76,10 +88,13 @@ export default function TransactionDetailScreen({
     if (!splitRows.error) setSplits((splitRows.data ?? []) as PaymentSplit[]);
 
     if (initial.merchant_id) {
+      // Tutta l'insegna, non il solo punto vendita: "presso McDonald's" deve
+      // contare anche gli altri McDonald's, altrimenti il numero e' sempre
+      // piu' basso del vero senza che niente lo dica.
       const { data } = await supabase
         .from("payments")
         .select("effective_amount")
-        .eq("merchant_id", initial.merchant_id);
+        .in("merchant_id", merchantFamily);
 
       if (data) {
         setMerchantTotal({
@@ -88,7 +103,7 @@ export default function TransactionDetailScreen({
         });
       }
     }
-  }, [initial.id, initial.merchant_id]);
+  }, [initial.id, initial.merchant_id, merchantFamily]);
 
   useEffect(() => {
     load();
@@ -171,6 +186,16 @@ export default function TransactionDetailScreen({
             <Text style={[styles.merchant, { color: palette.ink }]}>
               {payment.merchant_name}
             </Text>
+
+            {/* L'insegna sotto il punto vendita: qui si guarda **questa**
+                spesa, quindi il nome grande resta quello del posto dove si e'
+                pagato davvero. L'insegna serve solo a spiegare sotto quale
+                nome la spesa comparira' negli elenchi. */}
+            {brand && (
+              <Text style={[styles.brand, { color: palette.ink3 }]}>
+                {brand.display_name}
+              </Text>
+            )}
 
             <Text style={[styles.amount, { color: palette.ink }]}>
               {amount.whole}
@@ -305,7 +330,7 @@ export default function TransactionDetailScreen({
           {payment.merchant_id && merchantTotal && (
             <View>
               <Text style={[styles.label, { color: palette.ink3 }]}>
-                Presso questo esercente
+                {brand ? `Presso ${brand.display_name}` : "Presso questo esercente"}
               </Text>
 
               <View style={styles.statsRow}>
@@ -331,7 +356,7 @@ export default function TransactionDetailScreen({
               <TouchableOpacity
                 style={styles.link}
                 onPress={() =>
-                  onOpenMerchant(payment.merchant_id!, payment.merchant_name)
+                  onOpenMerchant(payment.merchant_id!, brandLabel(payment))
                 }
               >
                 <Text style={[styles.linkText, { color: palette.accent }]}>
@@ -402,6 +427,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   merchant: { ...type.title, textAlign: "center" },
+  brand: { ...type.small, textAlign: "center", marginTop: 2 },
   amount: { ...type.hero, fontVariant: ["tabular-nums"] },
   foreign: { ...type.small, marginTop: 4 },
   foreignWarn: { ...type.small, marginTop: 6, lineHeight: 15 },

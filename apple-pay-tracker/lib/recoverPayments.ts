@@ -1,6 +1,6 @@
 import { File } from "expo-file-system";
+import { resolveMerchant } from "./merchants";
 import { supabase } from "./supabase";
-import type { Merchant } from "./types";
 
 /**
  * Recupero delle spese che la Shortcut non e' riuscita a mandare.
@@ -145,18 +145,16 @@ export function parseAmountText(input: string): number | null {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
-const normalize = (value: string) =>
-  value.trim().toLowerCase().replace(/\s+/g, " ");
-
 /**
  * Legge il file e inserisce le spese mancanti.
  *
  * L'inserimento avviene dall'app e non passando dalla Edge Function perche'
  * quella vuole il token di ingestione, che si vede una volta sola e qui non
- * c'e'. La risoluzione dell'esercente si fa allora sulla tabella `merchants`,
- * che l'app ha gia': un esercente gia' visto porta con se' la sua categoria,
- * uno nuovo entra da categorizzare — esattamente cio' che succederebbe
- * passando dalla funzione, per un esercente mai visto.
+ * c'e'. L'esercente lo risolve `resolve_merchant()` nel database, la stessa
+ * funzione che usano il foglio "Nuova spesa" e l'ingestione automatica: un
+ * esercente gia' visto porta con se' la sua categoria e la sua insegna, uno
+ * nuovo entra da categorizzare — esattamente cio' che succederebbe passando
+ * dalla funzione, per un esercente mai visto.
  */
 export async function recoverFromFile(uri: string): Promise<RecoverOutcome> {
   const text = await new File(uri).text();
@@ -173,23 +171,6 @@ export async function recoverFromFile(uri: string): Promise<RecoverOutcome> {
   const { data: auth } = await supabase.auth.getSession();
   const userId = auth.session?.user.id;
   if (!userId) throw new Error("Sessione scaduta: esci e rientra.");
-
-  // Paginata come l'export: PostgREST tronca a 1000 righe **senza errore**, e
-  // oltre quella soglia gli esercenti oltre il millesimo risulterebbero
-  // sconosciuti — la spesa entrerebbe senza esercente ne' categoria.
-  const perNome = new Map<string, Merchant>();
-  for (let from = 0; ; from += 1000) {
-    const { data, error: merchantError } = await supabase
-      .from("merchants")
-      .select("*")
-      .order("id", { ascending: true })
-      .range(from, from + 999);
-    if (merchantError) throw new Error(merchantError.message);
-
-    const pagina = (data ?? []) as Merchant[];
-    for (const m of pagina) perNome.set(m.normalized_name, m);
-    if (pagina.length < 1000) break;
-  }
 
   let importate = 0;
   let duplicate = 0;
@@ -247,22 +228,7 @@ export async function recoverFromFile(uri: string): Promise<RecoverOutcome> {
       continue;
     }
 
-    let merchant = perNome.get(normalize(row.merchant));
-    if (!merchant) {
-      const { data: created } = await supabase
-        .from("merchants")
-        .insert({
-          user_id: userId,
-          normalized_name: normalize(row.merchant),
-          display_name: row.merchant,
-        })
-        .select("*")
-        .single();
-      if (created) {
-        merchant = created as Merchant;
-        perNome.set(merchant.normalized_name, merchant);
-      }
-    }
+    const merchant = await resolveMerchant(userId, row.merchant);
 
     // La valuta si conserva. `parseAmountText` restituisce il numero grezzo,
     // che per una spesa in sterline **non e' euro**: scriverlo in `amount` come
@@ -283,9 +249,9 @@ export async function recoverFromFile(uri: string): Promise<RecoverOutcome> {
         original_currency: currency,
         fx_rate: null,
         merchant_raw: row.merchant,
-        merchant_name: merchant?.display_name ?? row.merchant,
-        merchant_id: merchant?.id ?? null,
-        category_id: merchant?.category_id ?? null,
+        merchant_name: merchant?.merchant_name ?? row.merchant,
+        merchant_id: merchant?.merchant_id ?? null,
+        category_id: merchant?.effective_category_id ?? null,
         occurred_at: when.toISOString(),
         source: "shortcut",
       })
