@@ -20,6 +20,15 @@ type Props = {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
+  /**
+   * Vela cio' che sta sotto.
+   *
+   * Serve solo ai fogli aperti **sopra un altro foglio**: senza, si vedono due
+   * intestazioni impilate e non si capisce piu' quale delle due comanda. Sui
+   * fogli normali resta spento — il fondo caldo dell'app dietro un foglio e'
+   * parte di come e' fatta, e oscurarlo ovunque sarebbe un altro progetto.
+   */
+  dim?: boolean;
 };
 
 /**
@@ -32,7 +41,7 @@ type Props = {
  * esplicito di annullare: toccare fuori dal foglio resta possibile ma non
  * deve essere l'unica via.
  */
-export function Sheet({ visible, onClose, title, children }: Props) {
+export function Sheet({ visible, onClose, title, children, dim }: Props) {
   const { palette } = useTheme();
 
   return (
@@ -42,7 +51,7 @@ export function Sheet({ visible, onClose, title, children }: Props) {
       transparent
       onRequestClose={onClose}
     >
-      <View style={styles.wrap}>
+      <View style={[styles.wrap, dim && styles.dimmed]}>
         <Pressable
           style={StyleSheet.absoluteFill}
           onPress={onClose}
@@ -90,6 +99,7 @@ export function Sheet({ visible, onClose, title, children }: Props) {
 
 const styles = StyleSheet.create({
   wrap: { flex: 1 },
+  dimmed: { backgroundColor: "rgba(0,0,0,0.32)" },
   avoider: { flex: 1, justifyContent: "flex-end" },
   sheet: {
     maxHeight: "92%",

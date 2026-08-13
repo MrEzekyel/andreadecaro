@@ -137,7 +137,7 @@ export default function GroupDetailScreen({
   const gainAmount = seriesFailed ? null : (period?.amount ?? group.priceGain);
   const gainPct = seriesFailed ? null : (period?.pct ?? group.priceGainPct);
   const positive = (gainAmount ?? 0) >= 0;
-  const gainColor = positive ? palette.good : palette.over;
+  const gainColor = positive ? palette.investUp : palette.over;
 
   const slices = group.positions.map((p, i) => ({
     id: p.asset.id,
@@ -204,7 +204,7 @@ export default function GroupDetailScreen({
         </View>
 
         <View style={styles.chartBlock}>
-          <ScrubChart points={points} color={palette.accent} onScrub={setScrub} />
+          <ScrubChart points={points} color={palette.invest} onScrub={setScrub} />
           <View style={styles.ranges}>
             {RANGES.map((r) => {
               const active = r.key === range;
@@ -217,7 +217,7 @@ export default function GroupDetailScreen({
                   }}
                   style={[
                     styles.rangeChip,
-                    active && { backgroundColor: tint(palette.accent, dark) },
+                    active && { backgroundColor: tint(palette.invest, dark) },
                   ]}
                   accessibilityRole="button"
                   accessibilityState={{ selected: active }}
@@ -225,7 +225,7 @@ export default function GroupDetailScreen({
                   <Text
                     style={[
                       styles.rangeLabel,
-                      { color: active ? palette.accent : palette.ink3 },
+                      { color: active ? palette.invest : palette.ink3 },
                     ]}
                   >
                     {r.label}
@@ -255,7 +255,7 @@ export default function GroupDetailScreen({
             <BarChart
               buckets={versamenti}
               metric="amount"
-              color={palette.accent}
+              color={palette.invest}
               // Con lo scorrimento ogni mese ha la sua aria: senza, sopra la
               // decina di colonne le etichette si sovrappongono.
               minColumnWidth={46}
@@ -276,7 +276,7 @@ export default function GroupDetailScreen({
             invested={group.investedBasis}
             gain={group.priceGain}
             gainPct={group.priceGainPct}
-            color={palette.accent}
+            color={palette.invest}
           />
         </View>
 
@@ -399,7 +399,7 @@ export default function GroupDetailScreen({
                     <Text
                       style={[
                         styles.assetGain,
-                        { color: pos ? palette.good : palette.over },
+                        { color: pos ? palette.investUp : palette.over },
                       ]}
                     >
                       {pos ? "+" : "−"}

@@ -46,7 +46,7 @@ export function ValueSplit({ invested, gain, gainPct, color }: Props) {
     : quotaCapitale * WIDTH;
   const larghezzaGuadagno = Math.max(WIDTH - larghezzaCapitale, 0);
 
-  const coloreGuadagno = inPerdita ? palette.over : palette.good;
+  const coloreGuadagno = inPerdita ? palette.over : palette.investUp;
 
   return (
     <View>

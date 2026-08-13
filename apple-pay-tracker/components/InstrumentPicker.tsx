@@ -244,8 +244,8 @@ export function InstrumentPicker({ value, onChange, onPick, placeholder }: Props
             Nessuno strumento trovato con questo nome.
           </Text>
           <TouchableOpacity onPress={chooseManual} style={styles.manualButton}>
-            <Icon name="pencil" size={13} color={palette.accent} />
-            <Text style={[styles.manualText, { color: palette.accent }]}>
+            <Icon name="pencil" size={13} color={palette.invest} />
+            <Text style={[styles.manualText, { color: palette.invest }]}>
               Inserisci "{value.trim()}" a mano
             </Text>
           </TouchableOpacity>

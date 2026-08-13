@@ -131,7 +131,7 @@ export default function AssetDetailScreen({
   const heroValue = at ? at.value_eur : position.value;
   const heroGain = at ? at.value_eur - at.invested_eur : position.gain;
   const amount = splitAmount(heroValue);
-  const gainColor = heroGain >= 0 ? palette.good : palette.over;
+  const gainColor = heroGain >= 0 ? palette.investUp : palette.over;
 
   const operazioni = useMemo(
     () =>
@@ -189,7 +189,7 @@ export default function AssetDetailScreen({
         <View style={styles.chartBlock}>
           <ScrubChart
             points={points}
-            color={palette.accent}
+            color={palette.invest}
             onScrub={setScrub}
           />
           <View style={styles.ranges}>
@@ -204,13 +204,13 @@ export default function AssetDetailScreen({
                   }}
                   style={[
                     styles.rangeChip,
-                    active && { backgroundColor: tint(palette.accent, dark) },
+                    active && { backgroundColor: tint(palette.invest, dark) },
                   ]}
                 >
                   <Text
                     style={[
                       styles.rangeLabel,
-                      { color: active ? palette.accent : palette.ink3 },
+                      { color: active ? palette.invest : palette.ink3 },
                     ]}
                   >
                     {r.label}
@@ -246,12 +246,12 @@ export default function AssetDetailScreen({
               <Icon
                 name={stale ? "circle-alert" : "pencil"}
                 size={14}
-                color={stale ? palette.over : palette.accent}
+                color={stale ? palette.over : palette.invest}
               />
               <Text
                 style={[
                   styles.updateText,
-                  { color: stale ? palette.over : palette.accent },
+                  { color: stale ? palette.over : palette.invest },
                 ]}
               >
                 {position.priceDate
@@ -324,7 +324,7 @@ export default function AssetDetailScreen({
                         ? palette.ink
                         : op.kind === "buy"
                           ? palette.ink3
-                          : palette.good,
+                          : palette.investUp,
                   },
                 ]}
               >
@@ -363,7 +363,7 @@ export default function AssetDetailScreen({
           ]}
         />
         <TouchableOpacity
-          style={[styles.save, { backgroundColor: palette.accent }]}
+          style={[styles.save, { backgroundColor: palette.invest }]}
           onPress={saveValue}
           disabled={saving}
         >

@@ -244,8 +244,8 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
           style={[styles.add, { borderColor: palette.hairline }]}
           onPress={openNew}
         >
-          <Icon name="plus" size={16} color={palette.accent} />
-          <Text style={[styles.addText, { color: palette.accent }]}>
+          <Icon name="plus" size={16} color={palette.invest} />
+          <Text style={[styles.addText, { color: palette.invest }]}>
             Nuovo piano
           </Text>
         </TouchableOpacity>
@@ -279,16 +279,16 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
                   styles.chip,
                   {
                     backgroundColor: selected
-                      ? tint(palette.accent, dark)
+                      ? tint(palette.invest, dark)
                       : palette.surface2,
-                    borderColor: selected ? palette.accent : "transparent",
+                    borderColor: selected ? palette.invest : "transparent",
                   },
                 ]}
               >
                 <Text
                   style={[
                     styles.chipLabel,
-                    { color: selected ? palette.accent : palette.ink2 },
+                    { color: selected ? palette.invest : palette.ink2 },
                   ]}
                 >
                   {asset.name}
@@ -302,8 +302,8 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
             style={[styles.chip, { backgroundColor: palette.surface2 }]}
           >
             <View style={styles.chipNewInner}>
-              <Icon name="plus" size={13} color={palette.accent} />
-              <Text style={[styles.chipLabel, { color: palette.accent }]}>
+              <Icon name="plus" size={13} color={palette.invest} />
+              <Text style={[styles.chipLabel, { color: palette.invest }]}>
                 Nuovo
               </Text>
             </View>
@@ -339,16 +339,16 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
                   styles.chip,
                   {
                     backgroundColor: selected
-                      ? tint(palette.accent, dark)
+                      ? tint(palette.invest, dark)
                       : palette.surface2,
-                    borderColor: selected ? palette.accent : "transparent",
+                    borderColor: selected ? palette.invest : "transparent",
                   },
                 ]}
               >
                 <Text
                   style={[
                     styles.chipLabel,
-                    { color: selected ? palette.accent : palette.ink2 },
+                    { color: selected ? palette.invest : palette.ink2 },
                   ]}
                 >
                   {FREQUENCY_LABEL[value]}
@@ -380,7 +380,7 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
         )}
 
         <TouchableOpacity
-          style={[styles.save, { backgroundColor: palette.accent }]}
+          style={[styles.save, { backgroundColor: palette.invest }]}
           onPress={save}
           disabled={saving}
         >
@@ -388,17 +388,19 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
             {saving ? "Salvo…" : "Salva"}
           </Text>
         </TouchableOpacity>
-      </Sheet>
 
-      <AddAssetSheet
-        visible={addingAsset}
-        onClose={() => setAddingAsset(false)}
-        assets={assets}
-        onCreated={(asset) => {
-          onSaved();
-          setAssetId(asset.id);
-        }}
-      />
+        {/* Annidato nel foglio che lo apre: due `Modal` fratelli non possono
+            stare aperti insieme su iOS, il secondo non comparirebbe mai. */}
+        <AddAssetSheet
+          visible={addingAsset}
+          onClose={() => setAddingAsset(false)}
+          assets={assets}
+          onCreated={(asset) => {
+            onSaved();
+            setAssetId(asset.id);
+          }}
+        />
+      </Sheet>
     </SwipeBack>
   );
 }

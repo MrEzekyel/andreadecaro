@@ -11,7 +11,6 @@ import {
 } from "react-native";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
-import { RecoverSheet } from "../components/RecoverSheet";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useTheme } from "../lib/ThemeContext";
 import { SHORTCUT_INSTALL_URL } from "../lib/guide";
@@ -221,7 +220,9 @@ export default function AutomationsScreen({ onBack, onOpenGuide }: Props) {
           </Text>
         )}
 
-        <RecoverSheet onDone={loadTokens} />
+        {/* Il recupero delle spese non inviate stava qui: e' passato in
+            Movimenti, dentro "Importa". Chi ha una spesa mancante se ne
+            accorge guardando l'elenco, non aprendo le impostazioni. */}
 
         {/* In fondo e piccolo di proposito: serve solo a chi si costruisce
             il comando rapido da zero invece di installare quello pronto. */}

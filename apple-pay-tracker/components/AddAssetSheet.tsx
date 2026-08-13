@@ -174,6 +174,9 @@ export function AddAssetSheet({ visible, onClose, onCreated, assets, defaultGrou
         onClose();
       }}
       title="Nuovo asset"
+      // Si apre sempre sopra un altro foglio (nuovo investimento, o il piano
+      // di accumulo): senza il velo si vedrebbero due intestazioni impilate.
+      dim
     >
       <Text style={styles.field}>Gruppo</Text>
       <View style={styles.chips}>
@@ -190,15 +193,15 @@ export function AddAssetSheet({ visible, onClose, onCreated, assets, defaultGrou
               style={[
                 styles.chip,
                 {
-                  backgroundColor: selected ? tint(palette.accent, dark) : palette.surface2,
-                  borderColor: selected ? palette.accent : "transparent",
+                  backgroundColor: selected ? tint(palette.invest, dark) : palette.surface2,
+                  borderColor: selected ? palette.invest : "transparent",
                 },
               ]}
             >
               <Text
                 style={[
                   styles.chipLabel,
-                  { color: selected ? palette.accent : palette.ink2 },
+                  { color: selected ? palette.invest : palette.ink2 },
                 ]}
               >
                 {GROUP_LABEL[value]}
@@ -248,7 +251,7 @@ export function AddAssetSheet({ visible, onClose, onCreated, assets, defaultGrou
       )}
 
       <TouchableOpacity
-        style={[styles.save, { backgroundColor: palette.accent }]}
+        style={[styles.save, { backgroundColor: palette.invest }]}
         onPress={save}
         disabled={saving}
       >

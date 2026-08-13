@@ -233,8 +233,8 @@ function Chip({
       style={[
         styles.chip,
         {
-          backgroundColor: active ? tint(palette.accent, dark) : palette.surface2,
-          borderColor: active ? palette.accent : "transparent",
+          backgroundColor: active ? tint(palette.invest, dark) : palette.surface2,
+          borderColor: active ? palette.invest : "transparent",
         },
       ]}
       accessibilityRole="button"
@@ -243,7 +243,7 @@ function Chip({
       <Text
         style={[
           styles.chipLabel,
-          { color: active ? palette.accent : palette.ink2 },
+          { color: active ? palette.invest : palette.ink2 },
         ]}
       >
         {label}

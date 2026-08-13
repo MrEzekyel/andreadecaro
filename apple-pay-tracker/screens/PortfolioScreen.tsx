@@ -59,7 +59,7 @@ function RangePicker({
             onPress={() => onChange(r.key)}
             style={[
               styles.rangeChip,
-              active && { backgroundColor: tint(palette.accent, dark) },
+              active && { backgroundColor: tint(palette.invest, dark) },
             ]}
             accessibilityRole="button"
             accessibilityState={{ selected: active }}
@@ -67,7 +67,7 @@ function RangePicker({
             <Text
               style={[
                 styles.rangeLabel,
-                { color: active ? palette.accent : palette.ink3 },
+                { color: active ? palette.invest : palette.ink3 },
               ]}
             >
               {r.label}
@@ -151,7 +151,7 @@ export default function PortfolioScreen({ addNonce }: Props) {
   const heroGain = at ? at.value_eur - at.invested_eur : totals.priceGain;
   const heroPct = heroBasis > 0 ? heroGain / heroBasis : null;
   const amount = splitAmount(heroValue);
-  const gainColor = heroGain >= 0 ? palette.good : palette.over;
+  const gainColor = heroGain >= 0 ? palette.investUp : palette.over;
 
   // Renderizzato una volta sola, a prescindere da quale sotto-pagina e'
   // aperta: il tasto "+" della tabbar deve poter aprirlo anche dal dettaglio
@@ -318,7 +318,7 @@ export default function PortfolioScreen({ addNonce }: Props) {
       </View>
 
       <View style={styles.chartBlock}>
-        <ScrubChart points={points} color={palette.accent} onScrub={setScrub} />
+        <ScrubChart points={points} color={palette.invest} onScrub={setScrub} />
         <RangePicker
           range={range}
           onChange={(r) => {
@@ -497,7 +497,7 @@ function GroupSection({
             <Text
               style={[
                 styles.groupGain,
-                { color: positive ? palette.good : palette.over },
+                { color: positive ? palette.investUp : palette.over },
               ]}
             >
               {positive ? "+" : "\u2212"}
@@ -521,8 +521,8 @@ function GroupSection({
             style={[styles.groupMore, { borderColor: palette.hairline }]}
             onPress={onOpenGroup}
           >
-            <Icon name="chart-line" size={15} color={palette.accent} />
-            <Text style={[styles.groupMoreText, { color: palette.accent }]}>
+            <Icon name="chart-line" size={15} color={palette.invest} />
+            <Text style={[styles.groupMoreText, { color: palette.invest }]}>
               Andamento e analisi
             </Text>
           </TouchableOpacity>
@@ -591,7 +591,7 @@ function AssetRow({
           <Text
             style={[
               styles.assetGain,
-              { color: positive ? palette.good : palette.over },
+              { color: positive ? palette.investUp : palette.over },
             ]}
           >
             {positive ? "+" : "−"}

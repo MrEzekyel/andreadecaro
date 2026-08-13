@@ -29,7 +29,7 @@ export function StatTiles({ tiles }: Props) {
   const { palette } = useTheme();
 
   const colore = (tone: Tile["tone"]) =>
-    tone === "good" ? palette.good : tone === "bad" ? palette.over : palette.ink;
+    tone === "good" ? palette.investUp : tone === "bad" ? palette.over : palette.ink;
 
   return (
     <View style={styles.grid}>

@@ -118,6 +118,15 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 - Le **modali** (`components/Sheet.tsx`) partono dal basso, salgono sopra la
   tastiera (`KeyboardAvoidingView`), e hanno sempre un tasto "Indietro" —
   mai solo "tocca fuori per chiudere".
+- **Un foglio aperto da un altro foglio va renderizzato DENTRO di lui**, fra i
+  suoi `children` — non come fratello nello stesso `<>`. Due `<Modal>` fratelli
+  su iOS non possono stare aperti insieme: il secondo viene presentato da una
+  vista già coperta dal primo e **non compare mai**, senza errori né avvisi.
+  È così che "Nuovo asset" dentro "Nuovo investimento" è rimasto un pulsante
+  morto. Il foglio annidato passa anche `dim` (velo scuro dietro il pannello),
+  altrimenti si vedono due intestazioni impilate e non si capisce quale
+  comanda; sui fogli di primo livello `dim` resta spento, il fondo caldo
+  dietro una modale è parte di come è fatta l'app.
 - Categorie, persone e metodi di pagamento si possono **creare al volo**
   da qualunque selettore (chip "+"), non solo dalle rispettive schermate in
   Impostazioni.
@@ -664,6 +673,91 @@ chiudono quel buco.
   da `App.tsx` tramite un contatore (`investmentNonce`, stesso schema di
   `settingsNonce`) e non da un booleano, così il tasto lo riapre anche da
   una sotto-pagina (dettaglio asset, PAC) senza dover tornare alla radice.
+- **La sezione Investimenti è blu, non arancione.** `palette.invest` è
+  l'accento di tutta la sezione — grafici (`ScrubChart`), chip di periodo,
+  chip di selezione, pulsanti di salvataggio, tasto centrale della tabbar —
+  al posto di `palette.accent`, che resta l'accento del resto dell'app. Serve
+  a rendere impossibile lo scambio: investire e spendere sono due versi
+  diversi del denaro, e finché condividevano il colore il tasto "+" sembrava
+  lo stesso tasto.
+- **I guadagni negli investimenti usano `palette.investUp`, non
+  `palette.good`.** Il verde brillante delle entrate accostato al blu di
+  `invest` stona (due colori accesi di temperatura opposta a pochi millimetri
+  l'uno dall'altro): `investUp` è lo stesso verde più cupo. Le perdite
+  restano `palette.over` (arancione), scelta esplicita di Andrea. Vale anche
+  per `StatTiles` e `ValueSplit`, che sono usati **solo** dentro gli
+  investimenti — se un giorno servissero altrove, il colore va parametrizzato
+  invece di cambiato.
+
+### Import da estratto conto
+
+`screens/ImportScreen.tsx` (Movimenti → "Importa", accanto alla ricerca) è
+**l'unico posto da cui entrano movimenti da un file**, e ne contiene due:
+l'estratto conto della banca e il recupero delle spese che la Shortcut non è
+riuscita a mandare (`RecoverSheet`, che prima stava fra le Automazioni — chi
+ha una spesa mancante la nota guardando l'elenco, non aprendo le impostazioni
+di un comando rapido).
+
+- **All'utente non si chiede mai di mappare le colonne.** È il vincolo che
+  decide tutto il resto: un foglio "quale colonna è la data?" è il punto in cui
+  abbandona chi non ha mai aperto un CSV — cioè proprio chi ne trarrebbe di
+  più. `lib/statementImport.ts` riconosce da solo separatore, riga
+  d'intestazione, ruolo di ogni colonna, formato di data e di numero.
+- **Nessun modello linguistico tocca questi numeri.** Il riconoscimento è
+  dizionari di nomi comuni (`DATE_NAMES`, `DEBIT_NAMES`, …) **più una verifica
+  sul contenuto**: una colonna intestata "Data" che sotto ha testo libero non è
+  una colonna di date. Aggiungere una banca nuova = aggiungere un nome al
+  dizionario, ed è per questo che stanno in un elenco e non sparsi nel codice.
+- **La riga d'intestazione non è la prima**: le banche ci mettono sopra
+  intestatario, IBAN, saldo, righe vuote. Si prova ogni riga delle prime trenta
+  e si tiene la prima che regge la verifica sul contenuto.
+- **Giorno-prima o mese-prima si decide guardando tutta la colonna**, non la
+  singola riga: `03/04/2025` da solo è indecidibile e sbagliare sposta le spese
+  di mesi interi senza dare errore. Basta un valore che superi 12 in una delle
+  due posizioni; senza nessuno, si sceglie il formato italiano.
+- **Il rischio vero non è leggere male il file, è contare due volte.**
+  L'estratto conto contiene le stesse operazioni già arrivate da Apple Pay, con
+  un'altra data (la banca contabilizza uno o due giorni dopo) e un'altra
+  descrizione. Le difese sono due, diverse apposta:
+  1. `payments.dedup_key` (`stmt:giorno|importo|descrizione|progressivo`) con
+     l'indice unico parziale `payments_user_dedup_key_idx`: rende **innocuo**
+     reimportare lo stesso file, e regge nel database anche se il controllo
+     applicativo sfugge.
+  2. Confronto per importo uguale entro ±4 giorni contro ciò che già esiste,
+     che è l'unico modo di riconoscere una spesa entrata da Apple Pay con
+     un'altra chiave. La corrispondenza trovata viene **consumata**: due caffè
+     identici lo stesso giorno sono due spese e devono trovare due
+     corrispondenze distinte, altrimenti la seconda andrebbe persa.
+- Il progressivo nella `dedup_key` esiste per lo stesso motivo: senza, il
+  secondo caffè identico dello stesso giorno avrebbe la chiave del primo e
+  sparirebbe — il conto non tornerebbe, in meno, per sempre.
+- **La lettura di ciò che esiste già pagina sempre** (`readAll` in
+  `lib/statementWriter.ts`) e un suo errore **interrompe l'import**: PostgREST
+  tronca a 1000 righe senza errore, e ciò che non vede lo reimporterebbe come
+  nuovo. Un confronto fallito non può diventare "non c'era niente".
+- **Si mostra cosa si è capito PRIMA di scrivere**: quali colonne, quante righe
+  riconosciute, quante scartate e perché, più l'anteprima delle prime cinque.
+  È l'unico modo perché un riconoscimento sbagliato si veda finché è ancora
+  annullabile. Nessun import parte da solo.
+- Limite temporale: **da gennaio dell'anno precedente** (`importFloor()`). Le
+  righe più vecchie si contano e si dichiarano, non spariscono in silenzio.
+- Più file insieme, anche di banche diverse: ognuno ha la sua mappatura, i
+  movimenti confluiscono in un unico inserimento.
+- Encoding: si leggono i **byte** e si decodifica UTF-8, con ripiego su
+  Windows-1252 se non è valido. Mezza Italia esporta ancora in 1252, e letto
+  come UTF-8 "Caffè" si rompe: l'esercente non combacerebbe più con quello già
+  in archivio, creando due gruppi per lo stesso bar. `TextDecoder` non è
+  garantito su Hermes, quindi il decoder è scritto a mano.
+- `cleanDescription()` toglie il contorno bancario ("PAGAMENTO POS 12/03 ORE
+  14:32 CARTA \*1234 ESSELUNGA SPA MILANO" → "Esselunga Spa Milano"): senza,
+  la data dentro la stringa renderebbe ogni spesa un esercente nuovo. Toglie
+  solo pezzi riconoscibili con certezza, non svuota mai il campo, e la riga
+  originale resta comunque in `payments.raw_notification_text`.
+- Le spese passano da `resolve_merchant()` come tutte le altre (una chiamata
+  per **nome distinto**, non per riga), quindi un esercente già noto porta con
+  sé categoria e insegna. Le entrate finiscono in `incomes`, che non ha
+  `dedup_key` né colonne per la valuta: lì la difesa è solo il confronto
+  ravvicinato, e una valuta diversa dall'euro si dichiara nella nota.
 
 ### Export dei dati
 

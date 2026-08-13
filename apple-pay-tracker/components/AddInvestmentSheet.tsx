@@ -152,7 +152,6 @@ export function AddInvestmentSheet({ visible, onClose, onSaved, assets, reloadAs
   }
 
   return (
-    <>
       <Sheet
         visible={visible}
         onClose={() => {
@@ -303,18 +302,22 @@ export function AddInvestmentSheet({ visible, onClose, onSaved, assets, reloadAs
             <Text style={[styles.saveText, { color: palette.onAccent }]}>Salva</Text>
           )}
         </TouchableOpacity>
-      </Sheet>
 
-      <AddAssetSheet
-        visible={addingAsset}
-        onClose={() => setAddingAsset(false)}
-        assets={assets}
-        onCreated={(asset) => {
-          reloadAssets();
-          setAssetId(asset.id);
-        }}
-      />
-    </>
+        {/* Dentro il foglio, non accanto: due `Modal` fratelli non possono
+            stare aperti insieme su iOS — il secondo viene presentato da una
+            vista che e' gia' coperta dal primo e non compare mai. Annidato
+            nell'albero del foglio che lo apre, invece, si presenta sopra.
+            E' il motivo per cui "Nuovo asset" prima non faceva nulla. */}
+        <AddAssetSheet
+          visible={addingAsset}
+          onClose={() => setAddingAsset(false)}
+          assets={assets}
+          onCreated={(asset) => {
+            reloadAssets();
+            setAssetId(asset.id);
+          }}
+        />
+      </Sheet>
   );
 }
 

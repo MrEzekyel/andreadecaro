@@ -25,8 +25,16 @@ export type Palette = {
   over: string;
   warn: string;
   good: string;
-  /** Investito: azzurro, terzo verso del denaro oltre a entrato e speso. */
+  /** Investito: blu, terzo verso del denaro oltre a entrato e speso. */
   invest: string;
+  /**
+   * Verde dei guadagni nella sezione investimenti: piu' cupo di `good`.
+   * Il verde brillante usato per le entrate, accostato al blu profondo di
+   * `invest`, stona — due colori accesi di temperatura opposta a pochi
+   * millimetri l'uno dall'altro. Qui serve un verde che stia sotto il blu,
+   * non che gli faccia concorrenza.
+   */
+  investUp: string;
   uncategorized: string;
 };
 
@@ -45,7 +53,8 @@ export const lightPalette: Palette = {
   over: "#b4472c",
   warn: "#a16207",
   good: "#16a34a",
-  invest: "#0ea5e9",
+  invest: "#0369a1",
+  investUp: "#15803d",
   uncategorized: "#71717a",
 };
 
@@ -64,7 +73,8 @@ export const darkPalette: Palette = {
   over: "#e0765a",
   warn: "#b77f06",
   good: "#16a34a",
-  invest: "#38bdf8",
+  invest: "#0e8fd4",
+  investUp: "#1a9b52",
   uncategorized: "#8b8b96",
 };
 

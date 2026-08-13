@@ -11,6 +11,7 @@ import {
   View,
 } from "react-native";
 import { useExplorer } from "../components/Explorer";
+import ImportScreen from "./ImportScreen";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { ScreenHeader } from "../components/ScreenHeader";
@@ -51,6 +52,11 @@ type Props = {
 export default function MovementsScreen({ mode, onModeChange }: Props) {
   const { palette } = useTheme();
   const [month, setMonth] = useState(() => new Date());
+  const [importing, setImporting] = useState(false);
+  // Cambia dopo un import: gli elenchi tengono i propri dati in stato interno
+  // e devono rileggerli, altrimenti si torna indietro su una schermata che non
+  // mostra ancora cio' che si e' appena importato.
+  const [importedAt, setImportedAt] = useState(0);
 
   function shiftMonth(delta: number) {
     setMonth((current) => {
@@ -59,6 +65,15 @@ export default function MovementsScreen({ mode, onModeChange }: Props) {
       next.setMonth(next.getMonth() + delta);
       return next;
     });
+  }
+
+  if (importing) {
+    return (
+      <ImportScreen
+        onBack={() => setImporting(false)}
+        onImported={() => setImportedAt(Date.now())}
+      />
+    );
   }
 
   return (
@@ -116,9 +131,13 @@ export default function MovementsScreen({ mode, onModeChange }: Props) {
       </View>
 
       {mode === "uscite" ? (
-        <ExpensesList month={month} />
+        <ExpensesList
+          key={`spese-${importedAt}`}
+          month={month}
+          onImport={() => setImporting(true)}
+        />
       ) : (
-        <IncomeList month={month} />
+        <IncomeList key={`entrate-${importedAt}`} month={month} />
       )}
     </View>
   );
@@ -126,7 +145,13 @@ export default function MovementsScreen({ mode, onModeChange }: Props) {
 
 /** L'elenco spese di sempre, solo senza il proprio titolo/mese in testa —
  *  li mostra ormai la testata condivisa sopra. */
-function ExpensesList({ month }: { month: Date }) {
+function ExpensesList({
+  month,
+  onImport,
+}: {
+  month: Date;
+  onImport: () => void;
+}) {
   const { palette, dark } = useTheme();
   const { categories, categoryById, brandLabel } = useData();
   const { payments, error, staleLabel, staleReason, reload } = usePayments(month);
@@ -193,25 +218,43 @@ function ExpensesList({ month }: { month: Date }) {
       )}
 
       <View style={styles.filters}>
-        <View
-          style={[
-            styles.searchBox,
-            { backgroundColor: palette.surface, borderColor: palette.hairline },
-          ]}
-        >
-          <Icon name="search" size={15} color={palette.ink3} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Cerca per nome"
-            placeholderTextColor={palette.ink3}
-            style={[styles.searchInput, { color: palette.ink }]}
-          />
-          {query.length > 0 && (
-            <TouchableOpacity onPress={() => setQuery("")} hitSlop={8}>
-              <Icon name="x" size={15} color={palette.ink3} />
-            </TouchableOpacity>
-          )}
+        {/* La ricerca lascia spazio all'import: e' qui che ci si accorge che
+            manca qualcosa, e da qui deve partire il rimedio — non da tre
+            schermate piu' in la', fra le automazioni. */}
+        <View style={styles.searchRow}>
+          <View
+            style={[
+              styles.searchBox,
+              { backgroundColor: palette.surface, borderColor: palette.hairline },
+            ]}
+          >
+            <Icon name="search" size={15} color={palette.ink3} />
+            <TextInput
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Cerca"
+              placeholderTextColor={palette.ink3}
+              style={[styles.searchInput, { color: palette.ink }]}
+            />
+            {query.length > 0 && (
+              <TouchableOpacity onPress={() => setQuery("")} hitSlop={8}>
+                <Icon name="x" size={15} color={palette.ink3} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <TouchableOpacity
+            onPress={onImport}
+            style={[
+              styles.importButton,
+              { backgroundColor: palette.surface, borderColor: palette.hairline },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Importa movimenti"
+          >
+            <Icon name="file-up" size={15} color={palette.ink2} />
+            <Text style={[styles.importText, { color: palette.ink2 }]}>Importa</Text>
+          </TouchableOpacity>
         </View>
 
         <ScrollView
@@ -588,7 +631,9 @@ const styles = StyleSheet.create({
   month: { ...type.caption, fontWeight: "500", textTransform: "capitalize" },
   stale: { paddingHorizontal: space.lg, paddingTop: space.sm },
   filters: { paddingHorizontal: space.lg, gap: space.sm, paddingTop: space.sm, paddingBottom: space.sm },
+  searchRow: { flexDirection: "row", alignItems: "center", gap: space.sm },
   searchBox: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
@@ -597,6 +642,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 9,
   },
+  importButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: radius.field,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  importText: { ...type.caption, fontWeight: "500" },
   searchInput: { flex: 1, ...type.body, padding: 0 },
   chipRow: { gap: 7, paddingRight: space.lg },
   chip: {
