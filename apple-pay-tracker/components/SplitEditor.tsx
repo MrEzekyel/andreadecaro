@@ -1,12 +1,12 @@
 import React, { useState } from "react";
-import { Alert, StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount } from "../lib/format";
-import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
+import { Person } from "../lib/types";
+import { AddPersonSheet } from "./AddPersonSheet";
 import { Icon } from "./Icon";
-import { NamePromptSheet } from "./NamePromptSheet";
 
 export type SplitMode = "equal" | "percent" | "exact";
 
@@ -101,36 +101,13 @@ export function SplitEditor({ total, split, onChange }: Props) {
     });
   }
 
-  async function createPerson(name: string) {
-    const { data: session } = await supabase.auth.getSession();
-    const userId = session.session?.user.id;
-    if (!userId) {
-      Alert.alert("Sessione scaduta", "Accedi di nuovo.");
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from("people")
-      .insert({ user_id: userId, name })
-      .select()
-      .single();
-
-    if (error || !data) {
-      Alert.alert(
-        "Errore",
-        error?.code === "23505"
-          ? "Hai già una persona con questo nome."
-          : error?.message ?? "Salvataggio non riuscito."
-      );
-      return;
-    }
-
+  async function onPersonCreated(person: Person) {
     await reload();
     setAddingPerson(false);
     onChange({
       ...split,
       enabled: true,
-      personIds: [...split.personIds, data.id],
+      personIds: [...split.personIds, person.id],
     });
   }
 
@@ -150,12 +127,10 @@ export function SplitEditor({ total, split, onChange }: Props) {
           Per dividere una spesa aggiungi prima qualcuno con cui condividerla.
         </Text>
         {addPersonRow}
-        <NamePromptSheet
+        <AddPersonSheet
           visible={addingPerson}
-          title="Nuova persona"
-          placeholder="Nome"
           onClose={() => setAddingPerson(false)}
-          onSubmit={createPerson}
+          onCreated={onPersonCreated}
         />
       </View>
     );
@@ -323,12 +298,10 @@ export function SplitEditor({ total, split, onChange }: Props) {
         </>
       )}
 
-      <NamePromptSheet
+      <AddPersonSheet
         visible={addingPerson}
-        title="Nuova persona"
-        placeholder="Nome"
         onClose={() => setAddingPerson(false)}
-        onSubmit={createPerson}
+        onCreated={onPersonCreated}
       />
     </View>
   );

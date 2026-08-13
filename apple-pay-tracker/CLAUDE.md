@@ -497,6 +497,43 @@ che non sono sue, ed è la superficie più delicata dell'app.
   dell'importo che si propaga, cancellazione che porta via la copia.
 - "Risparmiato" (Home → Bilancio del mese) = Introiti − Spese − Investimenti:
   quello che resta sul conto senza essere né speso né investito.
+
+**`OwedScreen` (Dividi spese) ragiona per persona, non solo per direzione.**
+`lib/splits.ts` unisce `payment_splits` (i miei crediti) e `incoming_splits()`
+(le quote che mi hanno fatto) in un solo elenco di `SplitEvent`, perché i
+grafici e le liste sotto rispondono a "quanto ho diviso con Leonardo", non a
+"quanto nella tabella A e quanto nella B".
+
+- **`incoming_splits()` porta `payer_user_id`** (migrazione 0041, prima solo
+  nome/handle testuali). Il match con un contatto locale è un confronto
+  diretto contro `people.linked_user_id`, non un'euristica sul nome: regge
+  perché `ensure_linked_person` garantisce che un amico accettato ha già un
+  `people.id` collegato su **entrambi** i lati, non solo su chi ha pagato.
+- **Due semicerchi affiancati, non uno**: "Ti devono" cresce dalla punta
+  sinistra come sempre, "Devi" usa il nuovo `mirror` di `SemiGauge` e cresce
+  dalla punta destra — stessa scala (`max` = il maggiore dei due totali
+  aperti), cosi' il confronto si legge senza cambiare scheda. `mirror` flippa
+  solo l'arco (`scaleX: -1` su un `View` che avvolge il solo `<Svg>`): non e'
+  pensato per convivere con `endLabel`/`markRatio`, il cui testo verrebbe
+  scritto alla rovescia — qui non servono.
+- **`GroupedBarChart` (non `BarChart`) per "con chi dividi di più".**
+  `BarChart` disegna una barra per intervallo di tempo e non regge un secondo
+  valore accanto al primo; qui servono due barre affiancate per categoria
+  (ricevuto/inviato), sia raggruppando per persona (le prime 5) sia per mese
+  (dentro `PersonDetailScreen`).
+- **`PersonDetailScreen` è la stessa impalcatura di `DetailScreen`**
+  (categorie/esercenti nelle spese): totale, carosello di grafici, elenco per
+  mese con "Vedi tutte". La differenza è che qui il denaro si muove in due
+  direzioni, quindi ogni grafico ha due serie invece di una.
+- **`AddPersonSheet` sostituisce `NamePromptSheet` per le persone** (non per
+  gli altri usi di `NamePromptSheet`, es. `CardPicker`): due schede, "Nome"
+  (un contatto locale, subito pronto per la spesa che si sta salvando) e
+  "Clinck Tag" (ricerca per tag esatto + richiesta di amicizia). La ricerca
+  **non** rende la persona subito selezionabile per la spesa in corso: una
+  richiesta va accettata prima, quindi resta in sospeso e per quella spesa si
+  usa comunque "Nome" — dirlo esplicitamente nel testo evita di far credere
+  che la richiesta sblocchi qualcosa di immediato.
+
 ### Portafoglio investimenti
 
 - `assets` = cosa si possiede (nome, gruppo `conto_titoli`/`crypto`/

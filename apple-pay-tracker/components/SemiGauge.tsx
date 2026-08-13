@@ -33,6 +33,19 @@ type Props = {
   endLabel?: string;
   /** Contenuto al centro dell'arco (importo, etichette). */
   children?: React.ReactNode;
+  /**
+   * Specchia l'arco: riempie dalla punta destra invece che dalla sinistra.
+   *
+   * Serve alla coppia "Ti devono / Devi" in `OwedScreen`: due semicerchi
+   * affiancati sulla stessa scala, che crescono l'uno verso l'altro invece
+   * che nella stessa direzione — altrimenti due archi identici accostati si
+   * leggono come un unico arco spezzato, non come un confronto.
+   *
+   * Specchia solo gli archi (un `View` con `scaleX: -1` attorno al solo
+   * `<Svg>`): `endLabel` e `markRatio` non sono pensati per convivere con
+   * questo prop, perche' il loro testo verrebbe scritto alla rovescia.
+   */
+  mirror?: boolean;
 };
 
 /**
@@ -54,6 +67,7 @@ export function SemiGauge({
   stroke = 11,
   endLabel,
   children,
+  mirror,
 }: Props) {
   const { palette } = useTheme();
 
@@ -134,6 +148,7 @@ export function SemiGauge({
 
   return (
     <View>
+      <View style={mirror ? { transform: [{ scaleX: -1 }] } : undefined}>
       <Svg width={width} height={height}>
         {/* fondo dell'arco esterno */}
         <Circle
@@ -192,6 +207,7 @@ export function SemiGauge({
           </SvgText>
         )}
       </Svg>
+      </View>
 
       {/* Il contenuto al centro sta sopra come View e non come testo SVG:
           cosi' usa la stessa tipografia del resto dell'app. */}

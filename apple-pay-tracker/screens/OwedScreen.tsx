@@ -5,17 +5,27 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from "react-native";
+import { AddPersonSheet } from "../components/AddPersonSheet";
+import { ChartCarousel, ChartPage } from "../components/ChartCarousel";
+import { GroupedBarChart } from "../components/GroupedBarChart";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
-import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { SemiGauge } from "../components/SemiGauge";
 import { Sheet } from "../components/Sheet";
+import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useData } from "../lib/DataContext";
-import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, splitAmount } from "../lib/format";
+import {
+  buildSplitEvents,
+  groupEventsByMonth,
+  personTotals,
+  sameMonth,
+  SplitEvent,
+} from "../lib/splits";
 import {
   incomingSplits,
   linkPerson,
@@ -25,8 +35,10 @@ import {
   unlinkPerson,
 } from "../lib/social";
 import { supabase } from "../lib/supabase";
+import { useTheme } from "../lib/ThemeContext";
 import { radius, space, tint, type } from "../lib/theme";
 import { Connection, IncomingSplit, OpenCredit, Person } from "../lib/types";
+import PersonDetailScreen from "./PersonDetailScreen";
 
 /** Dopo quanti giorni un credito aperto viene segnalato come in ritardo. */
 const OVERDUE_DAYS = 3;
@@ -49,6 +61,8 @@ type Side = "credits" | "debts";
 export default function OwedScreen({ onBack }: { onBack: () => void }) {
   const { palette, dark } = useTheme();
   const { people, reload: reloadPeople } = useData();
+  const { width: windowWidth } = useWindowDimensions();
+  const gaugeWidth = (Math.min(windowWidth - space.lg * 2, 340) - space.lg) / 2;
 
   const [side, setSide] = useState<Side>("credits");
   const [credits, setCredits] = useState<OpenCredit[]>([]);
@@ -58,9 +72,13 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
   const [refreshing, setRefreshing] = useState(false);
   const [showSettled, setShowSettled] = useState(false);
   const [addingPerson, setAddingPerson] = useState(false);
-  const [newName, setNewName] = useState("");
   /** La persona a cui si sta cercando l'account Clinck da associare. */
   const [linking, setLinking] = useState<Person | null>(null);
+  /** La persona il cui dettaglio e' aperto, o null alla radice. */
+  const [openPerson, setOpenPerson] = useState<{ id: string; name: string } | null>(
+    null
+  );
+  const [showAllDivisions, setShowAllDivisions] = useState(false);
 
   const load = useCallback(async () => {
     // La spesa arriva in join perche' un credito senza il suo contesto
@@ -123,6 +141,30 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
     return Array.from(map.entries()).sort((a, b) => b[1].total - a[1].total);
   }, [open]);
 
+  // Tutte le divisioni viste per persona invece che per direzione: i due
+  // grafici sotto e l'elenco del mese ragionano su "quanto ho diviso con
+  // Leonardo", non su "quanto nella tabella dei crediti e quanto in quella
+  // dei debiti" — vedi lib/splits.ts.
+  const events = useMemo(
+    () => buildSplitEvents(credits, debts, people),
+    [credits, debts, people]
+  );
+
+  const top5 = useMemo(
+    () =>
+      personTotals(events)
+        .sort((a, b) => b.received + b.sent - (a.received + a.sent))
+        .slice(0, 5),
+    [events]
+  );
+
+  const monthEvents = useMemo(
+    () => events.filter((e) => sameMonth(new Date(e.occurredAt), new Date())),
+    [events]
+  );
+  const eventMonths = useMemo(() => groupEventsByMonth(events), [events]);
+  const hasOlderDivisions = events.length > monthEvents.length;
+
   async function settle(credit: OpenCredit) {
     const { error } = await supabase
       .from("payment_splits")
@@ -147,32 +189,7 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
     await load();
   }
 
-  async function addPerson() {
-    const trimmed = newName.trim();
-    if (!trimmed) return;
-
-    const { data: session } = await supabase.auth.getSession();
-    const userId = session.session?.user.id;
-    if (!userId) {
-      Alert.alert("Sessione scaduta", "Accedi di nuovo.");
-      return;
-    }
-
-    const { error } = await supabase
-      .from("people")
-      .insert({ user_id: userId, name: trimmed });
-
-    if (error) {
-      Alert.alert(
-        "Errore",
-        error.code === "23505"
-          ? "Hai già una persona con questo nome."
-          : error.message
-      );
-      return;
-    }
-
-    setNewName("");
+  async function onPersonCreated() {
     setAddingPerson(false);
     await reloadPeople();
   }
@@ -267,6 +284,17 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
     setRefreshing(false);
   }
 
+  if (openPerson) {
+    return (
+      <PersonDetailScreen
+        personId={openPerson.id}
+        personName={openPerson.name}
+        events={events}
+        onBack={() => setOpenPerson(null)}
+      />
+    );
+  }
+
   return (
     <SwipeBack onBack={onBack}>
     <View style={[styles.container, { backgroundColor: palette.ground }]}>
@@ -333,6 +361,48 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
+        {/* Le due direzioni fianco a fianco, sulla stessa scala: crescono
+            l'una verso l'altra invece che nello stesso verso, cosi' il
+            confronto si legge a colpo d'occhio senza dover cambiare scheda.
+            "Ti devono" e "Devi" restano comunque i due lati della lista
+            sotto — qui e' solo il riepilogo, non sostituisce la scelta. */}
+        {!error && (totalOpen > 0 || totalDebts > 0) && (
+          <View style={styles.gaugesRow}>
+            <View style={styles.gaugeCol}>
+              <SemiGauge
+                width={gaugeWidth}
+                stroke={12}
+                outer={{
+                  segments: [{ value: totalOpen, color: palette.good }],
+                  max: Math.max(totalOpen, totalDebts, 1),
+                }}
+              >
+                <Text style={[styles.gaugeAmount, { color: palette.ink }]} numberOfLines={1}>
+                  {formatAmount(totalOpen)}
+                </Text>
+              </SemiGauge>
+              <Text style={[styles.gaugeLabel, { color: palette.good }]}>Ti devono</Text>
+            </View>
+
+            <View style={styles.gaugeCol}>
+              <SemiGauge
+                width={gaugeWidth}
+                stroke={12}
+                mirror
+                outer={{
+                  segments: [{ value: totalDebts, color: palette.over }],
+                  max: Math.max(totalOpen, totalDebts, 1),
+                }}
+              >
+                <Text style={[styles.gaugeAmount, { color: palette.ink }]} numberOfLines={1}>
+                  {formatAmount(totalDebts)}
+                </Text>
+              </SemiGauge>
+              <Text style={[styles.gaugeLabel, { color: palette.over }]}>Devi</Text>
+            </View>
+          </View>
+        )}
+
         {/* "Totale da recuperare 0,00 € da 0 persone" con la rete spenta
             direbbe a chi legge che non gli deve piu' niente nessuno. */}
         {!error && (
@@ -581,7 +651,10 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
                     />
                   )}
                   <View style={styles.personRow}>
-                    <View style={{ flex: 1 }}>
+                    <TouchableOpacity
+                      style={{ flex: 1 }}
+                      onPress={() => setOpenPerson({ id: person.id, name: person.name })}
+                    >
                       <Text style={[styles.person, { color: palette.ink }]}>
                         {person.name}
                       </Text>
@@ -590,7 +663,7 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
                           Ha Clinck · le divisioni gli arrivano sull'app
                         </Text>
                       )}
-                    </View>
+                    </TouchableOpacity>
 
                     {/* Il tasto che chiude il caso piu' comune: si e' diviso
                         per mesi con un amico che non aveva l'app, poi la
@@ -698,37 +771,151 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
             ? `I crediti aperti da più di ${OVERDUE_DAYS} giorni vengono evidenziati. Le notifiche push arriveranno più avanti.`
             : "Accettare una quota la registra come spesa tua, con la data della spesa originale. Se chi ha pagato la corregge, si corregge anche la tua; se la cancella, sparisce anche dai tuoi conti."}
         </Text>
+
+        {/* ── Con chi divido di più ──────────────────────────────────────
+            Le due direzioni fianco a fianco per persona, non due grafici
+            separati: "quanto ho ricevuto da Leonardo" accanto a "quanto gli
+            ho mandato" e' la domanda che ci si fa, non le due tabelle da cui
+            i numeri arrivano. */}
+        {top5.length > 0 && (
+          <View>
+            <Text style={[styles.label, { color: palette.ink3 }]}>
+              Con chi dividi di più
+            </Text>
+            <ChartCarousel
+              pages={[
+                {
+                  key: "amount",
+                  title: "Quanto dividi",
+                  subtitle: "per persona",
+                  content: (
+                    <GroupedBarChart
+                      groups={top5.map((p) => ({
+                        key: p.personId,
+                        label: firstName(p.name),
+                        values: [p.received, p.sent],
+                      }))}
+                      colors={[palette.good, palette.over]}
+                      formatValue={(v) => formatAmount(v)}
+                    />
+                  ),
+                } as ChartPage,
+                {
+                  key: "count",
+                  title: "Quante volte",
+                  subtitle: "numero di divisioni",
+                  content: (
+                    <GroupedBarChart
+                      groups={top5.map((p) => ({
+                        key: p.personId,
+                        label: firstName(p.name),
+                        values: [p.receivedCount, p.sentCount],
+                      }))}
+                      colors={[palette.good, palette.over]}
+                      formatValue={(v) => String(Math.round(v))}
+                    />
+                  ),
+                } as ChartPage,
+              ]}
+            />
+
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: palette.good }]} />
+                <Text style={[styles.legendText, { color: palette.ink2 }]}>Ricevuto</Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View style={[styles.legendDot, { backgroundColor: palette.over }]} />
+                <Text style={[styles.legendText, { color: palette.ink2 }]}>Inviato</Text>
+              </View>
+            </View>
+
+            <View
+              style={[
+                styles.card,
+                { backgroundColor: palette.surface, borderColor: palette.hairline, marginTop: space.md },
+              ]}
+            >
+              {top5.map((p, index) => (
+                <View key={p.personId}>
+                  {index > 0 && (
+                    <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+                  )}
+                  <TouchableOpacity
+                    style={styles.personRow}
+                    onPress={() => setOpenPerson({ id: p.personId, name: p.name })}
+                  >
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.person, { color: palette.ink }]}>{p.name}</Text>
+                      <Text style={[styles.context, { color: palette.ink3 }]}>
+                        {p.receivedCount + p.sentCount}{" "}
+                        {p.receivedCount + p.sentCount === 1 ? "divisione" : "divisioni"}
+                      </Text>
+                    </View>
+                    <Icon name="chevron-right" size={14} color={palette.ink3} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          </View>
+        )}
+
+        {/* ── Divisioni del mese ─────────────────────────────────────────
+            Stesso schema di "Vedi tutte le transazioni" nel dettaglio di
+            una categoria: chiuso mostra solo il mese corrente, aperto
+            l'intera storia raggruppata. */}
+        {events.length > 0 && (
+          <View>
+            <View style={styles.listHead}>
+              <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
+                {showAllDivisions ? "Tutte le divisioni" : "Divisioni del mese"}
+              </Text>
+              {hasOlderDivisions && (
+                <TouchableOpacity onPress={() => setShowAllDivisions((v) => !v)}>
+                  <Text style={[styles.link, { color: palette.accent }]}>
+                    {showAllDivisions ? "Mostra meno" : "Vedi tutte"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {showAllDivisions ? (
+              eventMonths.map((group) => (
+                <View key={group.key}>
+                  <Text style={[styles.monthLabel, { color: palette.ink3 }]}>
+                    {group.label}
+                  </Text>
+                  {group.data.map((event) => (
+                    <DivisionRow
+                      key={event.id}
+                      event={event}
+                      onPress={() => setOpenPerson({ id: event.personId, name: event.personName })}
+                    />
+                  ))}
+                </View>
+              ))
+            ) : monthEvents.length > 0 ? (
+              monthEvents.map((event) => (
+                <DivisionRow
+                  key={event.id}
+                  event={event}
+                  onPress={() => setOpenPerson({ id: event.personId, name: event.personName })}
+                />
+              ))
+            ) : (
+              <Text style={[styles.empty, { color: palette.ink3 }]}>
+                Nessuna divisione questo mese.
+              </Text>
+            )}
+          </View>
+        )}
       </ScrollView>
 
-      <Sheet
+      <AddPersonSheet
         visible={addingPerson}
         onClose={() => setAddingPerson(false)}
-        title="Nuova persona"
-      >
-        <TextInput
-          value={newName}
-          onChangeText={setNewName}
-          placeholder="Nome"
-          placeholderTextColor={palette.ink3}
-          autoFocus
-          style={[
-            styles.input,
-            {
-              backgroundColor: palette.surface,
-              borderColor: palette.hairline,
-              color: palette.ink,
-            },
-          ]}
-        />
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: palette.accent }]}
-          onPress={addPerson}
-        >
-          <Text style={[styles.buttonText, { color: palette.onAccent }]}>
-            Aggiungi
-          </Text>
-        </TouchableOpacity>
-      </Sheet>
+        onCreated={onPersonCreated}
+      />
 
       <Sheet
         visible={linking !== null}
@@ -766,6 +953,41 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
       </Sheet>
     </View>
     </SwipeBack>
+  );
+}
+
+/** Solo nome, per non far traboccare l'etichetta sotto le colonne del grafico. */
+function firstName(name: string) {
+  return name.split(" ")[0];
+}
+
+function DivisionRow({ event, onPress }: { event: SplitEvent; onPress: () => void }) {
+  const { palette, dark } = useTheme();
+  const credit = event.direction === "credit";
+  const color = credit ? palette.good : palette.over;
+
+  return (
+    <TouchableOpacity style={styles.divisionRow} onPress={onPress}>
+      <View style={[styles.divisionIcon, { backgroundColor: tint(color, dark) }]}>
+        <Icon name={credit ? "arrow-down-left" : "arrow-up-right"} size={13} color={color} />
+      </View>
+      <View style={{ flex: 1 }}>
+        <Text style={[styles.person, { color: palette.ink }]} numberOfLines={1}>
+          {event.personName}
+        </Text>
+        <Text style={[styles.context, { color: palette.ink3 }]} numberOfLines={1}>
+          {event.merchant} ·{" "}
+          {new Date(event.occurredAt).toLocaleDateString("it-IT", {
+            day: "numeric",
+            month: "short",
+          })}
+        </Text>
+      </View>
+      <Text style={[styles.owed, { color }]}>
+        {credit ? "+" : "−"}
+        {formatAmount(event.amount)}
+      </Text>
+    </TouchableOpacity>
   );
 }
 
@@ -887,4 +1109,28 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   buttonText: { ...type.bodyMedium, fontSize: 14.5 },
+  gaugesRow: { flexDirection: "row", justifyContent: "space-between" },
+  gaugeCol: { alignItems: "center", gap: space.xs },
+  gaugeAmount: { ...type.bodyMedium, fontSize: 15, fontVariant: ["tabular-nums"] },
+  gaugeLabel: { ...type.small, fontWeight: "500" },
+  legendRow: { flexDirection: "row", gap: space.lg, justifyContent: "center", marginTop: space.sm },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
+  legendDot: { width: 8, height: 8, borderRadius: 4 },
+  legendText: { ...type.small },
+  listHead: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: space.sm,
+  },
+  link: { ...type.caption, fontWeight: "500" },
+  monthLabel: { ...type.label, marginTop: space.md, marginBottom: space.xs },
+  divisionRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 10 },
+  divisionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 });

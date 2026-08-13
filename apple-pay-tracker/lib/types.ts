@@ -150,6 +150,9 @@ export type IncomingSplit = {
   settle_requested_at: string | null;
   payer_name: string;
   payer_handle: string | null;
+  /** Chi ha pagato — collegabile a `people.linked_user_id` per raggruppare
+   *  per persona insieme alle quote che gli ho fatto io (migrazione 0041). */
+  payer_user_id: string;
   merchant: string;
   occurred_at: string;
   /** Quanto ha pagato in tutto chi ha diviso: dà il contesto alla quota. */
