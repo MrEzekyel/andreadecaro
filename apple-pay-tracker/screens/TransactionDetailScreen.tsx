@@ -40,6 +40,7 @@ const SOURCE_LABEL: Record<string, string> = {
   siri: "Dettata a Siri",
   manual: "Inserita a mano",
   recurring: "Ricorrente",
+  shared: "Divisa con te",
 };
 
 export default function TransactionDetailScreen({

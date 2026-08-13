@@ -389,6 +389,56 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   e non lo stato, altrimenti lascerebbe doppioni sulle rate già completate.
 - `incomes` è **sempre manuale**: stipendio e ricavi variano ogni volta,
   una regola ricorrente darebbe quasi sempre il numero sbagliato.
+
+### Spese divise fra due account (Clinck Tag)
+
+Fino alla migrazione 0037 l'app era a utente singolo: **ogni** policy diceva
+`auth.uid() = user_id`, senza eccezioni. Da qui in poi un utente legge righe
+che non sono sue, ed è la superficie più delicata dell'app.
+
+- **Tutto quello che attraversa il confine passa da una RPC `security
+  definer` con l'elenco delle colonne scritto a mano** (`lib/social.ts` →
+  `incoming_splits`, `find_profile_by_handle`, `list_connections`), mai da
+  una policy larga. Una policy su `payments` abbastanza permissiva da far
+  leggere all'amico la spesa che lo riguarda gli aprirebbe anche nota,
+  carta, categoria e `my_share` di chi ha pagato.
+- **La ricerca è per tag esatto, mai a prefisso.** Una ricerca "che inizia
+  per" su una tabella di profili è un modo per farsi enumerare l'utenza tre
+  lettere alla volta. Il tag si condivide, non si indovina. Verificato:
+  cercare `prova` non trova `prova_b`.
+- **`people.linked_user_id` è il perno di tutto il disegno.** Le quote
+  restano attaccate al contatto della rubrica e il contatto punta
+  all'account: un amico che scarica Clinck dopo mesi di cene divise si porta
+  dietro tutto lo storico scrivendo un uuid in una colonna (`link_person`,
+  il tasto "Associa"). Nessuna migrazione di dati, mai.
+- **Accettare una quota crea una spesa vera** nell'account di chi accetta
+  (`source='shared'`, `payment_splits.mirror_payment_id`). Senza, l'amico
+  accetterebbe un debito che nei suoi numeri non compare da nessuna parte.
+  L'esercente si risolve nella **sua** rubrica, non in quella di chi ha
+  pagato.
+- **Rifiutare non tocca la spesa di chi ha pagato.** Riportargli la quota a
+  carico suo cambierebbe da solo un mese che lui aveva già chiuso, in
+  silenzio: è la stessa classe di errore per cui `splitUnknown` blocca la
+  riscrittura delle quote non lette. Gli arriva l'avviso, decide lui.
+- **Correggere l'importo aggiorna la copia, non la riporta "da accettare"**
+  (`payment_splits_sync_mirror`): togliere di colpo una spesa già registrata
+  dal mese dell'amico è il verso pericoloso di sbagliare — il suo totale
+  calerebbe da solo.
+- **Il saldo lo conferma chi ha pagato**, sempre. Il debitore può dichiarare
+  "ho pagato" (`settle_requested_at`), ma Clinck non muove denaro: dare per
+  chiuso un credito sulla parola del debitore sarebbe l'unica bugia che
+  quella schermata può raccontare.
+- **`EditPaymentSheet` non può più cancellare e reinserire le quote.**
+  Funzionava finché una quota era un promemoria privato; ora la
+  cancellazione porta via anche la spesa che l'amico ha già nei suoi conti
+  (`payment_splits_drop_mirror`) e la riga reinserita riparte da "da
+  accettare" — salvare una nota cambierebbe il mese di un'altra persona.
+  Si fa `upsert` su `(payment_id, person_id)` e si cancellano solo le
+  persone tolte davvero.
+- Il giro completo è stato **provato end-to-end sui due account veri** prima
+  di scrivere una riga di interfaccia: tag, amicizia, contatti creati su
+  entrambe le rubriche, quota `pending`, accettazione, correzione
+  dell'importo che si propaga, cancellazione che porta via la copia.
 - "Risparmiato" (Home → Bilancio del mese) = Introiti − Spese − Investimenti:
   quello che resta sul conto senza essere né speso né investito.
 ### Portafoglio investimenti

@@ -22,6 +22,18 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-13",
+    date: "2026-08-13",
+    title: "Dividere le spese con gli amici",
+    items: [
+      "Scegli il tuo Clinck Tag da Impostazioni → Amici, condividilo, e i tuoi amici possono aggiungerti cercandolo.",
+      "Quando dividi una spesa con un amico che ha Clinck, la sua quota gli arriva sull'app: la accetta o la rifiuta, e se la accetta la spesa entra nei suoi conti.",
+      "Chi non ha Clinck resta come prima: le sue quote continuano a vivere in \"Ti devono\".",
+      "Se un amico scarica l'app dopo, dal suo nome in Divisioni c'è \"Associa\": le quote già aperte diventano sue, senza reinserire niente.",
+      "Il nome dell'esercente ora propone quelli che hai già usato, e i punti vendita della stessa insegna stanno insieme: tutti i McDonald's fanno una voce sola in \"dove spendi di più\".",
+    ],
+  },
+  {
     id: "2026-08-11",
     date: "2026-08-11",
     title: "La Home, ridisegnata",

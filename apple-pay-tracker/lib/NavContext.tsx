@@ -6,6 +6,7 @@ export type SettingsPage =
   | "limits"
   | "recurring"
   | "people"
+  | "friends"
   | "automations"
   | "export"
   | "subscription"

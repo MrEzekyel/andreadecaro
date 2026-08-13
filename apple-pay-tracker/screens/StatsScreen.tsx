@@ -71,6 +71,7 @@ const SOURCE_LABEL: Record<string, string> = {
   siri: "Siri",
   manual: "Manuale",
   recurring: "Ricorrente",
+  shared: "Divisa con te",
 };
 
 const SOURCE_ICON: Record<string, string> = {
@@ -79,6 +80,7 @@ const SOURCE_ICON: Record<string, string> = {
   siri: "mic",
   manual: "pencil",
   recurring: "repeat",
+  shared: "users",
 };
 
 /**

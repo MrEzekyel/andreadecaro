@@ -225,10 +225,7 @@ export function EditPaymentSheet({
       return;
     }
 
-    // Le quote vengono riscritte da zero: gestire l'insieme differenziale
-    // (chi e' stato tolto, chi aggiunto, chi cambiato) sarebbe piu' codice
-    // per lo stesso risultato, e questa tabella e' piccola per definizione.
-    // Ma "da zero" vale solo se sappiamo da cosa partiamo: se la lettura era
+    // "Da zero" vale solo se sappiamo da cosa partiamo: se la lettura era
     // fallita e l'utente non ha toccato la divisione, le quote restano dove
     // sono invece di essere azzerate da un editor che non le ha mai viste.
     if (!riscriviQuote) {
@@ -238,17 +235,46 @@ export function EditPaymentSheet({
       return;
     }
 
-    await supabase.from("payment_splits").delete().eq("payment_id", payment.id);
+    // Le quote si aggiornano **per persona**, non cancellando tutto e
+    // riscrivendo. Prima bastava cancellare e reinserire, perche' una quota
+    // era un promemoria privato; da quando puo' essere stata accettata da un
+    // altro account non lo e' piu': la cancellazione porterebbe via anche la
+    // spesa che l'amico ha gia' nei suoi conti (trigger
+    // `payment_splits_drop_mirror`), e la riga reinserita ripartirebbe da "da
+    // accettare". Salvare una nota cambierebbe il mese di un'altra persona.
+    const wanted = split.enabled ? split.personIds : [];
 
-    if (split.enabled && split.personIds.length > 0) {
-      const rows = split.personIds.map((personId) => ({
+    const { error: pruneError } = await (wanted.length > 0
+      ? supabase
+          .from("payment_splits")
+          .delete()
+          .eq("payment_id", payment.id)
+          .not("person_id", "in", `(${wanted.join(",")})`)
+      : supabase.from("payment_splits").delete().eq("payment_id", payment.id));
+
+    if (pruneError) {
+      setSaving(false);
+      Alert.alert(
+        "Spesa salvata, ma non le quote",
+        `La divisione non e' stata aggiornata: ${pruneError.message}`
+      );
+      onSaved();
+      onClose();
+      return;
+    }
+
+    if (wanted.length > 0) {
+      const rows = wanted.map((personId) => ({
         payment_id: payment.id,
         person_id: personId,
         amount_owed: splitResult.owed[personId] ?? 0,
       }));
+      // `onConflict` sul vincolo che esiste gia' da sempre: la quota di chi
+      // c'era prima viene aggiornata sul posto, quindi stato, accettazione e
+      // spesa speculare dell'amico restano al loro posto.
       const { error: splitError } = await supabase
         .from("payment_splits")
-        .insert(rows);
+        .upsert(rows, { onConflict: "payment_id,person_id" });
 
       if (splitError) {
         setSaving(false);

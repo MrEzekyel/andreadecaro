@@ -85,17 +85,75 @@ export type Person = {
   user_id: string;
   name: string;
   color: string;
+  /**
+   * L'account Clinck di questa persona, quando ce l'ha.
+   *
+   * È la colonna che regge tutta la divisione fra account: le quote restano
+   * attaccate al contatto della rubrica e il contatto punta all'account,
+   * quindi un amico che scarica l'app mesi dopo si porta dietro tutto lo
+   * storico senza che niente vada migrato (`link_person`).
+   */
+  linked_user_id: string | null;
   created_at: string;
 };
+
+/**
+ * `local` = persona senza account, il comportamento di sempre.
+ * `pending` = mandata a un account Clinck, in attesa di risposta.
+ * `accepted` = accettata, ed è diventata una spesa nel conto dell'altro.
+ * `declined` = rifiutata: la spesa di chi ha pagato **non** cambia da sola.
+ */
+export type SplitStatus = "local" | "pending" | "accepted" | "declined";
 
 export type PaymentSplit = {
   id: string;
   payment_id: string;
   person_id: string;
   amount_owed: number;
+  status: SplitStatus;
+  responded_at: string | null;
+  /** Quando il debitore ha dichiarato di aver pagato. Non salda da solo. */
+  settle_requested_at: string | null;
+  mirror_payment_id: string | null;
   settled_at: string | null;
   reminder_sent_at: string | null;
   created_at: string;
+};
+
+export type ConnectionStatus = "pending" | "accepted" | "declined" | "none";
+
+/** Un amico, o una richiesta di amicizia in sospeso. */
+export type Connection = {
+  connection_id: string;
+  other_user_id: string;
+  handle: string;
+  display_name: string;
+  status: "pending" | "accepted";
+  /** Vero se la richiesta l'ho ricevuta io e tocca a me rispondere. */
+  incoming: boolean;
+};
+
+/** Il risultato della ricerca per tag: tre campi e basta. */
+export type FoundProfile = {
+  user_id: string;
+  handle: string;
+  display_name: string;
+  connection_status: ConnectionStatus;
+};
+
+/** Una quota che qualcun altro ha diviso con me. */
+export type IncomingSplit = {
+  split_id: string;
+  amount_owed: number;
+  status: "pending" | "accepted";
+  settled_at: string | null;
+  settle_requested_at: string | null;
+  payer_name: string;
+  payer_handle: string | null;
+  merchant: string;
+  occurred_at: string;
+  /** Quanto ha pagato in tutto chi ha diviso: dà il contesto alla quota. */
+  total_amount: number;
 };
 
 /** Una quota con accanto la spesa e la persona a cui si riferisce. */
@@ -230,6 +288,9 @@ export type SubscriptionPlan = "monthly" | "annual";
 
 export type Profile = {
   user_id: string;
+  /** Il Clinck Tag: minuscolo, 3-20 fra lettere, numeri e underscore. */
+  handle: string | null;
+  display_name: string | null;
   trial_ends_at: string;
   subscription_status: SubscriptionStatus;
   subscription_plan: SubscriptionPlan | null;

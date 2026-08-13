@@ -29,6 +29,7 @@ import ChangelogScreen from "./ChangelogScreen";
 import ExportScreen from "./ExportScreen";
 import GuideScreen from "./GuideScreen";
 import LimitsScreen from "./LimitsScreen";
+import FriendsScreen from "./FriendsScreen";
 import OwedScreen from "./OwedScreen";
 import RecurringScreen from "./RecurringScreen";
 import ReferralScreen from "./ReferralScreen";
@@ -118,6 +119,7 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
       limits: <LimitsScreen onBack={back} />,
       recurring: <RecurringScreen onBack={back} />,
       people: <OwedScreen onBack={back} />,
+      friends: <FriendsScreen onBack={back} />,
       automations: (
         <AutomationsScreen onBack={back} onOpenGuide={() => setPage("guide")} />
       ),
@@ -243,6 +245,13 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
               : `${people.length} ${people.length === 1 ? "persona" : "persone"}`
           }
           onPress={() => setPage("people")}
+        />
+        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+        <SettingRow
+          icon="at-sign"
+          label="Amici"
+          value="Clinck Tag"
+          onPress={() => setPage("friends")}
         />
         <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
         <SettingRow

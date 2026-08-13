@@ -241,6 +241,13 @@ export function SplitEditor({ total, split, onChange }: Props) {
                   <Text style={[styles.personName, { color: palette.ink }]}>
                     {person.name}
                   </Text>
+                  {/* Chi ha Clinck riceve la quota sull'app e deve
+                      accettarla: e' una differenza di conseguenze, non un
+                      dettaglio del profilo, e va vista **prima** di
+                      spuntare la casella. */}
+                  {person.linked_user_id && (
+                    <Icon name="at-sign" size={12} color={palette.good} />
+                  )}
                 </TouchableOpacity>
 
                 {selected && split.mode !== "equal" && (
@@ -301,6 +308,18 @@ export function SplitEditor({ total, split, onChange }: Props) {
               {formatAmount(result.myShare)}
             </Text>
           </View>
+
+          {/* Detto una volta sola sotto, non su ogni riga: salvando parte
+              qualcosa verso un'altra persona, e chi divide deve saperlo
+              prima di premere Salva, non scoprirlo dopo. */}
+          {split.personIds.some(
+            (id) => people.find((p) => p.id === id)?.linked_user_id
+          ) && (
+            <Text style={[styles.hint, { color: palette.ink3 }]}>
+              La quota di chi ha Clinck gli arriva sull'app: dovrà accettarla,
+              e da quel momento la spesa comparirà anche nei suoi conti.
+            </Text>
+          )}
         </>
       )}
 
