@@ -65,10 +65,17 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
   const load = useCallback(async () => {
     // La spesa arriva in join perche' un credito senza il suo contesto
     // ("22,50 € da Leonardo") non dice abbastanza per agire.
+    //
+    // `payments!payment_splits_payment_id_fkey` e non il piu' semplice
+    // `payments(...)`: da `mirror_payment_id` (la copia nel conto
+    // dell'amico che accetta, migrazione 0038) `payment_splits` ha **due**
+    // riferimenti a `payments`, e senza dire quale usare PostgREST rifiuta
+    // la richiesta invece di indovinare ("more than one relationship was
+    // found for 'payment_splits' and 'payments'").
     const { data, error: failure } = await supabase
       .from("payment_splits")
       .select(
-        "*, person:people(*), payment:payments(id, merchant_name, occurred_at, amount)"
+        "*, person:people(*), payment:payments!payment_splits_payment_id_fkey(id, merchant_name, occurred_at, amount)"
       )
       .order("created_at", { ascending: false });
 
