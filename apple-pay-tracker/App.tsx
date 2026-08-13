@@ -27,6 +27,7 @@ import MovementsScreen from "./screens/MovementsScreen";
 import PortfolioScreen from "./screens/PortfolioScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import StatsScreen from "./screens/StatsScreen";
+import WelcomeScreen from "./screens/WelcomeScreen";
 
 type Tab = "home" | "movements" | "stats" | "portfolio" | "settings";
 
@@ -243,10 +244,60 @@ function Root() {
   return (
     <LockGate>
       <DataProvider key={session.user.id}>
-        <Shell />
+        <FirstRunGate>
+          <Shell />
+        </FirstRunGate>
       </DataProvider>
     </LockGate>
   );
+}
+
+/**
+ * Il benvenuto, una volta sola, appena l'account e' verificato.
+ *
+ * Il discriminante e' `profiles.display_name` nullo e non un flag su disco:
+ * un flag locale si perde cambiando telefono e rifarebbe comparire il
+ * benvenuto a chi l'ha gia' fatto, mentre il nome mancante e' la stessa cosa
+ * che la schermata esiste per raccogliere.
+ *
+ * Se il profilo non si riesce a leggere si tira dritto: un errore di rete
+ * all'avvio non deve poter bloccare fuori dall'app chi ci e' gia' dentro.
+ */
+function FirstRunGate({ children }: { children: React.ReactNode }) {
+  const { palette } = useTheme();
+  const [state, setState] = useState<
+    { status: "loading" } | { status: "welcome"; handle: string } | { status: "ready" }
+  >({ status: "loading" });
+
+  useEffect(() => {
+    (async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("handle, display_name")
+        .maybeSingle();
+
+      if (error || !data || data.display_name || !data.handle) {
+        setState({ status: "ready" });
+        return;
+      }
+      setState({ status: "welcome", handle: data.handle });
+    })();
+  }, []);
+
+  if (state.status === "loading") {
+    return <View style={{ flex: 1, backgroundColor: palette.ground }} />;
+  }
+
+  if (state.status === "welcome") {
+    return (
+      <WelcomeScreen
+        handle={state.handle}
+        onDone={() => setState({ status: "ready" })}
+      />
+    );
+  }
+
+  return <>{children}</>;
 }
 
 /**

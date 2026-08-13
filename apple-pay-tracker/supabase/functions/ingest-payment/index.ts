@@ -439,6 +439,10 @@ Deno.serve(async (req) => {
   // gruppo diverso a seconda di *da dove* e' entrata la spesa. La gestione
   // del 23505 sparisce con loro, perche' ora sta dentro la funzione (`on
   // conflict do update`).
+  //
+  // Il corpo della richiesta non cambia: `p_name` riceve lo stesso
+  // `merchantRaw` che arriva da Wallet, quello che prima finiva dritto in
+  // `merchants.display_name`.
   let merchantId: string | null = null;
   let categoryId: string | null = null;
 

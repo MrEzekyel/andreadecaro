@@ -414,9 +414,27 @@ che non sono sue, ed è la superficie più delicata dell'app.
   leggere all'amico la spesa che lo riguarda gli aprirebbe anche nota,
   carta, categoria e `my_share` di chi ha pagato.
 - **La ricerca è per tag esatto, mai a prefisso.** Una ricerca "che inizia
-  per" su una tabella di profili è un modo per farsi enumerare l'utenza tre
-  lettere alla volta. Il tag si condivide, non si indovina. Verificato:
+  per" su una tabella di profili è un modo per farsi enumerare l'utenza sei
+  cifre alla volta. Il tag si condivide, non si indovina. Verificato:
   cercare `prova` non trova `prova_b`.
+- **Il tag non si sceglie: lo assegna il database alla creazione
+  dell'account** (migrazione 0039). Formato `CLI-######`, sei cifre
+  casuali generate da `generate_clinck_tag()` — stesso schema di
+  `generate_referral_code()`: si riprova finché non se ne trova uno libero.
+  Prima era un nome scelto a mano (`@andrea`): con più di un utente i nomi
+  buoni finiscono subito, e inventarsi un identificativo è un passo in più
+  proprio nel momento in cui si vuole solo entrare nell'app. Con sei cifre
+  (un milione di combinazioni) restano collisioni teoriche solo fra due
+  registrazioni nello stesso istante che estraggono lo stesso numero — lo
+  stesso rischio, mai chiuso con un lock, che il codice referral aveva già
+  da prima. `set_handle` non esiste più: solo `set_display_name` resta
+  modificabile.
+- **`screens/WelcomeScreen.tsx` compare una volta sola**, subito dopo che il
+  codice email è stato verificato: chiede il nome e consegna il tag già
+  pronto, con Copia e Condividi. Il discriminante è `profiles.display_name`
+  nullo (`App.tsx` → `FirstRunGate`), non un flag salvato sul telefono — un
+  flag locale si perderebbe cambiando dispositivo e rifarebbe comparire il
+  benvenuto a chi ha già finito.
 - **`people.linked_user_id` è il perno di tutto il disegno.** Le quote
   restano attaccate al contatto della rubrica e il contatto punta
   all'account: un amico che scarica Clinck dopo mesi di cene divise si porta

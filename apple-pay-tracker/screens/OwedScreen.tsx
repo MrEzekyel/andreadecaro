@@ -750,7 +750,7 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
                 {friend.display_name}
               </Text>
               <Text style={[styles.context, { color: palette.ink3 }]}>
-                @{friend.handle}
+                {friend.handle}
               </Text>
             </View>
             <Icon name="chevron-right" size={16} color={palette.ink3} />

@@ -17,10 +17,17 @@ function fail(message: string): never {
   throw new Error(message);
 }
 
-export async function setHandle(handle: string, displayName?: string) {
-  const { data, error } = await supabase.rpc("set_handle", {
-    p_handle: handle,
-    p_display_name: displayName ?? null,
+/**
+ * Il nome con cui gli amici ti vedono.
+ *
+ * È l'unica cosa che si sceglie di se': il tag lo assegna il database alla
+ * creazione dell'account (`generate_clinck_tag`), e non e' modificabile —
+ * altrimenti l'unicita' garantita dal generatore dipenderebbe da cosa manda
+ * il client.
+ */
+export async function setDisplayName(name: string) {
+  const { data, error } = await supabase.rpc("set_display_name", {
+    p_display_name: name,
   });
   if (error) fail(error.message);
   return data as string;
@@ -30,8 +37,9 @@ export async function setHandle(handle: string, displayName?: string) {
  * Cerca una persona dal tag **esatto**.
  *
  * Non c'e' una ricerca "che inizia per", ed e' una scelta: su una tabella di
- * profili sarebbe un modo per farsi enumerare tutta l'utenza tre lettere alla
- * volta. Il tag si condivide, non si indovina.
+ * profili sarebbe un modo per farsi enumerare tutta l'utenza sei cifre alla
+ * volta. Il tag si condivide, non si indovina. Il database tollera solo le
+ * differenze di forma (minuscole, spazi, le sole cifre senza `CLI-`).
  */
 export async function findByHandle(handle: string): Promise<FoundProfile | null> {
   const { data, error } = await supabase.rpc("find_profile_by_handle", {

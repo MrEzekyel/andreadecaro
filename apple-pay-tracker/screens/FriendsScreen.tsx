@@ -1,3 +1,4 @@
+import * as Clipboard from "expo-clipboard";
 import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
@@ -22,7 +23,7 @@ import {
   listConnections,
   requestConnection,
   respondConnection,
-  setHandle,
+  setDisplayName,
 } from "../lib/social";
 import { supabase } from "../lib/supabase";
 import { radius, space, tint, type } from "../lib/theme";
@@ -32,22 +33,25 @@ import { Connection, FoundProfile } from "../lib/types";
  * Il Clinck Tag e gli amici.
  *
  * Ci si cerca **solo col tag esatto**: una ricerca a prefisso su una tabella
- * di profili sarebbe un modo per farsi enumerare tutta l'utenza tre lettere
+ * di profili sarebbe un modo per farsi enumerare tutta l'utenza sei cifre
  * alla volta. Il tag si condivide (di persona, in chat, col tasto qui sotto)
- * e chi lo riceve lo scrive per intero.
+ * e chi lo riceve lo incolla per intero.
+ *
+ * Il tag non si modifica: lo assegna il database alla creazione dell'account.
+ * Qui si consegna — con "Copia" e "Condividi" — e si cambia solo il nome.
  */
 export default function FriendsScreen({ onBack }: { onBack: () => void }) {
   const { palette, dark } = useTheme();
   const { reload: reloadPeople } = useData();
 
-  const [handle, setLocalHandle] = useState<string | null>(null);
-  const [displayName, setDisplayName] = useState<string | null>(null);
+  const [handle, setHandle] = useState<string | null>(null);
+  const [displayName, setLocalDisplayName] = useState<string | null>(null);
   const [connections, setConnections] = useState<Connection[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const [editing, setEditing] = useState(false);
-  const [draftHandle, setDraftHandle] = useState("");
   const [draftName, setDraftName] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -65,8 +69,8 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
         listConnections(),
       ]);
       if (profileError) throw new Error(profileError.message);
-      setLocalHandle(profile?.handle ?? null);
-      setDisplayName(profile?.display_name ?? null);
+      setHandle(profile?.handle ?? null);
+      setLocalDisplayName(profile?.display_name ?? null);
       setConnections(list);
       setError(null);
     } catch (e) {
@@ -78,14 +82,21 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
     load();
   }, [load]);
 
-  async function saveHandle() {
+  async function copyTag() {
+    if (!handle) return;
+    await Clipboard.setStringAsync(handle);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1800);
+  }
+
+  async function saveName() {
     setSaving(true);
     try {
-      await setHandle(draftHandle, draftName);
+      await setDisplayName(draftName);
       setEditing(false);
       await load();
     } catch (e) {
-      Alert.alert("Tag non salvato", e instanceof Error ? e.message : "Riprova.");
+      Alert.alert("Nome non salvato", e instanceof Error ? e.message : "Riprova.");
     } finally {
       setSaving(false);
     }
@@ -161,7 +172,10 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
             <LoadError message={error} onRetry={load} />
           ) : (
             <>
-              {/* ── Il proprio tag ─────────────────────────────────────── */}
+              {/* ── Il proprio tag ─────────────────────────────────────────
+                  Non si sceglie: lo assegna il database alla creazione
+                  dell'account. Qui si consegna — Copia, Condividi — e
+                  l'unica cosa che si personalizza e' il nome. */}
               <View
                 style={[
                   styles.card,
@@ -175,25 +189,49 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
                 {handle ? (
                   <>
                     <Text style={[styles.handle, { color: palette.ink }]}>
-                      @{handle}
+                      {handle}
                     </Text>
-                    {displayName && (
-                      <Text style={[styles.name, { color: palette.ink3 }]}>
-                        {displayName}
-                      </Text>
-                    )}
+                    <Text style={[styles.name, { color: palette.ink3 }]}>
+                      {displayName ?? "Senza nome"}
+                    </Text>
 
                     <View style={styles.tagActions}>
                       <TouchableOpacity
-                        style={[styles.pill, { backgroundColor: palette.accent }]}
+                        style={[
+                          styles.pill,
+                          {
+                            backgroundColor: copied
+                              ? tint(palette.good, dark)
+                              : palette.accent,
+                          },
+                        ]}
+                        onPress={copyTag}
+                      >
+                        <Icon
+                          name={copied ? "check" : "copy"}
+                          size={14}
+                          color={copied ? palette.good : palette.onAccent}
+                        />
+                        <Text
+                          style={[
+                            styles.pillText,
+                            { color: copied ? palette.good : palette.onAccent },
+                          ]}
+                        >
+                          {copied ? "Copiato" : "Copia"}
+                        </Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.pill, { borderWidth: 1, borderColor: palette.hairline }]}
                         onPress={() =>
                           Share.share({
-                            message: `Aggiungimi su Clinck: @${handle}`,
+                            message: `Aggiungimi su Clinck, il mio tag è ${handle} — così dividiamo le spese senza rincorrerci.`,
                           })
                         }
                       >
-                        <Icon name="share" size={14} color={palette.onAccent} />
-                        <Text style={[styles.pillText, { color: palette.onAccent }]}>
+                        <Icon name="share" size={14} color={palette.ink2} />
+                        <Text style={[styles.pillText, { color: palette.ink2 }]}>
                           Condividi
                         </Text>
                       </TouchableOpacity>
@@ -201,36 +239,18 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
                       <TouchableOpacity
                         style={[styles.pill, { borderWidth: 1, borderColor: palette.hairline }]}
                         onPress={() => {
-                          setDraftHandle(handle);
                           setDraftName(displayName ?? "");
                           setEditing(true);
                         }}
                       >
                         <Text style={[styles.pillText, { color: palette.ink2 }]}>
-                          Cambia
+                          Nome
                         </Text>
                       </TouchableOpacity>
                     </View>
                   </>
                 ) : (
-                  <>
-                    <Text style={[styles.body, { color: palette.ink3 }]}>
-                      Scegli un tag e i tuoi amici potranno trovarti per dividere
-                      le spese senza scriversi ogni volta chi deve cosa.
-                    </Text>
-                    <TouchableOpacity
-                      style={[styles.button, { backgroundColor: palette.accent }]}
-                      onPress={() => {
-                        setDraftHandle("");
-                        setDraftName("");
-                        setEditing(true);
-                      }}
-                    >
-                      <Text style={[styles.buttonText, { color: palette.onAccent }]}>
-                        Scegli il tuo tag
-                      </Text>
-                    </TouchableOpacity>
-                  </>
+                  <LoadError message="Non riesco a leggere il tuo tag." onRetry={load} />
                 )}
               </View>
 
@@ -246,14 +266,13 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
                       { backgroundColor: palette.surface, borderColor: palette.hairline },
                     ]}
                   >
-                    <Text style={[styles.at, { color: palette.ink3 }]}>@</Text>
                     <TextInput
                       value={query}
                       onChangeText={setQuery}
                       onSubmitEditing={search}
-                      placeholder="il tag dell'amico"
+                      placeholder="CLI-076982"
                       placeholderTextColor={palette.ink3}
-                      autoCapitalize="none"
+                      autoCapitalize="characters"
                       autoCorrect={false}
                       returnKeyType="search"
                       style={[styles.searchInput, { color: palette.ink }]}
@@ -272,11 +291,13 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
                   </TouchableOpacity>
                 </View>
 
-                {/* Il tag va scritto per intero, e va detto: chi cerca "and"
-                    e non trova "andrea" deve capire perche', altrimenti
-                    conclude che l'amico non ha l'app. */}
+                {/* Il tag va scritto per intero, e va detto: chi cerca solo
+                    "076982" senza il prefisso deve capire perche' non trova
+                    niente, altrimenti conclude che l'amico non ha l'app. Il
+                    database accetta comunque le sole sei cifre: e' lo stesso
+                    tag scritto in modo diverso, non una ricerca parziale. */}
                 <Text style={[styles.hint, { color: palette.ink3 }]}>
-                  Serve il tag esatto, per intero.
+                  Serve il tag esatto — puoi scriverlo anche senza "CLI-".
                 </Text>
 
                 {found && (
@@ -296,7 +317,7 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
                         {found.display_name}
                       </Text>
                       <Text style={[styles.resultHandle, { color: palette.ink3 }]}>
-                        @{found.handle}
+                        {found.handle}
                       </Text>
                     </View>
 
@@ -347,7 +368,7 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
                               {request.display_name}
                             </Text>
                             <Text style={[styles.resultHandle, { color: palette.ink3 }]}>
-                              @{request.handle}
+                              {request.handle}
                             </Text>
                           </View>
                           <TouchableOpacity
@@ -413,7 +434,7 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
                               {friend.display_name}
                             </Text>
                             <Text style={[styles.resultHandle, { color: palette.ink3 }]}>
-                              @{friend.handle}
+                              {friend.handle}
                             </Text>
                           </View>
                           {friend.status === "pending" && (
@@ -431,50 +452,18 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
           )}
         </ScrollView>
 
-        <Sheet
-          visible={editing}
-          onClose={() => setEditing(false)}
-          title={handle ? "Cambia il tag" : "Scegli il tuo tag"}
-        >
-          <View>
-            <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Tag</Text>
-            <View
-              style={[
-                styles.searchBox,
-                { backgroundColor: palette.surface, borderColor: palette.hairline },
-              ]}
-            >
-              <Text style={[styles.at, { color: palette.ink3 }]}>@</Text>
-              <TextInput
-                value={draftHandle}
-                onChangeText={(text) =>
-                  // Si normalizza mentre si scrive invece di rifiutare dopo:
-                  // il tag e' minuscolo per forza, e far scrivere "Andrea"
-                  // per poi dire di no e' un giro inutile.
-                  setLocalDraft(text, setDraftHandle)
-                }
-                placeholder="andrea"
-                placeholderTextColor={palette.ink3}
-                autoCapitalize="none"
-                autoCorrect={false}
-                maxLength={20}
-                style={[styles.searchInput, { color: palette.ink }]}
-              />
-            </View>
-            <Text style={[styles.hint, { color: palette.ink3 }]}>
-              Da 3 a 20 caratteri: lettere, numeri e underscore.
-            </Text>
-          </View>
-
+        <Sheet visible={editing} onClose={() => setEditing(false)} title="Il tuo nome">
           <View>
             <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-              Come ti vedono
+              Come ti vedono gli amici
             </Text>
             <TextInput
               value={draftName}
               onChangeText={setDraftName}
               placeholder="Il tuo nome"
               placeholderTextColor={palette.ink3}
+              autoFocus
+              maxLength={40}
               style={[
                 styles.input,
                 {
@@ -488,7 +477,7 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
 
           <TouchableOpacity
             style={[styles.button, { backgroundColor: palette.accent }]}
-            onPress={saveHandle}
+            onPress={saveName}
             disabled={saving}
           >
             {saving ? (
@@ -503,11 +492,6 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
       </View>
     </SwipeBack>
   );
-}
-
-/** Minuscole e caratteri ammessi, mentre si scrive. */
-function setLocalDraft(text: string, set: (value: string) => void) {
-  set(text.toLowerCase().replace(/[^a-z0-9_]/g, ""));
 }
 
 const styles = StyleSheet.create({
