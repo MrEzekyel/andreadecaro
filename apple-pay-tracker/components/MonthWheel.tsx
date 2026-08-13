@@ -4,6 +4,7 @@ import {
   LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  ScrollView,
   StyleSheet,
   View,
 } from "react-native";
@@ -33,7 +34,7 @@ type Props = {
 export function MonthWheel({ months, value, onChange }: Props) {
   const { palette } = useTheme();
   const scrollX = useRef(new Animated.Value(0)).current;
-  const ref = useRef<Animated.FlatList<Date>>(null);
+  const ref = useRef<ScrollView>(null);
   const [width, setWidth] = useState(0);
   const positioned = useRef(false);
 
@@ -55,11 +56,7 @@ export function MonthWheel({ months, value, onChange }: Props) {
     // allinearlo a mano la ghiera finisce nella posizione giusta ma illumina
     // la voce sbagliata (era il "mostra luglio ma si illumina maggio").
     scrollX.setValue(offset);
-
-    // Il ref di un componente animato non sempre espone i metodi della lista
-    // sottostante: se manca, la ghiera resta dov'e' invece di far cadere la
-    // schermata.
-    ref.current?.scrollToOffset?.({ offset, animated });
+    ref.current?.scrollTo({ x: offset, animated });
   }, [value, width, scrollX]);
 
   function onMomentumEnd(event: NativeSyntheticEvent<NativeScrollEvent>) {
@@ -75,33 +72,29 @@ export function MonthWheel({ months, value, onChange }: Props) {
   return (
     <View onLayout={onLayout} style={{ height: HEIGHT }}>
       {width > 0 && (
-        <Animated.FlatList
+        // `ScrollView` e non `FlatList`: la ghiera copre al piu' qualche
+        // decina di mesi, non ha bisogno di virtualizzazione, e un
+        // `Animated.FlatList` orizzontale annidato in un carosello
+        // orizzontale (`ChartCarousel`, stessa orientazione) e' esattamente
+        // il caso che React Native avvisa di non fare — "VirtualizedLists
+        // should never be nested inside plain ScrollViews with the same
+        // orientation" — perche' puo' rompere il windowing di entrambi.
+        <Animated.ScrollView
           ref={ref}
-          data={months}
           horizontal
           showsHorizontalScrollIndicator={false}
           snapToInterval={ITEM_W}
           decelerationRate="fast"
           disableIntervalMomentum
-          keyExtractor={(item) => String((item as Date).getTime())}
           contentContainerStyle={{ paddingHorizontal: sidePad }}
-          getItemLayout={(_, index) => ({
-            // Deve includere il padding laterale: e' la posizione REALE
-            // dell'elemento nel contenuto, non lo scroll che lo centra —
-            // usarlo come scroll (come faceva initialScrollIndex prima di
-            // questa versione) sbagliava il punto d'arrivo di un intero
-            // padding, visibile su liste corte come "parte dal primo mese".
-            length: ITEM_W,
-            offset: sidePad + ITEM_W * index,
-            index,
-          })}
           onMomentumScrollEnd={onMomentumEnd}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { x: scrollX } } }],
             { useNativeDriver: true }
           )}
           scrollEventThrottle={16}
-          renderItem={({ item, index }) => {
+        >
+          {months.map((month, index) => {
             const distance = Animated.divide(
               Animated.subtract(scrollX, index * ITEM_W),
               ITEM_W
@@ -128,6 +121,7 @@ export function MonthWheel({ months, value, onChange }: Props) {
 
             return (
               <Animated.View
+                key={month.getTime()}
                 style={[
                   styles.item,
                   { opacity, transform: [{ scale }, { translateY }] },
@@ -137,12 +131,12 @@ export function MonthWheel({ months, value, onChange }: Props) {
                   style={[styles.label, { color: palette.ink }]}
                   numberOfLines={1}
                 >
-                  {monthShort(item as Date)}
+                  {monthShort(month)}
                 </Animated.Text>
               </Animated.View>
             );
-          }}
-        />
+          })}
+        </Animated.ScrollView>
       )}
     </View>
   );

@@ -74,6 +74,17 @@ produzione.
   Expo Go. Il mese in Home si cambia con un selettore a foglio
   (`MonthYearPicker`, apertura al tocco), non più a swipe; in Statistiche il
   periodo si cambia sia con le frecce sia con lo swipe
+- **`components/MonthWheel.tsx` usa `Animated.ScrollView`, non
+  `Animated.FlatList`.** Era un `FlatList` fino a che, dentro il dettaglio di
+  un esercente (terza pagina del carosello "Peso nella categoria"), non ha
+  fatto scattare l'avviso di React Native "VirtualizedLists should never be
+  nested inside plain ScrollViews with the same orientation": la ghiera è
+  orizzontale e vive dentro `ChartCarousel`, anch'esso uno scorrimento
+  orizzontale — stessa orientazione, l'esatto caso che l'avviso segnala.
+  La ghiera copre al più qualche decina di mesi, non ha bisogno di
+  virtualizzazione: `ScrollView` con gli elementi mappati a mano risolve
+  senza perdere l'animazione (opacità/scala/traslazione interpolate su
+  `scrollX`) né il posizionamento esatto al primo render.
 - Schede in basso: Home, Movimenti, Statistiche, Investimenti. **Impostazioni
   non è una scheda**: ci si arriva dall'ingranaggio in alto a destra, uguale
   su tutte e quattro (`components/ScreenHeader.tsx`, `useNav().openSettings`)
