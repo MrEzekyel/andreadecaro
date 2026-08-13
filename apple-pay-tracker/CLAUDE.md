@@ -93,6 +93,18 @@ produzione.
   (dentro Movimenti, Statistiche, Investimenti): quelle hanno già un tasto
   Indietro, e un secondo modo di uscire accanto confonderebbe quale dei due
   riporta dove.
+- **`screens/SettingsScreen.tsx` è organizzata per argomento, non per ordine
+  di aggiunta.** *Profilo* sta da sola in cima, in una card propria: è
+  l'unica riga che parla di te invece che di una funzione dell'app, e
+  mescolata con le altre si perde. Poi Aspetto e Blocco (preferenze del
+  dispositivo), *Spese* (Categorie, Limiti, Spese ricorrenti, Dividi spese —
+  tutto ciò che riguarda come si registra e si divide una spesa), *Account*
+  (Abbonamento, Invita un amico, Automazioni — tutto ciò che riguarda il
+  rapporto con Clinck stesso), infine Esporta i dati e Novità. La pagina
+  dietro "Profilo" (`screens/FriendsScreen.tsx`, chiave di navigazione
+  `"profile"`) mostra prima il proprio tag e nome, poi la ricerca amici e le
+  richieste: non si chiama "Amici" perché la prima cosa che fa è parlare di
+  te, non di loro.
 
 ## Design system
 
@@ -371,6 +383,12 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   vero senza che niente lo segnali. È `security invoker` e non `definer`:
   qui la RLS serve, non va aggirata, e ogni utente vede i propri totali
   perché le policy sulle tabelle sottostanti si applicano a lui.
+  Il client (`HomeScreen.loadHistory`) aveva lo stesso difetto già chiuso
+  una volta per Flusso (vedi commit "Flusso che spariva in silenzio"): un
+  errore di rete su questa RPC faceva sparire "Sui mesi" ed "Entrate mese
+  per mese" senza dire perché, indistinguibile da un bug del grafico.
+  `historyError` copre ora entrambi, con lo stesso avviso "tira giù per
+  aggiornare".
 - `investment_rules` = i **piani di accumulo** (schermata PAC). Il ciclo è
   interamente automatico e **non richiede mai un import**:
   1. `materialize_investments()` (cron 05:00 UTC) inserisce la rata il giorno

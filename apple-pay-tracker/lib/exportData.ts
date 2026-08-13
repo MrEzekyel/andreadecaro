@@ -302,7 +302,7 @@ async function buildSplits(): Promise<{ csv: string } & ExportResult> {
 
   // Quello che ti devono ancora: le quote non saldate. E' l'unico dei quattro
   // che coincide anche con un numero mostrato a schermo, il "Totale da
-  // recuperare" di "Mi devono".
+  // recuperare" della scheda "Ti devono" in Divisioni.
   const total = splits
     .filter((s) => s.settled_at === null)
     .reduce((sum, s) => sum + Number(s.amount_owed), 0);

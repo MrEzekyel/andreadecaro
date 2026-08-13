@@ -186,7 +186,7 @@ export default function WelcomeScreen({ handle, onDone }: Props) {
         </TouchableOpacity>
 
         <Text style={[styles.footNote, { color: palette.ink3 }]}>
-          Il tag lo trovi sempre in Impostazioni → Amici.
+          Il tag lo trovi sempre in Impostazioni → Profilo.
         </Text>
       </ScrollView>
     </KeyboardAvoidingView>

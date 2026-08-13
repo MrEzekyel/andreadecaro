@@ -90,7 +90,8 @@ export function EditPaymentSheet({
    * salvataggio successivo cancella le quote vere: `my_share` torna a null e
    * la delete non reinserisce niente. Una cena da 80 euro divisa in quattro
    * rientrerebbe nel mese per 80 invece che per 20, e i crediti sparirebbero
-   * da "Mi devono" — una perdita di dati che *aumenta* le spese in silenzio.
+   * da "Dividi spese" — una perdita di dati che *aumenta* le spese in
+   * silenzio.
    */
   const [splitUnknown, setSplitUnknown] = useState(false);
   const [siblingCount, setSiblingCount] = useState(0);

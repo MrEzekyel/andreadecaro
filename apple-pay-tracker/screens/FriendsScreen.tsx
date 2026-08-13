@@ -30,7 +30,11 @@ import { radius, space, tint, type } from "../lib/theme";
 import { Connection, FoundProfile } from "../lib/types";
 
 /**
- * Il Clinck Tag e gli amici.
+ * Profilo: il proprio Clinck Tag, il nome, e gli amici.
+ *
+ * Non e' "Amici" perche' la prima cosa che questa schermata fa e' parlare di
+ * se': il tag da consegnare, il nome da correggere. Gli amici — richieste,
+ * ricerca, elenco — sono la seconda meta', non il motivo per cui ci si entra.
  *
  * Ci si cerca **solo col tag esatto**: una ricerca a prefisso su una tabella
  * di profili sarebbe un modo per farsi enumerare tutta l'utenza sei cifre
@@ -166,7 +170,7 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          <Text style={[styles.title, { color: palette.ink }]}>Amici</Text>
+          <Text style={[styles.title, { color: palette.ink }]}>Profilo</Text>
 
           {error ? (
             <LoadError message={error} onRetry={load} />
@@ -404,7 +408,7 @@ export default function FriendsScreen({ onBack }: { onBack: () => void }) {
                 {friends.length === 0 && sent.length === 0 ? (
                   <Text style={[styles.empty, { color: palette.ink3 }]}>
                     Ancora nessuno. Le spese divise con chi non ha Clinck
-                    continuano a funzionare come prima: restano in "Mi devono".
+                    continuano a funzionare come prima: restano in "Dividi spese".
                   </Text>
                 ) : (
                   <View

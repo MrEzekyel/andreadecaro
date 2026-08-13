@@ -119,7 +119,7 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
       limits: <LimitsScreen onBack={back} />,
       recurring: <RecurringScreen onBack={back} />,
       people: <OwedScreen onBack={back} />,
-      friends: <FriendsScreen onBack={back} />,
+      profile: <FriendsScreen onBack={back} />,
       automations: (
         <AutomationsScreen onBack={back} onOpenGuide={() => setPage("guide")} />
       ),
@@ -143,6 +143,22 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
       contentContainerStyle={styles.content}
     >
       <Text style={[styles.title, { color: palette.ink }]}>Impostazioni</Text>
+
+      {/* Da sola, in cima: e' l'unica riga che parla di te invece che di una
+          funzione dell'app, e mescolata con le altre si perderebbe. */}
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: palette.surface, borderColor: palette.hairline },
+        ]}
+      >
+        <SettingRow
+          icon="circle-user-round"
+          label="Profilo"
+          value={profile?.display_name ?? profile?.handle ?? "…"}
+          onPress={() => setPage("profile")}
+        />
+      </View>
 
       <View>
         <Text style={[styles.label, { color: palette.ink3 }]}>Aspetto</Text>
@@ -205,75 +221,81 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
         </View>
       </View>
 
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: palette.surface, borderColor: palette.hairline },
-        ]}
-      >
-        <SettingRow
-          icon="palette"
-          label="Categorie"
-          value={String(categories.length)}
-          onPress={() => setPage("categories")}
-        />
-        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
-        <SettingRow
-          icon="gauge"
-          label="Limiti di spesa"
-          value={
-            statuses.length === 0
-              ? "nessuno"
-              : `${statuses.length} attiv${statuses.length === 1 ? "o" : "i"}`
-          }
-          onPress={() => setPage("limits")}
-        />
-        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
-        <SettingRow
-          icon="repeat"
-          label="Spese ricorrenti"
-          value="Gestisci"
-          onPress={() => setPage("recurring")}
-        />
-        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
-        <SettingRow
-          icon="users"
-          label="Mi devono"
-          value={
-            people.length === 0
-              ? "nessuno"
-              : `${people.length} ${people.length === 1 ? "persona" : "persone"}`
-          }
-          onPress={() => setPage("people")}
-        />
-        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
-        <SettingRow
-          icon="at-sign"
-          label="Amici"
-          value="Clinck Tag"
-          onPress={() => setPage("friends")}
-        />
-        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
-        <SettingRow
-          icon="zap"
-          label="Automazioni"
-          value="Gestisci"
-          onPress={() => setPage("automations")}
-        />
-        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
-        <SettingRow
-          icon="crown"
-          label="Abbonamento"
-          value={subscriptionValue}
-          onPress={() => setPage("subscription")}
-        />
-        <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
-        <SettingRow
-          icon="gift"
-          label="Invita un amico"
-          value="Gestisci"
-          onPress={() => setPage("referral")}
-        />
+      <View>
+        <Text style={[styles.label, { color: palette.ink3 }]}>Spese</Text>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: palette.surface, borderColor: palette.hairline },
+          ]}
+        >
+          <SettingRow
+            icon="palette"
+            label="Categorie"
+            value={String(categories.length)}
+            onPress={() => setPage("categories")}
+          />
+          <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+          <SettingRow
+            icon="gauge"
+            label="Limiti di spesa"
+            value={
+              statuses.length === 0
+                ? "nessuno"
+                : `${statuses.length} attiv${statuses.length === 1 ? "o" : "i"}`
+            }
+            onPress={() => setPage("limits")}
+          />
+          <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+          <SettingRow
+            icon="repeat"
+            label="Spese ricorrenti"
+            value="Gestisci"
+            onPress={() => setPage("recurring")}
+          />
+          <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+          <SettingRow
+            icon="users"
+            label="Dividi spese"
+            value={
+              people.length === 0
+                ? "nessuno"
+                : `${people.length} ${people.length === 1 ? "persona" : "persone"}`
+            }
+            onPress={() => setPage("people")}
+          />
+        </View>
+      </View>
+
+      <View>
+        <Text style={[styles.label, { color: palette.ink3 }]}>Account</Text>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: palette.surface, borderColor: palette.hairline },
+          ]}
+        >
+          <SettingRow
+            icon="crown"
+            label="Abbonamento"
+            value={subscriptionValue}
+            onPress={() => setPage("subscription")}
+          />
+          <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+          <SettingRow
+            icon="gift"
+            label="Invita un amico"
+            value="Gestisci"
+            onPress={() => setPage("referral")}
+          />
+          <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+          <SettingRow
+            icon="zap"
+            label="Automazioni"
+            value="Gestisci"
+            onPress={() => setPage("automations")}
+          />
+        </View>
       </View>
 
       <View

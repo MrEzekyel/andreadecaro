@@ -221,11 +221,18 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
   // I totali per mese arrivano gia' aggregati dal database: sommarli qui
   // vorrebbe dire scaricare un anno di pagamenti a ogni apertura della Home.
   const [history, setHistory] = useState<MonthTotal[]>([]);
+  // Senza questo, un fallimento di rete su `monthly_totals` faceva sparire
+  // "Sui mesi" ed "Entrate mese per mese" senza dire perche' — la stessa
+  // classe di difetto gia' chiusa per Flusso (vedi `balanceError`), rimasta
+  // aperta qui perche' i due grafici leggono la stessa `history` ma nessuno
+  // dei due controllava se la lettura fosse davvero andata a buon fine.
+  const [historyError, setHistoryError] = useState(false);
 
   const loadHistory = useCallback(async () => {
     const { data, error } = await supabase.rpc("monthly_totals", {
       p_months: MESI_STORICI,
     });
+    setHistoryError(Boolean(error));
     if (error) return;
     setHistory(
       ((data ?? []) as MonthTotal[]).map((row) => ({
@@ -848,16 +855,27 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                     </View>
                   )}
 
-                  {spesaBars.length > 1 && (
+                  {historyError ? (
                     <View style={[styles.card, { backgroundColor: palette.surface }]}>
                       <Text style={[styles.cardLabel, { color: palette.ink3 }]}>
                         Sui mesi
                       </Text>
-                      <MonthBars bars={spesaBars} color={palette.accent} />
-                      <Text style={[styles.cardFoot, { color: palette.ink3 }]}>
-                        media {formatAmount(monthBarsAverage(spesaBars))}
+                      <Text style={[styles.cardFoot, { color: palette.warn }]}>
+                        Non disponibile. Tira giù per aggiornare.
                       </Text>
                     </View>
+                  ) : (
+                    spesaBars.length > 1 && (
+                      <View style={[styles.card, { backgroundColor: palette.surface }]}>
+                        <Text style={[styles.cardLabel, { color: palette.ink3 }]}>
+                          Sui mesi
+                        </Text>
+                        <MonthBars bars={spesaBars} color={palette.accent} />
+                        <Text style={[styles.cardFoot, { color: palette.ink3 }]}>
+                          media {formatAmount(monthBarsAverage(spesaBars))}
+                        </Text>
+                      </View>
+                    )
                   )}
                 </View>
 
@@ -1098,7 +1116,21 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                   </View>
                 )}
 
-                {introitiBars.length > 1 && (
+                {historyError && (
+                  <View style={[styles.alert, { backgroundColor: `${palette.warn}1f` }]}>
+                    <Icon name="triangle-alert" size={16} color={palette.warn} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.alertTitle, { color: palette.ink }]}>
+                        Entrate mese per mese non disponibili
+                      </Text>
+                      <Text style={[styles.alertBody, { color: palette.ink2 }]}>
+                        Tira giù per aggiornare.
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {!historyError && introitiBars.length > 1 && (
                   <View>
                     {/* La media sta qui e non piu' come riga sul grafico: era
                         un riferimento che nessun mese toccava, e occupava lo
