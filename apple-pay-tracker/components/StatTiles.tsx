@@ -12,7 +12,13 @@ export type Tile = {
   tone?: "neutral" | "good" | "bad";
 };
 
-type Props = { tiles: Tile[] };
+type Props = {
+  tiles: Tile[];
+  /** Tinta di `tone: "good"`. Investimenti passa `palette.investUp` (piu'
+   *  cupo, pensato per stare accanto al blu di quella sezione); altrove il
+   *  verde comune dell'app basta, quindi resta il default. */
+  goodColor?: string;
+};
 
 /**
  * Numeri secondari come riquadri affiancati invece che come righe di elenco.
@@ -25,11 +31,11 @@ type Props = { tiles: Tile[] };
  * per cio' che si tocca o per gli elenchi lunghi, e qui non serve delimitare,
  * serve raggruppare.
  */
-export function StatTiles({ tiles }: Props) {
+export function StatTiles({ tiles, goodColor }: Props) {
   const { palette } = useTheme();
 
   const colore = (tone: Tile["tone"]) =>
-    tone === "good" ? palette.investUp : tone === "bad" ? palette.over : palette.ink;
+    tone === "good" ? goodColor ?? palette.good : tone === "bad" ? palette.over : palette.ink;
 
   return (
     <View style={styles.grid}>

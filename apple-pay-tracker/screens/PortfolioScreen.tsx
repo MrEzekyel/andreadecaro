@@ -348,6 +348,7 @@ export default function PortfolioScreen({ addNonce }: Props) {
       </View>
 
       <StatTiles
+        goodColor={palette.investUp}
         tiles={[
           ...(xirr !== null
             ? [{

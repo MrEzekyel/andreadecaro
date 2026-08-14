@@ -509,13 +509,44 @@ grafici e le liste sotto rispondono a "quanto ho diviso con Leonardo", non a
   diretto contro `people.linked_user_id`, non un'euristica sul nome: regge
   perché `ensure_linked_person` garantisce che un amico accettato ha già un
   `people.id` collegato su **entrambi** i lati, non solo su chi ha pagato.
-- **Due semicerchi affiancati, non uno**: "Ti devono" cresce dalla punta
-  sinistra come sempre, "Devi" usa il nuovo `mirror` di `SemiGauge` e cresce
-  dalla punta destra — stessa scala (`max` = il maggiore dei due totali
-  aperti), cosi' il confronto si legge senza cambiare scheda. `mirror` flippa
-  solo l'arco (`scaleX: -1` su un `View` che avvolge il solo `<Svg>`): non e'
-  pensato per convivere con `endLabel`/`markRatio`, il cui testo verrebbe
-  scritto alla rovescia — qui non servono.
+- **Niente più tab "Ti devono"/"Devi".** La prima versione le teneva separate
+  dietro un selettore; Andrea l'ha corretta — le due direzioni vanno viste
+  **insieme**, non l'una al posto dell'altra. Le sezioni azionabili (crediti
+  da saldare, quote da accettare) stanno ora sempre entrambe in pagina, senza
+  toggle.
+- **Un solo semicerchio con due anelli concentrici**, non due semicerchi
+  affiancati (prima versione, bocciata). L'esterno è quanto ricevuto questo
+  mese, l'interno (specchiato) quanto inviato — stesso schema di Home
+  (spese fuori, investito dentro), con l'anello interno che cresce dalla
+  punta **destra** invece che dalla sinistra: `SemiGauge` → prop
+  `mirrorInner`, un `<G transform="translate(2*cx 0) scale(-1 1)">` che
+  riflette solo il gruppo dell'anello interno attorno al proprio asse
+  verticale, lasciando l'esterno invariato. Diverso da un `mirror` che
+  flippasse l'intero `<Svg>` (scartato): qui i due anelli condividono lo
+  stesso centro, e solo uno dei due deve crescere al contrario.
+- **Ogni anello ha due segmenti impilati dello stesso colore**: pieno per la
+  parte già saldata questo mese, `shade()` (lib/theme.ts — più scuro e più
+  trasparente, stessa tinta) per la parte ancora aperta. È lo stesso
+  meccanismo con cui Home impila più fonti di introito in un solo arco, non
+  due anelli diversi: **un colore diverso avrebbe letto come "un'altra
+  categoria di dato"**, mentre qui è la stessa cosa, solo non ancora finita.
+- **La scala dei due anelli è il mese più pieno degli ultimi sei** (ricevuto
+  o inviato, quello dei due che vince) — `monthlySplitBuckets(events, 6)` da
+  `lib/splits.ts`. Senza un riferimento fisso l'arco di ogni mese si
+  scalerebbe sul proprio stesso totale ed sarebbe sempre pieno, un
+  indicatore che non indica niente. Il testo dentro il semicerchio (quanto
+  resta da recuperare/inviare) resta invece **sempre a tutta la storia**, non
+  solo al mese: sono due domande diverse — "quanto è pieno questo mese
+  rispetto al mio picco" contro "quanto mi devono/devo ancora in totale" — e
+  rispondono a scale diverse apposta.
+- **Un solo elenco Persone, non due.** La prima versione ne aveva due quasi
+  identici: uno sotto il grafico "Con chi dividi di più" (solo lettura, i
+  primi 5), uno più sotto con le azioni gestionali (associa/scollega/elimina,
+  tutte le persone). Ora è uno solo — lo stesso elenco porta sia la
+  navigazione al dettaglio sia le azioni, capped a 5 quando c'è un grafico
+  sopra da cui prendere l'ordine, tutte le persone quando il grafico non
+  c'è ancora (nessuno ha ancora diviso niente). `PersonRow` è il componente
+  condiviso fra i due casi, per non duplicare la riga.
 - **`GroupedBarChart` (non `BarChart`) per "con chi dividi di più".**
   `BarChart` disegna una barra per intervallo di tempo e non regge un secondo
   valore accanto al primo; qui servono due barre affiancate per categoria
@@ -533,6 +564,14 @@ grafici e le liste sotto rispondono a "quanto ho diviso con Leonardo", non a
   richiesta va accettata prima, quindi resta in sospeso e per quella spesa si
   usa comunque "Nome" — dirlo esplicitamente nel testo evita di far credere
   che la richiesta sblocchi qualcosa di immediato.
+- **`StatTiles` non è più solo degli investimenti**: prende un `goodColor`
+  opzionale (default `palette.good`, il verde comune) proprio perché
+  `OwedScreen` lo usa con quel verde mentre `PortfolioScreen`/
+  `GroupDetailScreen` passano `palette.investUp` esplicitamente per restare
+  sul verde più cupo di quella sezione. Prima "good" era cablato su
+  `investUp`: bastava per un solo chiamante, ha smesso di bastare quando è
+  arrivato il secondo — il colore va sempre parametrizzato quando un
+  componente condiviso serve a più di una sezione con temi diversi.
 
 ### Portafoglio investimenti
 

@@ -281,6 +281,7 @@ export default function GroupDetailScreen({
         </View>
 
         <StatTiles
+          goodColor={palette.investUp}
           tiles={[
             ...(rendimento !== null
               ? [{

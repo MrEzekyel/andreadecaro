@@ -1,6 +1,6 @@
 import React from "react";
 import { View } from "react-native";
-import Svg, { Circle, Line, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, G, Line, Text as SvgText } from "react-native-svg";
 import { useTheme } from "../lib/ThemeContext";
 
 export type GaugeSegment = {
@@ -34,18 +34,18 @@ type Props = {
   /** Contenuto al centro dell'arco (importo, etichette). */
   children?: React.ReactNode;
   /**
-   * Specchia l'arco: riempie dalla punta destra invece che dalla sinistra.
+   * L'anello interno riempie dalla punta destra invece che dalla sinistra,
+   * restando concentrico con l'esterno.
    *
-   * Serve alla coppia "Ti devono / Devi" in `OwedScreen`: due semicerchi
-   * affiancati sulla stessa scala, che crescono l'uno verso l'altro invece
-   * che nella stessa direzione — altrimenti due archi identici accostati si
-   * leggono come un unico arco spezzato, non come un confronto.
-   *
-   * Specchia solo gli archi (un `View` con `scaleX: -1` attorno al solo
-   * `<Svg>`): `endLabel` e `markRatio` non sono pensati per convivere con
-   * questo prop, perche' il loro testo verrebbe scritto alla rovescia.
+   * Serve a `OwedScreen`: un solo semicerchio con "quanto ti devono" fuori e
+   * "quanto devi" dentro, che crescono l'uno verso l'altro invece che nello
+   * stesso verso — altrimenti due archi concentrici identici si leggono come
+   * la stessa cosa vista due volte, non come un confronto fra direzioni
+   * opposte del denaro. Lo specchio e' un `<G>` che riflette solo il gruppo
+   * dell'anello interno attorno all'asse verticale del centro (`cx`), non
+   * l'intero `<Svg>`: l'esterno resta invariato.
    */
-  mirror?: boolean;
+  mirrorInner?: boolean;
 };
 
 /**
@@ -67,7 +67,7 @@ export function SemiGauge({
   stroke = 11,
   endLabel,
   children,
-  mirror,
+  mirrorInner,
 }: Props) {
   const { palette } = useTheme();
 
@@ -148,7 +148,6 @@ export function SemiGauge({
 
   return (
     <View>
-      <View style={mirror ? { transform: [{ scaleX: -1 }] } : undefined}>
       <Svg width={width} height={height}>
         {/* fondo dell'arco esterno */}
         <Circle
@@ -165,7 +164,7 @@ export function SemiGauge({
         {arcs(outer, r, stroke)}
 
         {inner && innerRadius > stroke && (
-          <>
+          <G transform={mirrorInner ? `translate(${2 * cx} 0) scale(-1 1)` : undefined}>
             <Circle
               cx={cx}
               cy={cy}
@@ -178,7 +177,7 @@ export function SemiGauge({
               transform={`rotate(180 ${cx} ${cy})`}
             />
             {arcs(inner, innerRadius, stroke - 2)}
-          </>
+          </G>
         )}
 
         {markAngle !== null && (
@@ -207,7 +206,6 @@ export function SemiGauge({
           </SvgText>
         )}
       </Svg>
-      </View>
 
       {/* Il contenuto al centro sta sopra come View e non come testo SVG:
           cosi' usa la stessa tipografia del resto dell'app. */}

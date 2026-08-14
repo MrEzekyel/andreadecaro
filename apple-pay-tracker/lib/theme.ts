@@ -111,6 +111,22 @@ export function tint(hex: string, dark: boolean) {
   return `${hex}${alpha}`;
 }
 
+/**
+ * Variante piu' scura e piu' trasparente dello stesso colore, stessa tinta.
+ *
+ * Serve a distinguere due porzioni di un arco senza cambiare colore: in
+ * `OwedScreen` la parte gia' saldata di un mese usa il colore pieno, la parte
+ * ancora aperta usa questa — "la stessa cosa, non ancora finita" si legge
+ * meglio scurita e attenuata che con una tinta diversa, che leggerebbe come
+ * "un'altra categoria di dato".
+ */
+export function shade(hex: string) {
+  const r = Math.round(parseInt(hex.slice(1, 3), 16) * 0.7);
+  const g = Math.round(parseInt(hex.slice(3, 5), 16) * 0.7);
+  const b = Math.round(parseInt(hex.slice(5, 7), 16) * 0.7);
+  return `rgba(${r}, ${g}, ${b}, 0.5)`;
+}
+
 export const font = {
   /** Titoli e prosa: al posto di Tiempos Text. */
   serif: "Tiempos Text",
