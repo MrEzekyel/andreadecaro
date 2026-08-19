@@ -22,6 +22,20 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-19",
+    date: "2026-08-19",
+    title: "Obiettivi di risparmio",
+    items: [
+      "Da Impostazioni → Limiti puoi dire quanto vuoi mettere da parte ogni mese. Diventa un tetto di spesa in Home: risparmiare 1.000 € su 2.000 di entrate significa non spenderne più di 1.000.",
+      "Gli investimenti contano come risparmio: un PAC da 500 € copre già metà di un obiettivo da 1.000 €.",
+      "Se limite di spesa e obiettivo non possono valere insieme, l'app te lo dice e ti propone il numero che li rimette d'accordo — un tocco per applicarlo.",
+      "Stesso controllo fra limite settimanale e mensile: 500 € a settimana valgono 2.174 € al mese, quindi sotto un mensile da 1.000 € non ti fermano mai. Ora si vede.",
+      "Nel semicerchio, quando ci sono entrambi, una tacca segna quello che sfori per primo, e il numero al centro dice a quale dei due si riferisce.",
+      "Sui mesi già chiusi trovi il verdetto: obiettivo centrato, o mancato di quanto.",
+      "Nelle liste, una spesa divisa mostra ora quanto è toccato a te, con il totale pagato in piccolo sotto e se la divisione è saldata o in attesa.",
+    ],
+  },
+  {
     id: "2026-08-13",
     date: "2026-08-13",
     title: "Dividere le spese con gli amici",
