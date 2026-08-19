@@ -5,6 +5,7 @@ import { useTheme } from "../lib/ThemeContext";
 import { formatAmount } from "../lib/format";
 import { categoryColor, radius, space, type } from "../lib/theme";
 import { LimitStatus } from "../lib/useLimits";
+import { Icon } from "./Icon";
 
 const PERIOD_LABEL = { weekly: "Settimanale", monthly: "Mensile" } as const;
 
@@ -17,9 +18,19 @@ type Props = {
    * modificabile dentro un elenco.
    */
   plain?: boolean;
+  /**
+   * Questo limite e' in conflitto con un altro o con l'obiettivo.
+   *
+   * L'icona sta sulla card e non solo nella sezione in cima perche' i due
+   * punti rispondono a domande diverse: la sezione dice *cosa* non torna,
+   * l'icona dice *quale* di questi limiti e' quello coinvolto — con quattro
+   * o cinque card in elenco, senza il segno bisogna rileggere l'avviso e
+   * cercare a mano la riga di cui parla.
+   */
+  warn?: boolean;
 };
 
-export function LimitCard({ status, onPress, plain }: Props) {
+export function LimitCard({ status, onPress, plain, warn }: Props) {
   const { palette, dark } = useTheme();
   const { categoryById } = useData();
 
@@ -64,6 +75,9 @@ export function LimitCard({ status, onPress, plain }: Props) {
           <Text style={[styles.title, { color: palette.ink }]}>
             {PERIOD_LABEL[limit.period]} · {scope}
           </Text>
+          {warn && (
+            <Icon name="triangle-alert" size={14} color={palette.warn} />
+          )}
         </View>
         <Text
           style={[

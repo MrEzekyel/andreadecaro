@@ -5,6 +5,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   TouchableOpacity,
   useWindowDimensions,
   View,
@@ -72,6 +73,10 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
   const [addingPerson, setAddingPerson] = useState(false);
   /** La persona a cui si sta cercando l'account Clinck da associare. */
   const [linking, setLinking] = useState<Person | null>(null);
+  /** La persona di cui si sta modificando il nome. */
+  const [renaming, setRenaming] = useState<Person | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+  const [savingRename, setSavingRename] = useState(false);
   /** La persona il cui dettaglio e' aperto, o null alla radice. */
   const [openPerson, setOpenPerson] = useState<{ id: string; name: string } | null>(
     null
@@ -210,6 +215,9 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
   // Statistiche di sempre, non del mese: quanto si e' diviso in totale da
   // quando esiste la funzione, per i riquadri sotto il semicerchio.
   const totalDivided = events.reduce((sum, e) => sum + e.amount, 0);
+  const totalSentAllTime = events
+    .filter((e) => e.direction === "debt")
+    .reduce((sum, e) => sum + e.amount, 0);
   const totalReceivedAllTime = events
     .filter((e) => e.direction === "credit")
     .reduce((sum, e) => sum + e.amount, 0);
@@ -326,6 +334,37 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
     );
   }
 
+  function startRename(person: Person) {
+    setRenaming(person);
+    setRenameDraft(person.name);
+  }
+
+  async function saveRename() {
+    if (!renaming) return;
+    const trimmed = renameDraft.trim();
+    if (!trimmed) return;
+
+    setSavingRename(true);
+    const { error } = await supabase
+      .from("people")
+      .update({ name: trimmed })
+      .eq("id", renaming.id);
+    setSavingRename(false);
+
+    if (error) {
+      Alert.alert(
+        "Errore",
+        error.code === "23505"
+          ? "Hai già una persona con questo nome."
+          : error.message
+      );
+      return;
+    }
+
+    setRenaming(null);
+    await Promise.all([reloadPeople(), load()]);
+  }
+
   async function onRefresh() {
     setRefreshing(true);
     await Promise.all([load(), reloadPeople()]);
@@ -399,6 +438,7 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
                   max: gaugeMax,
                 }}
                 mirrorInner
+                endLabel={formatAmount(gaugeMax)}
               >
                 <View style={styles.gaugeCenterRow}>
                   <View style={styles.gaugeCenterItem}>
@@ -442,10 +482,17 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
               </View>
             </View>
 
+            <Text style={[styles.gaugeScaleNote, { color: palette.ink3 }]}>
+              scala: {formatAmount(gaugeMax)}, il mese più pieno degli ultimi 6
+            </Text>
+
             <StatTiles
               tiles={[
                 { label: "Totale diviso", value: formatAmount(totalDivided) },
-                { label: "Totale ricevuto", value: formatAmount(totalReceivedAllTime) },
+                {
+                  label: "Tot Inviato/Ricevuto",
+                  value: `${formatAmount(totalSentAllTime)} / ${formatAmount(totalReceivedAllTime)}`,
+                },
                 { label: "Transazioni", value: String(events.length) },
                 { label: "Persone", value: String(distinctPeopleCount) },
               ]}
@@ -805,6 +852,7 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
                   count={receivedCount + sentCount}
                   canAssociate={friends.length > 0}
                   onOpen={() => setOpenPerson({ id: person.id, name: person.name })}
+                  onEdit={() => startRename(person)}
                   onAssociate={() => setLinking(person)}
                   onUnlink={() => confirmUnlink(person)}
                   onDelete={() => confirmDeletePerson(person.id, person.name)}
@@ -814,7 +862,12 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
           </View>
         )}
 
-        {top5.length === 0 && people.length > 0 && (
+        {/* Guardia `!error`: senza, un fallimento nel caricare crediti/debiti
+            lascia `events` vuoto e questa sezione mostrerebbe "Nessuna
+            divisione ancora" per ogni persona come se fosse vero, mentre in
+            realta' non si e' riusciti a leggerle — lo stesso errore che
+            `LoadError` sopra sta gia' segnalando. */}
+        {!error && top5.length === 0 && people.length > 0 && (
           <View>
             <Text style={[styles.label, { color: palette.ink3 }]}>Persone</Text>
             <View
@@ -831,6 +884,7 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
                   count={receivedCount + sentCount}
                   canAssociate={friends.length > 0}
                   onOpen={() => setOpenPerson({ id: person.id, name: person.name })}
+                  onEdit={() => startRename(person)}
                   onAssociate={() => setLinking(person)}
                   onUnlink={() => confirmUnlink(person)}
                   onDelete={() => confirmDeletePerson(person.id, person.name)}
@@ -931,6 +985,37 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
           </TouchableOpacity>
         ))}
       </Sheet>
+
+      <Sheet
+        visible={renaming !== null}
+        onClose={() => setRenaming(null)}
+        title="Nome"
+      >
+        <TextInput
+          value={renameDraft}
+          onChangeText={setRenameDraft}
+          placeholder="Nome"
+          placeholderTextColor={palette.ink3}
+          autoFocus
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: palette.accent }]}
+          onPress={saveRename}
+          disabled={savingRename}
+        >
+          <Text style={[styles.buttonText, { color: palette.onAccent }]}>
+            {savingRename ? "Salvo…" : "Salva"}
+          </Text>
+        </TouchableOpacity>
+      </Sheet>
     </View>
     </SwipeBack>
   );
@@ -953,6 +1038,7 @@ function PersonRow({
   count,
   canAssociate,
   onOpen,
+  onEdit,
   onAssociate,
   onUnlink,
   onDelete,
@@ -962,6 +1048,7 @@ function PersonRow({
   count: number;
   canAssociate: boolean;
   onOpen: () => void;
+  onEdit: () => void;
   onAssociate: () => void;
   onUnlink: () => void;
   onDelete: () => void;
@@ -981,6 +1068,14 @@ function PersonRow({
                 ? "Nessuna divisione ancora"
                 : `${count} ${count === 1 ? "divisione" : "divisioni"}`}
           </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={onEdit}
+          hitSlop={8}
+          accessibilityLabel={`Modifica ${person.name}`}
+        >
+          <Icon name="pencil" size={16} color={palette.ink3} />
         </TouchableOpacity>
 
         {/* Il tasto che chiude il caso piu' comune: si e' diviso per mesi
@@ -1115,6 +1210,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 13,
+    gap: space.md,
   },
   personMain: { flex: 1 },
   settledToggle: {
@@ -1130,6 +1226,7 @@ const styles = StyleSheet.create({
   gaugeCenterItem: { alignItems: "center" },
   gaugeAmount: { ...type.bodyMedium, fontSize: 17, fontVariant: ["tabular-nums"] },
   gaugeSubLabel: { ...type.small, fontWeight: "500", marginTop: 1 },
+  gaugeScaleNote: { ...type.small, textAlign: "center", marginTop: -space.xs },
   legendRow: { flexDirection: "row", gap: space.lg, justifyContent: "center" },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 6 },
   legendDot: { width: 8, height: 8, borderRadius: 4 },
@@ -1150,4 +1247,18 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  input: {
+    borderWidth: 1,
+    borderRadius: radius.field,
+    paddingHorizontal: 13,
+    paddingVertical: 12,
+    ...type.body,
+  },
+  button: {
+    borderRadius: radius.button,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: space.sm,
+  },
+  buttonText: { ...type.bodyMedium, fontSize: 14.5 },
 });

@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { BalanceChart, BalancePoint } from "../components/BalanceChart";
 import { CategoryDonut, DonutSlice } from "../components/CategoryDonut";
+import { CategoryLimitRow } from "../components/CategoryLimitRow";
 import { useExplorer } from "../components/Explorer";
 import { FlowCompare } from "../components/FlowCompare";
 import { Icon } from "../components/Icon";
@@ -46,6 +47,7 @@ import { categoryColor, radius, space, type } from "../lib/theme";
 import { Merchant, RecurringRule } from "../lib/types";
 import { supabase } from "../lib/supabase";
 import { useLimits } from "../lib/useLimits";
+import { goalVerdict, resolveCeilings } from "../lib/savings";
 import {
   comparisonCutoff,
   isCurrentMonth,
@@ -106,7 +108,15 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const { payments, total, previousTotal, error, staleLabel, staleReason, reload } =
     usePayments(month);
-  const { monthlyOverall, alerts, reload: reloadLimits } = useLimits();
+  const {
+    monthlyOverall,
+    weeklyOverall,
+    categoryLimits,
+    alerts,
+    goal,
+    conflicts,
+    reload: reloadLimits,
+  } = useLimits();
   const { profile: subscriptionProfile, automationActive, trialDaysLeft } =
     useSubscription();
   const { unread: unreadNews } = useChangelog();
@@ -355,6 +365,18 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     return points;
   }, [payments, daysInMonth, elapsedDays, isFixedCost, fixedCostsTotal]);
 
+  /** Indici (0-based) dei lunedi' del mese mostrato, escluso il primo giorno
+   *  del grafico stesso: sono dove il limite settimanale sul totale si
+   *  rinnova, quindi dove "Andamento" disegna la sua linea verticale. */
+  const weekBoundaries = useMemo(() => {
+    const indexes: number[] = [];
+    for (let day = 2; day <= daysInMonth; day++) {
+      const weekday = new Date(month.getFullYear(), month.getMonth(), day).getDay();
+      if (weekday === 1) indexes.push(day - 1);
+    }
+    return indexes;
+  }, [month, daysInMonth]);
+
   /**
    * Saldo del mese: sale a ogni introito, scende a ogni spesa e a ogni
    * investimento.
@@ -427,6 +449,47 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
       ? Number(monthlyOverall.limit.amount)
       : null;
 
+  /**
+   * Le due soglie di spesa del mese in corso, risolte in scala + vincolo.
+   *
+   * L'obiettivo di risparmio non e' un secondo tipo di grafico: risparmiare
+   * 1.000 su 2.000 di entrate *e'* un tetto di spesa da 1.000, quindi vive
+   * sullo stesso arco del limite. Quando ci sono entrambi la scala prende il
+   * piu' largo (cosi' l'arco non nasce gia' pieno e la tacca ha dove stare) e
+   * "restano" segue il piu' stretto — vedi `resolveCeilings`.
+   *
+   * Solo sul mese in corso: su un mese chiuso un tetto non ha piu' senso, li'
+   * si mostra il verdetto (obiettivo centrato o mancato di quanto).
+   */
+  const ceilings = useMemo(
+    () => resolveCeilings(limitAmount, viewingCurrentMonth ? goal : null),
+    [limitAmount, viewingCurrentMonth, goal]
+  );
+
+  // Senza un limite mensile configurato il semicerchio spariva del tutto:
+  // "niente da mostrare" invece di "nessun budget impostato, ma ecco come
+  // stai andando rispetto a quanto guadagni". Il guadagnato del mese prende
+  // il posto del limite come scala — non è un budget, ma è comunque il
+  // riferimento più onesto disponibile quando non ce n'è uno vero.
+  const fallbackLimitAmount =
+    viewingCurrentMonth && !ceilings && monthlyIncome > 0 ? monthlyIncome : null;
+
+  /**
+   * Com'e' finito un mese gia' chiuso rispetto all'obiettivo.
+   *
+   * `balanceError` e' la condizione che conta: se introiti e investimenti non
+   * si sono caricati, `monthlyIncome` vale 0 e il verdetto direbbe "obiettivo
+   * mancato di tutto" per una lettura fallita, non per come e' andato il
+   * mese. E' la stessa regola per cui `MonthCheck` non compare quando il
+   * totale non e' stato letto. Senza introiti registrati non c'e' nessun
+   * risparmio da calcolare, quindi niente verdetto invece di uno inventato.
+   */
+  const verdict = useMemo(() => {
+    if (viewingCurrentMonth || !goal || balanceError) return null;
+    if (monthlyIncome <= 0) return null;
+    return goalVerdict(goal, monthlyIncome, total);
+  }, [viewingCurrentMonth, goal, balanceError, monthlyIncome, total]);
+
   // A questo ritmo, dove si finisce a fine mese. I costi fissi sono gia'
   // interi dentro `fixedCostsTotal` e non vanno proiettati: solo la parte
   // variabile continua a crescere giorno per giorno. Proiettare anche loro
@@ -481,10 +544,28 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
   if (explorer.isOpen) return <>{explorer.overlay}</>;
 
   // Un oggetto e non un booleano: cosi' TypeScript sa che dentro il ramo
-  // `gauge !== null` sia lo stato del limite sia l'importo esistono davvero.
-  const gauge =
-    viewingCurrentMonth && monthlyOverall && limitAmount
-      ? { status: monthlyOverall, limit: limitAmount }
+  // `gauge !== null` l'importo esiste davvero. `remaining` si ricalcola qui
+  // invece di portarsi dietro l'intero `LimitStatus`, perche' con il
+  // riferimento sintetico (guadagnato del mese) non c'e' nessuna riga
+  // `spending_limits` a cui agganciarsi — solo un numero e quanto ne resta.
+  //
+  // `limit` e' il fondo scala dell'arco, `binding` il vincolo su cui si conta
+  // quanto resta: coincidono sempre tranne quando limite di spesa e obiettivo
+  // di risparmio convivono e non dicono la stessa cosa.
+  const gauge = ceilings
+    ? {
+        limit: ceilings.scale,
+        binding: ceilings.binding,
+        remaining: ceilings.binding - total,
+        synthetic: false,
+      }
+    : fallbackLimitAmount
+      ? {
+          limit: fallbackLimitAmount,
+          binding: fallbackLimitAmount,
+          remaining: fallbackLimitAmount - total,
+          synthetic: true,
+        }
       : null;
 
   return (
@@ -549,13 +630,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                 <Text
                   style={[
                     styles.segText,
-                    {
-                      color: on
-                        ? value === "entrate"
-                          ? palette.good
-                          : palette.ink
-                        : palette.ink2,
-                    },
+                    { color: on ? palette.ink : palette.ink2 },
                   ]}
                 >
                   {value === "uscite" ? "Uscite" : "Entrate"}
@@ -611,14 +686,43 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                               }
                             : undefined
                         }
-                        markRatio={
-                          fixedCostsTotal > 0
-                            ? fixedCostsTotal / gauge.limit
-                            : null
+                        // Due tacche possibili: dove arrivano i costi fissi, e
+                        // dove finisce il vincolo piu' stretto quando limite e
+                        // obiettivo non coincidono. Entrambe sono nominate
+                        // nella legenda qui sotto — una tacca senza nome qui
+                        // e' gia' stata scambiata per un'altra cosa.
+                        marks={[
+                          ...(fixedCostsTotal > 0
+                            ? [
+                                {
+                                  ratio: fixedCostsTotal / gauge.limit,
+                                  color: palette.ink,
+                                },
+                              ]
+                            : []),
+                          ...(ceilings?.markRatio != null
+                            ? [
+                                {
+                                  ratio: ceilings.markRatio,
+                                  color: palette.warn,
+                                },
+                              ]
+                            : []),
+                        ]}
+                        endLabel={
+                          gauge.synthetic
+                            ? `${formatAmount(gauge.limit)} guadagnati`
+                            : formatAmount(gauge.limit)
                         }
-                        markColor={palette.ink}
-                        endLabel={formatAmount(gauge.limit)}
                       >
+                        {/* Senza limite configurato, il numero sotto e' il
+                            guadagnato del mese, non un budget: va detto,
+                            altrimenti sembra un impegno che nessuno ha preso. */}
+                        {gauge.synthetic && (
+                          <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
+                            nessun limite · su quanto guadagnato
+                          </Text>
+                        )}
                         <Text style={[styles.gaugeValue, { color: palette.ink }]}>
                           {amount.whole}
                           <Text style={[styles.gaugeCents, { color: palette.ink3 }]}>
@@ -629,16 +733,25 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                           style={[
                             styles.gaugeNote,
                             {
-                              color:
-                                gauge.status.remaining >= 0
-                                  ? palette.good
-                                  : palette.over,
+                              color: gauge.remaining >= 0 ? palette.good : palette.over,
                             },
                           ]}
                         >
-                          {gauge.status.remaining >= 0
-                            ? `restano ${formatAmount(gauge.status.remaining)}`
-                            : `oltre di ${formatAmount(-gauge.status.remaining)}`}
+                          {gauge.remaining >= 0
+                            ? `restano ${formatAmount(gauge.remaining)}`
+                            : `oltre di ${formatAmount(-gauge.remaining)}`}
+                          {/* Con due soglie il numero da solo non basta:
+                              "restano 320 €" contro il limite e contro
+                              l'obiettivo sono due cifre diverse, e senza dire
+                              quale si sta guardando la piu' larga sembrerebbe
+                              un permesso a spendere che l'altra nega. */}
+                          {ceilings?.markRatio != null && (
+                            <Text style={{ color: palette.ink3 }}>
+                              {ceilings.bindingSource === "goal"
+                                ? " · obiettivo"
+                                : " · limite"}
+                            </Text>
+                          )}
                         </Text>
                       </SemiGauge>
                     </View>
@@ -654,6 +767,16 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                           />
                           <Text style={[styles.keyText, { color: palette.ink3 }]}>
                             costi fissi {formatAmount(fixedCostsTotal)}
+                          </Text>
+                        </View>
+                      )}
+                      {ceilings?.markLabel && (
+                        <View style={styles.gaugeKeyItem}>
+                          <View
+                            style={[styles.keyTick, { backgroundColor: palette.warn }]}
+                          />
+                          <Text style={[styles.keyText, { color: palette.ink3 }]}>
+                            {ceilings.markLabel}
                           </Text>
                         </View>
                       )}
@@ -686,8 +809,13 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                         <Stat
                           k="Fine mese"
                           v={`≈ ${compactAmount(projection)} €`}
+                          // Contro il vincolo che stringe, non contro il fondo
+                          // scala: con un obiettivo piu' severo del limite,
+                          // confrontare col secondo lascerebbe "Fine mese"
+                          // nero mentre la proiezione ha gia' mangiato il
+                          // risparmio del mese.
                           tone={
-                            projection > gauge.limit ? palette.warn : undefined
+                            projection > gauge.binding ? palette.warn : undefined
                           }
                         />
                       )}
@@ -696,6 +824,28 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                         v={`${daysInMonth - elapsedDays} giorni`}
                       />
                     </View>
+
+                    {/* I limiti di categoria non avevano nessun posto in Home
+                        dove si vedessero finche' non venivano sforati — solo
+                        allora comparivano fra gli avvisi qui sotto. Queste
+                        righe li mostrano sempre, non solo quando va male. Al
+                        massimo tre: la categoria piu' vicina al proprio
+                        limite prima, altrimenti non ci starebbero. */}
+                    {viewingCurrentMonth && categoryLimits.length > 0 && (
+                      <View style={styles.categoryLimits}>
+                        {categoryLimits.slice(0, 3).map((status) => {
+                          const category = categoryById(status.limit.category_id);
+                          if (!category) return null;
+                          return (
+                            <CategoryLimitRow
+                              key={status.limit.id}
+                              status={status}
+                              category={category}
+                            />
+                          );
+                        })}
+                      </View>
+                    )}
                   </View>
                 ) : (
                   <View>
@@ -742,6 +892,69 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                 {/* Solo sul mese corrente: sfogliando l'archivio la domanda sul
                     mese scorso sarebbe fuori posto. */}
                 {viewingCurrentMonth && <MonthCheck onReview={setMonth} />}
+
+                {/* Il verdetto su un mese chiuso: li' entrate e spese sono
+                    definitive, quindi "risparmiato" e' un fatto e non una
+                    proiezione. E' anche l'unica cosa che dice se l'obiettivo
+                    serve a qualcosa — un tetto rispettato tutti i mesi ma mai
+                    verificato a consuntivo resta una buona intenzione. */}
+                {verdict !== null && goal !== null && (
+                  <View
+                    style={[
+                      styles.alert,
+                      {
+                        backgroundColor: verdict.met
+                          ? `${palette.good}1f`
+                          : `${palette.warn}1f`,
+                      },
+                    ]}
+                  >
+                    <Icon
+                      name={verdict.met ? "piggy-bank" : "triangle-alert"}
+                      size={16}
+                      color={verdict.met ? palette.good : palette.warn}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.alertTitle, { color: palette.ink }]}>
+                        {verdict.met
+                          ? "Obiettivo centrato"
+                          : "Obiettivo mancato"}
+                      </Text>
+                      <Text style={[styles.alertBody, { color: palette.ink2 }]}>
+                        Risparmiati {formatAmount(verdict.saved)} su un
+                        obiettivo di {formatAmount(Number(goal.amount))}
+                        {verdict.met
+                          ? `, ${formatAmount(-verdict.missing)} in più.`
+                          : `: mancavano ${formatAmount(verdict.missing)}.`}{" "}
+                        Entrate {formatAmount(monthlyIncome)} meno spese{" "}
+                        {formatAmount(total)}.
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* Un conflitto fra limite e obiettivo va detto dove si guarda
+                    il semicerchio, non solo in Impostazioni: e' li' che il
+                    numero al centro sta rispondendo a una sola delle due
+                    soglie, e chi legge deve sapere che l'altra non e'
+                    rispettabile insieme a questa. */}
+                {viewingCurrentMonth &&
+                  conflicts.some((c) => c.severity === "conflict") && (
+                    <TouchableOpacity
+                      style={[styles.alert, { backgroundColor: `${palette.warn}1f` }]}
+                      onPress={() => openSettings("limits")}
+                    >
+                      <Icon name="triangle-alert" size={16} color={palette.warn} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={[styles.alertTitle, { color: palette.ink }]}>
+                          {conflicts.find((c) => c.severity === "conflict")?.title}
+                        </Text>
+                        <Text style={[styles.alertBody, { color: palette.ink2 }]}>
+                          {conflicts.find((c) => c.severity === "conflict")?.body}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
 
                 {/* Non legato al mese guardato: l'abbonamento e' un fatto
                     dell'account, non del periodo che si sta sfogliando. */}
@@ -904,9 +1117,22 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                     </Text>
                     <TrendChart
                       points={trend}
-                      limit={limitAmount}
+                      // Il vincolo che stringe, non il fondo scala: e' quello
+                      // che la retta di ritmo deve puntare, altrimenti il
+                      // ritmo direbbe "sei in linea" mentre porta dritto a
+                      // mancare l'obiettivo.
+                      limit={ceilings?.binding ?? null}
+                      limitLabel={
+                        ceilings?.bindingSource === "goal" ? "OBIETTIVO" : "LIMITE"
+                      }
                       baseline={fixedCostsTotal}
                       color={palette.accent}
+                      weekBoundaries={
+                        viewingCurrentMonth && weeklyOverall ? weekBoundaries : []
+                      }
+                      weeklyLimit={
+                        weeklyOverall ? Number(weeklyOverall.limit.amount) : null
+                      }
                     />
                     {merchantsUnknown && (
                       <Text style={[styles.chartNote, { color: palette.ink3 }]}>
@@ -1013,7 +1239,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                         <Text style={[styles.label, { color: palette.ink3 }]}>
                           Entrate
                         </Text>
-                        <Text style={[styles.gaugeValue, { color: palette.good }]}>
+                        <Text style={[styles.gaugeValue, { color: palette.ink }]}>
                           {splitAmount(monthlyIncome).whole}
                           <Text style={[styles.gaugeCents, { color: palette.ink3 }]}>
                             {splitAmount(monthlyIncome).cents}
@@ -1275,6 +1501,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: space.sm,
   },
+  categoryLimits: { gap: space.xs },
   gaugeKey: {
     flexDirection: "row",
     justifyContent: "center",

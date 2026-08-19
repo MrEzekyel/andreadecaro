@@ -106,10 +106,36 @@ export function GroupedBarChart({ groups, colors, formatValue, minGroupWidth }: 
 
       {groups.map((group, gi) => {
         const gx = gutter + gi * (groupWidth + GROUP_GAP);
+        // Con una sola serie diversa da zero (chi divide solo in una
+        // direzione, il caso comune) le due barre affiancate lascerebbero
+        // quella visibile spostata a sinistra del centro — il centro vero
+        // e' quello della coppia, non della singola barra rimasta. Con una
+        // sola barra da disegnare la si centra sul nome invece di lasciarla
+        // dov'era nella coppia.
+        const nonZero = group.values
+          .map((value, si) => ({ value, si }))
+          .filter((entry) => entry.value > 0);
+
+        const bars =
+          nonZero.length <= 1
+            ? [
+                {
+                  si: nonZero[0]?.si ?? 0,
+                  value: nonZero[0]?.value ?? 0,
+                  x: gx + groupWidth / 2 - barWidth,
+                  width: barWidth * 2,
+                },
+              ]
+            : group.values.map((value, si) => ({
+                si,
+                value,
+                x: gx + si * (barWidth + BAR_GAP),
+                width: barWidth,
+              }));
+
         return (
           <React.Fragment key={group.key}>
-            {group.values.map((value, si) => {
-              const x = gx + si * (barWidth + BAR_GAP);
+            {bars.map(({ si, value, x, width: barW }) => {
               const drawn = value > 0 ? Math.max((value / range) * PLOT_H, 2) : 0;
               const top = BASE - drawn;
               return (
@@ -117,7 +143,7 @@ export function GroupedBarChart({ groups, colors, formatValue, minGroupWidth }: 
                   key={si}
                   x={x}
                   y={top}
-                  width={barWidth}
+                  width={barW}
                   height={drawn}
                   rx={RADIUS}
                   fill={value === 0 ? palette.hairline : colors[si]}

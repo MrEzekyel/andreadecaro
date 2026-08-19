@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { describeAge, readCache, writeCache } from "./cache";
+import { useData } from "./DataContext";
 import { firstError } from "./loadError";
+import { checkCoherence } from "./savings";
 import { supabase } from "./supabase";
-import { Payment, SpendingLimit } from "./types";
+import { Payment, SavingsGoal, SpendingLimit } from "./types";
 
 const CACHE_KEY = "limits";
 
@@ -19,6 +21,7 @@ const CACHE_KEY = "limits";
 type LimitsCache = {
   limits: SpendingLimit[];
   payments: Payment[];
+  goal: SavingsGoal | null;
   weekStart: string;
   monthStart: string;
 };
@@ -82,8 +85,10 @@ export function evaluateLimit(
  * settimanale a cavallo di due mesi resta corretto senza query aggiuntive.
  */
 export function useLimits() {
+  const { categoryById } = useData();
   const [limits, setLimits] = useState<SpendingLimit[]>([]);
   const [payments, setPayments] = useState<Payment[]>([]);
+  const [goal, setGoal] = useState<SavingsGoal | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [staleAt, setStaleAt] = useState<string | null>(null);
@@ -100,7 +105,7 @@ export function useLimits() {
     const { data: auth } = await supabase.auth.getSession();
     const userId = auth.session?.user.id ?? null;
 
-    const [limitsResult, paymentsResult] = await Promise.all([
+    const [limitsResult, paymentsResult, goalResult] = await Promise.all([
       supabase
         .from("spending_limits")
         .select("*")
@@ -110,17 +115,23 @@ export function useLimits() {
         .from("payments")
         .select("*")
         .gte("occurred_at", since.toISOString()),
+      // `maybeSingle`: la riga puo' non esserci (nessun obiettivo impostato),
+      // e con `single` quel caso normale tornerebbe come errore facendo
+      // scattare il ramo della cache per una lettura in realta' riuscita.
+      supabase.from("savings_goals").select("*").eq("active", true).maybeSingle(),
     ]);
 
-    const failure = firstError(limitsResult, paymentsResult);
+    const failure = firstError(limitsResult, paymentsResult, goalResult);
 
     // Un limite valutato su una lista di spese vuota direbbe "0% del budget"
     // proprio mentre non sappiamo quanto e' stato speso.
     if (!failure) {
       const righe = (limitsResult.data ?? []) as SpendingLimit[];
       const spese = (paymentsResult.data ?? []) as Payment[];
+      const obiettivo = (goalResult.data ?? null) as SavingsGoal | null;
       setLimits(righe);
       setPayments(spese);
+      setGoal(obiettivo);
       setError(null);
       setStaleAt(null);
       setStaleReason(null);
@@ -128,6 +139,7 @@ export function useLimits() {
         writeCache<LimitsCache>(userId, CACHE_KEY, {
           limits: righe,
           payments: spese,
+          goal: obiettivo,
           weekStart: week.toISOString(),
           monthStart: month.toISOString(),
         });
@@ -150,6 +162,10 @@ export function useLimits() {
     if (cached && stessoPeriodo) {
       setLimits(cached.value.limits);
       setPayments(cached.value.payments);
+      // `?? null` e non `cached.value.goal`: le copie scritte prima che
+      // l'obiettivo esistesse non hanno il campo, e `undefined` renderebbe
+      // `goal` non piu' `SavingsGoal | null` a runtime.
+      setGoal(cached.value.goal ?? null);
       setError(null);
       setStaleAt(cached.at);
       setStaleReason(failure);
@@ -178,6 +194,27 @@ export function useLimits() {
     [statuses]
   );
 
+  /** Il limite complessivo della settimana: prima non veniva letto da
+   *  nessuna schermata, restava impostato ma invisibile in Home. */
+  const weeklyOverall = useMemo(
+    () =>
+      statuses.find(
+        (status) =>
+          status.limit.period === "weekly" && status.limit.category_id === null
+      ),
+    [statuses]
+  );
+
+  /** Limiti su una singola categoria, qualunque sia il periodo: sono quelli
+   *  che Home mostra come righe sotto il semicerchio, non come avviso. */
+  const categoryLimits = useMemo(
+    () =>
+      statuses
+        .filter((status) => status.limit.category_id !== null)
+        .sort((a, b) => b.ratio - a.ratio),
+    [statuses]
+  );
+
   /** Solo quelli che meritano un avviso, dal piu' grave. */
   const alerts = useMemo(
     () =>
@@ -187,10 +224,47 @@ export function useLimits() {
     [statuses]
   );
 
+  /**
+   * I modi in cui limiti e obiettivo si contraddicono.
+   *
+   * Si calcola qui e non nelle schermate perche' lo leggono in due (Home per
+   * l'avviso, Limiti per la sezione con le correzioni) e due copie della
+   * stessa regola divergono: e' gia' successo con `resolve_merchant`, dove
+   * tre copie della stessa logica creavano gruppi diversi secondo da dove
+   * entrava la spesa.
+   *
+   * Non dipende dagli introiti del mese: le entrate di riferimento sono
+   * congelate sull'obiettivo, quindi i conflitti sono gli stessi il 3 e il 28.
+   */
+  const conflicts = useMemo(
+    () =>
+      checkCoherence({
+        goal,
+        limits,
+        categoryName: (id) => categoryById(id)?.name ?? "Categoria",
+      }),
+    [goal, limits, categoryById]
+  );
+
+  /** Le righe da segnare con l'icona di avviso, per un accesso diretto. */
+  const conflictingLimitIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const conflict of conflicts) {
+      if (conflict.severity !== "conflict") continue;
+      for (const id of conflict.limitIds) set.add(id);
+    }
+    return set;
+  }, [conflicts]);
+
   return {
     statuses,
     monthlyOverall,
+    weeklyOverall,
+    categoryLimits,
     alerts,
+    goal,
+    conflicts,
+    conflictingLimitIds,
     loading,
     error,
     staleAt,

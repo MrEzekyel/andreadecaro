@@ -81,7 +81,14 @@ export function usePayments(month: Date) {
     const [current, earlier] = await Promise.all([
       supabase
         .from("payments")
-        .select("*")
+        // `payment_splits!payment_splits_payment_id_fkey` e non il piu'
+        // semplice `payment_splits(...)`: la colonna `mirror_payment_id`
+        // (migrazione 0038) da' a `payment_splits` un secondo riferimento a
+        // `payments`, e senza dire quale usare PostgREST rifiuta la
+        // richiesta invece di indovinare — stesso caso gia' visto in
+        // `OwedScreen.load`. Serve solo `settled_at`: e' la riga (aperta o
+        // saldata) che decide "In attesa"/"Saldato" in `PaymentRow`.
+        .select("*, payment_splits!payment_splits_payment_id_fkey(settled_at)")
         .gte("occurred_at", start.toISOString())
         .lt("occurred_at", end.toISOString())
         .order("occurred_at", { ascending: false }),

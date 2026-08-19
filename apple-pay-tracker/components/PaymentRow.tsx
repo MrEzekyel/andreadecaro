@@ -38,14 +38,28 @@ export function PaymentRow({ payment, category, onPress, exactName }: Props) {
 
   const isRecurring = payment.source === "recurring";
 
+  // `my_share` non nullo = spesa divisa: quello che compete a me
+  // (`effective_amount`) e' il numero che si vuole vedere subito, il totale
+  // pagato resta sotto, piccolo — e' contesto, non la cifra su cui si
+  // decide "posso permettermelo?". Le quote arrivano solo se la query le ha
+  // richieste esplicitamente (vedi `usePayments`/`DetailScreen`): finche'
+  // non sono note si tratta la divisione come ancora aperta, mai come gia'
+  // saldata per difetto.
+  const isSplit = payment.my_share !== null;
+  const splits = payment.payment_splits;
+  const isSettled =
+    isSplit && !!splits && splits.length > 0 && splits.every((s) => s.settled_at);
+  const statusLabel = isSettled ? "Saldato" : "In attesa";
+  const statusColor = isSettled ? palette.good : palette.ink3;
+
   return (
     <TouchableOpacity
       style={styles.row}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={`${name}, ${formatAmount(
-        payment.amount
-      )}, ${categoryName}`}
+        payment.effective_amount
+      )}${isSplit ? ` su ${formatAmount(payment.amount)} totali, divisione ${statusLabel.toLowerCase()}` : ""}, ${categoryName}`}
     >
       <View style={[styles.icon, { backgroundColor: tint(color, dark) }]}>
         <Icon name={iconName} size={17} color={color} />
@@ -73,9 +87,22 @@ export function PaymentRow({ payment, category, onPress, exactName }: Props) {
         </Text>
       </View>
 
-      <Text style={[styles.amount, { color: palette.ink }]}>
-        −{formatAmount(payment.amount)}
-      </Text>
+      <View style={styles.amountCol}>
+        <Text style={[styles.amount, { color: palette.ink }]}>
+          −{formatAmount(payment.effective_amount)}
+        </Text>
+        {isSplit && (
+          <View style={styles.splitMeta}>
+            <Icon name="split" size={11} color={statusColor} />
+            <Text style={[styles.splitMetaText, { color: statusColor }]}>
+              {statusLabel}
+            </Text>
+            <Text style={[styles.splitMetaText, { color: palette.ink3 }]}>
+              · {formatAmount(payment.amount)}
+            </Text>
+          </View>
+        )}
+      </View>
     </TouchableOpacity>
   );
 }
@@ -98,5 +125,8 @@ const styles = StyleSheet.create({
   nameRow: { flexDirection: "row", alignItems: "center", gap: 5 },
   name: { ...type.bodyMedium, flexShrink: 1 },
   meta: { ...type.caption, marginTop: 2 },
+  amountCol: { alignItems: "flex-end" },
   amount: { ...type.amount, fontVariant: ["tabular-nums"] },
+  splitMeta: { flexDirection: "row", alignItems: "center", gap: 3, marginTop: 2 },
+  splitMetaText: { ...type.small, fontSize: 10.5 },
 });

@@ -111,7 +111,9 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
   const load = useCallback(async () => {
     let query = supabase
       .from("payments")
-      .select("*")
+      // Vedi il commento in `usePayments.load`: serve il join disambiguato
+      // per via del secondo riferimento a `payments` da `mirror_payment_id`.
+      .select("*, payment_splits!payment_splits_payment_id_fkey(settled_at)")
       .order("occurred_at", { ascending: false });
 
     if (target.kind === "merchant") {

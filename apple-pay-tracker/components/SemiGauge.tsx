@@ -14,20 +14,30 @@ type Ring = {
   max: number;
 };
 
+export type GaugeMark = {
+  /** Posizione sull'arco, 0 a sinistra e 1 a destra. */
+  ratio: number;
+  color: string;
+};
+
 type Props = {
   width: number;
   outer: Ring;
   /** Secondo anello concentrico piu' piccolo, per il confronto entrate/uscite. */
   inner?: Ring;
   /**
-   * Tacca su una posizione dell'arco (0-1). Il significato lo decide chi
-   * chiama — in Home segna dove arrivano i costi fissi sul limite — quindi
-   * va sempre accompagnata da una voce in legenda che lo dica: una tacca
+   * Tacche su posizioni dell'arco (0-1). Il significato lo decide chi
+   * chiama — in Home segnano i costi fissi e il vincolo che stringe — quindi
+   * vanno sempre accompagnate da una voce in legenda che lo dica: una tacca
    * senza nome viene letta a caso, e qui si e' gia' visto scambiarla per
    * un'altra cosa.
+   *
+   * E' un elenco e non una tacca sola perche' da quando esiste l'obiettivo
+   * di risparmio l'arco puo' dover mostrare due soglie insieme: dove
+   * arrivano i costi fissi, e dove finisce il piu' stretto fra limite e
+   * obiettivo quando i due non coincidono.
    */
-  markRatio?: number | null;
-  markColor?: string;
+  marks?: GaugeMark[];
   stroke?: number;
   /** Valore di fondo scala, scritto sotto la punta destra dell'arco. */
   endLabel?: string;
@@ -62,8 +72,7 @@ export function SemiGauge({
   width,
   outer,
   inner,
-  markRatio,
-  markColor,
+  marks = [],
   stroke = 11,
   endLabel,
   children,
@@ -141,10 +150,11 @@ export function SemiGauge({
 
   const innerRadius = r - stroke - 5;
 
-  const markAngle =
-    markRatio != null
-      ? ((180 + 180 * Math.min(Math.max(markRatio, 0), 1)) * Math.PI) / 180
-      : null;
+  const markAngles = marks.map((mark) => ({
+    color: mark.color,
+    angle:
+      ((180 + 180 * Math.min(Math.max(mark.ratio, 0), 1)) * Math.PI) / 180,
+  }));
 
   return (
     <View>
@@ -180,17 +190,18 @@ export function SemiGauge({
           </G>
         )}
 
-        {markAngle !== null && (
+        {markAngles.map((mark, index) => (
           <Line
-            x1={cx + (r - stroke / 2 - 2) * Math.cos(markAngle)}
-            y1={cy + (r - stroke / 2 - 2) * Math.sin(markAngle)}
-            x2={cx + (r + stroke / 2 + 2) * Math.cos(markAngle)}
-            y2={cy + (r + stroke / 2 + 2) * Math.sin(markAngle)}
-            stroke={markColor ?? palette.ink}
+            key={`mark-${index}`}
+            x1={cx + (r - stroke / 2 - 2) * Math.cos(mark.angle)}
+            y1={cy + (r - stroke / 2 - 2) * Math.sin(mark.angle)}
+            x2={cx + (r + stroke / 2 + 2) * Math.cos(mark.angle)}
+            y2={cy + (r + stroke / 2 + 2) * Math.sin(mark.angle)}
+            stroke={mark.color}
             strokeWidth={2.5}
             strokeLinecap="round"
           />
-        )}
+        ))}
 
         {/* Il fondo scala sotto la punta destra: senza, l'arco dice quanto si
             e' riempito ma mai su quanto, e la frazione resta indovinata. */}

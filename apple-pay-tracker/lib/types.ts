@@ -78,6 +78,12 @@ export type Payment = {
   source: string;
   dedup_key: string | null;
   created_at: string;
+  /**
+   * Le quote di questa spesa, quando la query le richiede esplicitamente
+   * (join opzionale su `payment_splits`). `undefined` = non richieste,
+   * `[]` = spesa non divisa: i chiamanti devono distinguere i due casi.
+   */
+  payment_splits?: { settled_at: string | null }[];
 };
 
 export type Person = {
@@ -192,6 +198,28 @@ export type SpendingLimit = {
   /** NULL = limite complessivo su tutte le categorie. */
   category_id: string | null;
   warn_at_percent: number;
+  active: boolean;
+  created_at: string;
+};
+
+/**
+ * Obiettivo di risparmio mensile.
+ *
+ * Sta sullo stesso asse di `SpendingLimit`, non su un asse suo: risparmiare
+ * `amount` su `reference_income` di entrate significa non spendere piu' di
+ * `reference_income - amount`. Vedi `lib/savings.ts`.
+ */
+export type SavingsGoal = {
+  id: string;
+  user_id: string;
+  amount: number;
+  /**
+   * Le entrate su cui l'obiettivo e' calcolato, congelate al momento in cui
+   * viene impostato. **Non** sono gli introiti del mese in corso: quelli
+   * valgono zero fino a che lo stipendio non arriva, e un tetto derivato da
+   * zero e' un allarme inventato.
+   */
+  reference_income: number;
   active: boolean;
   created_at: string;
 };

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   ScrollView,
@@ -12,10 +12,14 @@ import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { StaleNote } from "../components/StaleNote";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { CoherenceNotice } from "../components/CoherenceNotice";
+import { GoalCard } from "../components/GoalCard";
 import { LimitCard } from "../components/LimitCard";
 import { CategoryPicker } from "../components/CategoryPicker";
 import { Sheet } from "../components/Sheet";
 import { useTheme } from "../lib/ThemeContext";
+import { formatAmount } from "../lib/format";
+import { CoherenceFix, median } from "../lib/savings";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
 import { SpendingLimit } from "../lib/types";
@@ -23,18 +27,196 @@ import { useLimits } from "../lib/useLimits";
 
 const WARN_CHOICES = [50, 60, 70, 75, 80, 90];
 
+/** Quanti mesi chiusi guardare per proporre le entrate di riferimento. */
+const MESI_PER_MEDIANA = 6;
+
 function parseAmountInput(value: string): number | null {
   const normalized = value.replace(/\s/g, "").replace(",", ".");
   const parsed = Number(normalized);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
 }
 
+/** Da numero a stringa modificabile, con la virgola italiana. */
+function toInput(value: number) {
+  return String(value).replace(".", ",");
+}
+
 export default function LimitsScreen({ onBack }: { onBack: () => void }) {
   const { palette } = useTheme();
-  const { statuses, error, staleLabel, staleReason, reload } = useLimits();
+  const {
+    statuses,
+    goal,
+    conflicts,
+    conflictingLimitIds,
+    error,
+    staleLabel,
+    staleReason,
+    reload,
+  } = useLimits();
 
   const [editing, setEditing] = useState<SpendingLimit | null>(null);
   const [open, setOpen] = useState(false);
+
+  // ── Obiettivo di risparmio ──────────────────────────────────────────
+  const [goalOpen, setGoalOpen] = useState(false);
+  const [goalAmount, setGoalAmount] = useState("");
+  const [goalIncome, setGoalIncome] = useState("");
+  const [suggestedIncome, setSuggestedIncome] = useState<number | null>(null);
+  const [applying, setApplying] = useState(false);
+
+  /**
+   * Le entrate da proporre: mediana dei mesi **chiusi**.
+   *
+   * Il mese in corso va escluso, e non e' un dettaglio: il 3 del mese vale
+   * quasi sempre zero e tirerebbe giu' la mediana proprio nel momento in cui
+   * l'utente sta impostando l'obiettivo, proponendogli entrate piu' basse
+   * del vero e quindi un tetto di spesa piu' stretto di quello che gli
+   * serve. `monthly_totals` restituisce il mese corrente per primo.
+   */
+  const loadSuggestion = useCallback(async () => {
+    const { data, error: failure } = await supabase.rpc("monthly_totals", {
+      p_months: MESI_PER_MEDIANA + 1,
+    });
+    // Un fallimento qui non e' bloccante: si perde il suggerimento, non la
+    // possibilita' di impostare l'obiettivo scrivendo le entrate a mano.
+    if (failure || !data) return;
+    const closed = (data as { introiti: number }[]).slice(1);
+    setSuggestedIncome(median(closed.map((row) => Number(row.introiti))));
+  }, []);
+
+  useEffect(() => {
+    loadSuggestion();
+  }, [loadSuggestion]);
+
+  function openGoal() {
+    setGoalAmount(goal ? toInput(Number(goal.amount)) : "");
+    setGoalIncome(
+      goal
+        ? toInput(Number(goal.reference_income))
+        : suggestedIncome
+          ? toInput(Math.round(suggestedIncome * 100) / 100)
+          : ""
+    );
+    setGoalOpen(true);
+  }
+
+  async function saveGoal() {
+    const amount = parseAmountInput(goalAmount);
+    const income = parseAmountInput(goalIncome);
+
+    if (amount === null) {
+      Alert.alert("Importo non valido", "Inserisci un obiettivo maggiore di zero.");
+      return;
+    }
+    if (income === null) {
+      Alert.alert(
+        "Entrate mancanti",
+        "Servono le entrate mensili di riferimento: sono loro a dire quanto puoi spendere restando dentro l'obiettivo."
+      );
+      return;
+    }
+    // Il vincolo sta anche nel database (`amount > 0`, `reference_income > 0`)
+    // ma non copre la relazione fra i due: un obiettivo pari alle entrate
+    // passerebbe l'insert e darebbe un tetto di spesa zero.
+    if (amount >= income) {
+      Alert.alert(
+        "Obiettivo troppo alto",
+        `Risparmiare ${formatAmount(amount)} su ${formatAmount(
+          income
+        )} di entrate non lascia niente per vivere.`
+      );
+      return;
+    }
+
+    const { data: session } = await supabase.auth.getSession();
+    const userId = session.session?.user.id;
+    if (!userId) {
+      Alert.alert("Sessione scaduta", "Accedi di nuovo.");
+      return;
+    }
+
+    // `upsert` su `user_id`: l'obiettivo e' uno solo per utente (indice unico),
+    // quindi crearlo e modificarlo sono la stessa operazione e non serve
+    // distinguere i due rami come per i limiti.
+    const { error: failure } = await supabase
+      .from("savings_goals")
+      .upsert(
+        {
+          user_id: userId,
+          amount,
+          reference_income: income,
+          active: true,
+        },
+        { onConflict: "user_id" }
+      );
+
+    if (failure) {
+      Alert.alert("Errore", failure.message);
+      return;
+    }
+
+    setGoalOpen(false);
+    await reload();
+  }
+
+  function confirmDeleteGoal() {
+    if (!goal) return;
+    Alert.alert(
+      "Eliminare l'obiettivo?",
+      "Il semicerchio in Home tornerà a misurarsi sul limite di spesa.",
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Elimina",
+          style: "destructive",
+          onPress: async () => {
+            const { error: failure } = await supabase
+              .from("savings_goals")
+              .delete()
+              .eq("id", goal.id);
+            if (failure) {
+              Alert.alert("Errore", failure.message);
+              return;
+            }
+            setGoalOpen(false);
+            await reload();
+          },
+        },
+      ]
+    );
+  }
+
+  /**
+   * Applica una correzione suggerita da `checkCoherence`.
+   *
+   * Scrive il numero gia' calcolato dove serve — sul limite o sull'obiettivo
+   * — invece di aprire il foglio con il campo da correggere a mano: il senso
+   * della sezione e' che rimettere in riga i due valori costi un tocco.
+   */
+  async function applyFix(fix: CoherenceFix) {
+    setApplying(true);
+    const failure =
+      fix.target.kind === "goal"
+        ? (
+            await supabase
+              .from("savings_goals")
+              .update({ amount: fix.amount })
+              .eq("id", goal?.id ?? "")
+          ).error
+        : (
+            await supabase
+              .from("spending_limits")
+              .update({ amount: fix.amount })
+              .eq("id", fix.target.id)
+          ).error;
+    setApplying(false);
+
+    if (failure) {
+      Alert.alert("Errore", failure.message);
+      return;
+    }
+    await reload();
+  }
 
   const [period, setPeriod] = useState<"weekly" | "monthly">("monthly");
   const [amount, setAmount] = useState("");
@@ -166,6 +348,58 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
 
         {error && <LoadError message={error} onRetry={reload} />}
 
+        {/* La coerenza va in cima: e' l'unica cosa qui dentro che dice che
+            quello che si sta guardando piu' sotto non funziona come sembra.
+            In fondo alla pagina non la leggerebbe nessuno. */}
+        {!error && (
+          <CoherenceNotice
+            items={conflicts}
+            onApply={applyFix}
+            busy={applying}
+          />
+        )}
+
+        {!error && (
+          <View style={styles.limitBlock}>
+            {goal ? (
+              <>
+                <GoalCard
+                  goal={goal}
+                  onPress={openGoal}
+                  warn={conflicts.some(
+                    (c) => c.involvesGoal && c.severity === "conflict"
+                  )}
+                />
+                <TouchableOpacity
+                  style={styles.deleteRow}
+                  onPress={confirmDeleteGoal}
+                >
+                  <Text style={[styles.deleteText, { color: palette.ink3 }]}>
+                    Elimina
+                  </Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                style={[styles.goalEmpty, { borderColor: palette.hairline }]}
+                onPress={openGoal}
+              >
+                <Icon name="piggy-bank" size={16} color={palette.good} />
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.goalEmptyTitle, { color: palette.ink }]}>
+                    Obiettivo di risparmio
+                  </Text>
+                  <Text style={[styles.goalEmptyBody, { color: palette.ink3 }]}>
+                    Quanto vuoi mettere da parte ogni mese. Diventa un tetto di
+                    spesa in Home.
+                  </Text>
+                </View>
+                <Icon name="plus" size={15} color={palette.accent} />
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+
         {/* "Nessun limite impostato. Creane uno" su una lettura fallita porta
             a crearne un doppione, che il vincolo unico rifiuta con un 23505. */}
         {!error && statuses.length === 0 && (
@@ -177,7 +411,11 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
 
         {statuses.map((status) => (
           <View key={status.limit.id} style={styles.limitBlock}>
-            <LimitCard status={status} onPress={() => openEdit(status.limit)} />
+            <LimitCard
+              status={status}
+              onPress={() => openEdit(status.limit)}
+              warn={conflictingLimitIds.has(status.limit.id)}
+            />
             <TouchableOpacity
               style={styles.deleteRow}
               onPress={() => confirmDelete(status.limit)}
@@ -190,8 +428,10 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
         ))}
 
         <Text style={[styles.note, { color: palette.ink3 }]}>
-          La settimana comincia il lunedì. Gli avvisi compaiono nella Home; le
-          notifiche push arriveranno più avanti.
+          La settimana comincia il lunedì. Un mese vale circa 4,35 settimane:
+          è con quel numero che un limite settimanale e uno mensile vengono
+          messi a confronto. Gli avvisi compaiono nella Home; le notifiche push
+          arriveranno più avanti.
         </Text>
       </ScrollView>
 
@@ -321,6 +561,85 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
           </Text>
         </TouchableOpacity>
       </Sheet>
+
+      <Sheet
+        visible={goalOpen}
+        onClose={() => setGoalOpen(false)}
+        title={goal ? "Modifica obiettivo" : "Obiettivo di risparmio"}
+      >
+        <Text style={[styles.sheetBody, { color: palette.ink3 }]}>
+          Quanto vuoi che ti resti a fine mese. Gli investimenti contano: un
+          PAC da 500 € copre già metà di un obiettivo da 1.000 €.
+        </Text>
+
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Obiettivo al mese
+        </Text>
+        <TextInput
+          value={goalAmount}
+          onChangeText={setGoalAmount}
+          keyboardType="decimal-pad"
+          placeholder="0,00"
+          placeholderTextColor={palette.ink3}
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Entrate mensili previste
+        </Text>
+        <TextInput
+          value={goalIncome}
+          onChangeText={setGoalIncome}
+          keyboardType="decimal-pad"
+          placeholder="0,00"
+          placeholderTextColor={palette.ink3}
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+
+        {/* Il suggerimento resta tale: si propone e si lascia correggere,
+            invece di leggere gli introiti del mese in corso — che il 3 del
+            mese valgono zero e darebbero un tetto di spesa negativo. */}
+        {suggestedIncome !== null && (
+          <TouchableOpacity
+            onPress={() =>
+              setGoalIncome(toInput(Math.round(suggestedIncome * 100) / 100))
+            }
+          >
+            <Text style={[styles.suggestion, { color: palette.accent }]}>
+              Usa {formatAmount(suggestedIncome)} · mediana degli ultimi mesi
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        <Text style={[styles.sheetFoot, { color: palette.ink3 }]}>
+          Servono per tradurre l'obiettivo in quanto puoi spendere. Restano
+          questo numero anche se un mese incassi di più o di meno: così il
+          tetto non balla, e lo cambi tu quando cambia davvero.
+        </Text>
+
+        <TouchableOpacity
+          style={[styles.button, { backgroundColor: palette.accent }]}
+          onPress={saveGoal}
+        >
+          <Text style={[styles.buttonText, { color: palette.onAccent }]}>
+            Salva
+          </Text>
+        </TouchableOpacity>
+      </Sheet>
     </View>
     </SwipeBack>
   );
@@ -350,6 +669,19 @@ const styles = StyleSheet.create({
   limitBlock: { gap: 4 },
   deleteRow: { alignSelf: "flex-end", paddingVertical: 4, paddingHorizontal: 4 },
   deleteText: { ...type.small },
+  goalEmpty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.md,
+    borderWidth: 1,
+    borderRadius: radius.card,
+    padding: space.lg,
+  },
+  goalEmptyTitle: { ...type.bodyMedium, fontSize: 12.5 },
+  goalEmptyBody: { ...type.small, lineHeight: 16, marginTop: 2 },
+  sheetBody: { ...type.small, lineHeight: 18 },
+  sheetFoot: { ...type.small, lineHeight: 16, marginTop: space.sm },
+  suggestion: { ...type.small, fontWeight: "500", marginTop: 6 },
   empty: { ...type.body, lineHeight: 21, textAlign: "center", marginTop: space.xl },
   note: { ...type.small, lineHeight: 17 },
   fieldLabel: { ...type.caption, marginTop: space.sm },

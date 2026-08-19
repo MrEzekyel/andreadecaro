@@ -41,6 +41,15 @@ type Props = {
   /** Limite di spesa da tracciare come riferimento, se ce n'e' uno. */
   limit?: number | null;
   /**
+   * Come chiamare quella soglia, quando non e' un limite di spesa.
+   *
+   * Da quando esiste l'obiettivo di risparmio la retta puo' segnare un tetto
+   * **derivato** (entrate meno obiettivo) invece di un limite impostato a
+   * mano: chiamarlo "LIMITE" manderebbe a cercare in Limiti una riga che non
+   * c'e'.
+   */
+  limitLabel?: string;
+  /**
    * Valore da cui parte davvero la linea il primo giorno, se non e' zero.
    *
    * Quando i costi fissi restano nella linea, questa non parte da zero ma
@@ -52,6 +61,17 @@ type Props = {
    */
   baseline?: number;
   color: string;
+  /**
+   * Indici (0-based, come `points`) in cui inizia una nuova settimana —
+   * il lunedi' di ogni settimana del periodo mostrato, tranne il primo
+   * giorno del grafico stesso. Servono a disegnare il limite settimanale
+   * sul totale, che altrimenti non avrebbe modo di comparire: un limite
+   * settimanale non e' un'unica soglia fissa su un grafico mensile
+   * cumulato, ma si rinnova ogni sette giorni.
+   */
+  weekBoundaries?: number[];
+  /** Importo del limite settimanale sul totale, per l'etichetta. */
+  weeklyLimit?: number | null;
   /** Quante etichette mostrare sull'asse x, estremi compresi. */
   xTicks?: number;
   empty?: string;
@@ -94,8 +114,11 @@ function smoothPath(points: { x: number; y: number }[]) {
 export function TrendChart({
   points,
   limit,
+  limitLabel = "LIMITE",
   baseline = 0,
   color,
+  weekBoundaries = [],
+  weeklyLimit,
   xTicks = 5,
   empty = "Servono almeno due giorni di spese per disegnare l'andamento.",
 }: Props) {
@@ -218,7 +241,7 @@ export function TrendChart({
               fontSize={8}
               fill={palette.limit}
             >
-              {`LIMITE ${formatAmount(limit as number)}`}
+              {`${limitLabel} ${formatAmount(limit as number)}`}
             </SvgText>
           </>
         )}
@@ -235,6 +258,35 @@ export function TrendChart({
             strokeLinecap="round"
             opacity={0.5}
           />
+        )}
+
+        {/* Il limite settimanale non e' una soglia sola come quello mensile:
+            si rinnova ogni lunedi', quindi diventa una linea verticale a
+            ogni inizio settimana invece di una orizzontale — verticale e
+            ambra apposta, per non confondersi con la soglia mensile
+            (orizzontale, tratteggio piu' largo) o con il ritmo (diagonale). */}
+        {weekBoundaries.map((index) => (
+          <Line
+            key={`week-${index}`}
+            x1={xOf(index)}
+            y1={TOP}
+            x2={xOf(index)}
+            y2={BASE}
+            stroke={palette.warn}
+            strokeWidth={1.5}
+            strokeDasharray="2 3"
+            opacity={0.55}
+          />
+        ))}
+        {weekBoundaries.length > 0 && weeklyLimit != null && weeklyLimit > 0 && (
+          <SvgText
+            x={xOf(weekBoundaries[0]) + 4}
+            y={TOP + 8}
+            fontSize={8}
+            fill={palette.warn}
+          >
+            {`SETT. ${formatAmount(weeklyLimit)}`}
+          </SvgText>
         )}
 
         <Path d={area} fill="url(#trendFill)" />
