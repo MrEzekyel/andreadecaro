@@ -227,39 +227,54 @@ WORDMARK: Bottom left, on the vanilla panel, small, ink #141413: "clinck"
 
 ---
 
-## 4 · B — Privacy
+## 4 · B — Privacy ⚠️ rivista dopo la prima prova
 
-Il contrasto competitivo vero (`MARKETING.md` §2). Post interamente
-tipografico: qui il soggetto grafico **è** il testo, come nei riferimenti
-della moodboard costruiti sulla scritta gigante.
+Il contrasto competitivo vero (`MARKETING.md` §2). Prima versione bocciata
+da Andrea: fondo arancio ok, ma tutto testo era troppo spoglio dentro una
+serie che altrove è sempre grafica. Aggiunta un'icona a tratto (scudo con
+spunta) come unico soggetto grafico — coerente con le "line graphics" già
+usate nei post 1 e 5, non un'icona a sé stante.
 
 ```
-1080x1350px, 4:5 portrait. Flat typographic poster.
+1080x1350px, 4:5 portrait. Flat graphic poster.
 
 BACKGROUND: Solid warm orange #FF5E2C, full bleed, completely flat.
 
-TEXT: All text in warm vanilla #FFF6C0, clean humanist sans-serif, light
-weight, generous letter spacing, left aligned, with a wide margin on the
-left side.
- - In the upper half, small size, three short lines stacked:
+TEXT: In the upper area, small size, left aligned with a wide left
+margin, in warm vanilla #FFF6C0, clean humanist sans-serif, light
+weight, generous letter spacing, three short lines stacked:
      "Le altre app di spese"
      "ti chiedono le credenziali"
      "della tua banca."
- - In the lower half, one enormous line occupying nearly the full width
-   of the canvas, dramatically larger than everything else:
-     "Noi no."
 
 RULE: One thin horizontal line in vanilla #FFF6C0, short, sitting in the
-empty space between the small text block and the large line.
+empty space below the small text block.
+
+ICON: In the lower half, one large line-art icon of a rounded shield
+with a simple checkmark inside it, drawn as a clean continuous outline
+in vanilla #FFF6C0, about 5px stroke, no fill, centered horizontally.
+Sized so it reads as the main visual anchor of the lower half — large
+but not touching the canvas edges.
+
+HEADLINE: Directly below the shield icon, centered, one enormous line,
+dramatically larger than the small text above, in vanilla #FFF6C0:
+     "Noi no."
 
 WORDMARK: Bottom left corner, small, vanilla #FFF6C0: "clinck"
 
 [BLOCCO STILE]
 ```
 
+Se lo scudo esce troppo "app bancaria seria", alternativa da provare: un
+grande cerchio vuoto a tratto che circonda idealmente "Noi no.", motivo
+astratto invece di un'icona-simbolo riconoscibile.
+
 ---
 
-## 5 · A — Siri
+## 5 · A — Siri ⏸️ in stand-by
+
+La funzionalità Siri non è ancora sviluppata: non pubblicare finché non
+esiste davvero da mostrare. Prompt tenuto pronto per quando sarà così.
 
 Screenshot da allegare: **inserimento a voce con Siri** (o Movimenti
 subito dopo l'inserimento).
