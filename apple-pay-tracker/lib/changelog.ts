@@ -22,6 +22,16 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-08-20",
+    date: "2026-08-20",
+    title: "Obiettivo di risparmio, più chiaro da impostare",
+    items: [
+      "Non puoi più salvare un obiettivo che non torna: se è troppo alto per le tue entrate, o in conflitto con un limite di spesa, l'app te lo dice subito e propone il numero giusto — niente più sorprese dopo.",
+      "Un obiettivo non può essere più basso di quanto già investi in automatico nei piani di accumulo: gli investimenti contano come risparmio, quindi sarebbe già superato da solo.",
+      "Per scegliere l'obiettivo c'è ora anche uno slider, con il numero comunque scrivibile a mano.",
+    ],
+  },
+  {
     id: "2026-08-19",
     date: "2026-08-19",
     title: "Obiettivi di risparmio",
