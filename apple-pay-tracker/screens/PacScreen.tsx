@@ -15,6 +15,7 @@ import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount } from "../lib/format";
 import { GROUP_LABEL, GROUP_ORDER } from "../lib/portfolio";
+import { monthlyEquivalent } from "../lib/recurrence";
 import { supabase } from "../lib/supabase";
 import { radius, space, tint, type } from "../lib/theme";
 import { Asset, InvestmentRule, RecurringFrequency } from "../lib/types";
@@ -24,14 +25,6 @@ const FREQUENCY_LABEL: Record<RecurringFrequency, string> = {
   monthly: "Ogni mese",
   yearly: "Ogni anno",
 };
-
-/** Quanto pesa al mese un piano, qualunque sia la sua cadenza. */
-function monthlyEquivalent(rule: InvestmentRule) {
-  const amount = Number(rule.amount);
-  if (rule.frequency === "weekly") return (amount * 52) / 12;
-  if (rule.frequency === "yearly") return amount / 12;
-  return amount;
-}
 
 function parseAmountInput(value: string): number | null {
   const parsed = Number(value.replace(",", ".").trim());

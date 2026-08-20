@@ -57,6 +57,22 @@ export function nextRunOn(
   return isoDate(candidate);
 }
 
+/**
+ * Quanto pesa al mese una regola ricorrente, qualunque sia la sua cadenza.
+ *
+ * Nata in `PacScreen` per la quota di ogni piano di accumulo sul totale
+ * mensile investito; usata anche da `lib/savings.ts` per il vincolo minimo
+ * di un obiettivo di risparmio (non puoi risparmiare meno di quanto investi
+ * gia' in automatico). Un'unica formula: se ne nascesse una seconda, le due
+ * potrebbero divergere silenziosamente sullo stesso numero.
+ */
+export function monthlyEquivalent(rule: { amount: number; frequency: RecurringFrequency }) {
+  const amount = Number(rule.amount);
+  if (rule.frequency === "weekly") return (amount * 52) / 12;
+  if (rule.frequency === "yearly") return amount / 12;
+  return amount;
+}
+
 /** Vero se la cadenza e' cambiata e `next_run_on` va ricalcolato. */
 export function scheduleChanged(
   rule: {

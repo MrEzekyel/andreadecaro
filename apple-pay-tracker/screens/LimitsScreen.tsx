@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { AmountSlider } from "../components/AmountSlider";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { StaleNote } from "../components/StaleNote";
@@ -19,7 +20,13 @@ import { CategoryPicker } from "../components/CategoryPicker";
 import { Sheet } from "../components/Sheet";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount } from "../lib/format";
-import { CoherenceFix, median } from "../lib/savings";
+import {
+  CoherenceFix,
+  computeGoalRange,
+  goalRangeReason,
+  median,
+  validateGoalInput,
+} from "../lib/savings";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
 import { SpendingLimit } from "../lib/types";
@@ -48,6 +55,8 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
     goal,
     conflicts,
     conflictingLimitIds,
+    limits,
+    investmentCommitment,
     error,
     staleLabel,
     staleReason,
@@ -100,6 +109,16 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
     setGoalOpen(true);
   }
 
+  // Numeri correnti del foglio, derivati a ogni render dai due campi: servono
+  // sia allo slider (che deve conoscere il proprio intervallo mentre si
+  // digita) sia al bottone Salva (che deve sapere se e' il caso di provarci).
+  const goalAmountValue = parseAmountInput(goalAmount);
+  const goalIncomeValue = parseAmountInput(goalIncome);
+  const goalRange =
+    goalIncomeValue !== null
+      ? computeGoalRange(goalIncomeValue, limits, investmentCommitment)
+      : null;
+
   async function saveGoal() {
     const amount = parseAmountInput(goalAmount);
     const income = parseAmountInput(goalIncome);
@@ -115,16 +134,15 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
       );
       return;
     }
-    // Il vincolo sta anche nel database (`amount > 0`, `reference_income > 0`)
-    // ma non copre la relazione fra i due: un obiettivo pari alle entrate
-    // passerebbe l'insert e darebbe un tetto di spesa zero.
-    if (amount >= income) {
-      Alert.alert(
-        "Obiettivo troppo alto",
-        `Risparmiare ${formatAmount(amount)} su ${formatAmount(
-          income
-        )} di entrate non lascia niente per vivere.`
-      );
+
+    // Si controlla qui, prima di scrivere — non dopo, con un avviso che si
+    // scopre per caso in Limiti o in Home. `validateGoalInput` e'
+    // esattamente la stessa regola che `checkCoherence` userebbe per
+    // segnalare il conflitto: la si blocca sul nascere invece di lasciarla
+    // nascere e poi dirlo.
+    const check = validateGoalInput(amount, income, limits, investmentCommitment);
+    if (!check.ok) {
+      Alert.alert("Obiettivo non valido", check.reason);
       return;
     }
 
@@ -573,25 +591,6 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
         </Text>
 
         <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
-          Obiettivo al mese
-        </Text>
-        <TextInput
-          value={goalAmount}
-          onChangeText={setGoalAmount}
-          keyboardType="decimal-pad"
-          placeholder="0,00"
-          placeholderTextColor={palette.ink3}
-          style={[
-            styles.input,
-            {
-              backgroundColor: palette.surface,
-              borderColor: palette.hairline,
-              color: palette.ink,
-            },
-          ]}
-        />
-
-        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
           Entrate mensili previste
         </Text>
         <TextInput
@@ -625,17 +624,76 @@ export default function LimitsScreen({ onBack }: { onBack: () => void }) {
           </TouchableOpacity>
         )}
 
+        <Text style={[styles.fieldLabel, { color: palette.ink3, marginTop: space.md }]}>
+          Obiettivo al mese
+        </Text>
+        <TextInput
+          value={goalAmount}
+          onChangeText={setGoalAmount}
+          keyboardType="decimal-pad"
+          placeholder="0,00"
+          placeholderTextColor={palette.ink3}
+          style={[
+            styles.input,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              color: palette.ink,
+            },
+          ]}
+        />
+
+        {/* Lo slider serve solo a scegliere piu' in fretta lo stesso numero:
+            il campo sopra resta scrivibile a mano in ogni momento, e resta
+            l'unica fonte di verita' di cosa verra' salvato — lo slider si
+            limita a scriverci dentro quando trascinato. */}
+        {goalRange && (
+          <View style={styles.sliderWrap}>
+            <AmountSlider
+              value={goalAmountValue ?? goalRange.min}
+              min={goalRange.min}
+              max={goalRange.max}
+              step={5}
+              color={palette.good}
+              floorLabel={investmentCommitment > 0 ? "già investito" : undefined}
+              onChange={(v) => setGoalAmount(toInput(v))}
+            />
+          </View>
+        )}
+
+        {/* Le entrate ci sono ma nessun obiettivo e' compatibile con limiti e
+            piani di accumulo attuali: si dice perche', invece di far scoprire
+            il blocco solo al tocco di Salva. */}
+        {goalIncomeValue !== null && !goalRange && (
+          <View style={[styles.impossible, { backgroundColor: `${palette.warn}1f` }]}>
+            <Icon name="triangle-alert" size={15} color={palette.warn} />
+            <Text style={[styles.impossibleText, { color: palette.ink2 }]}>
+              {goalRangeReason(goalIncomeValue, limits, investmentCommitment)}
+            </Text>
+          </View>
+        )}
+
         <Text style={[styles.sheetFoot, { color: palette.ink3 }]}>
-          Servono per tradurre l'obiettivo in quanto puoi spendere. Restano
-          questo numero anche se un mese incassi di più o di meno: così il
-          tetto non balla, e lo cambi tu quando cambia davvero.
+          Le entrate servono per tradurre l'obiettivo in quanto puoi
+          spendere. Restano questo numero anche se un mese incassi di più o
+          di meno: così il tetto non balla, e lo cambi tu quando cambia
+          davvero.
         </Text>
 
         <TouchableOpacity
-          style={[styles.button, { backgroundColor: palette.accent }]}
+          style={[
+            styles.button,
+            { backgroundColor: goalRange ? palette.accent : palette.hairline },
+          ]}
           onPress={saveGoal}
+          disabled={!goalRange}
         >
-          <Text style={[styles.buttonText, { color: palette.onAccent }]}>
+          <Text
+            style={[
+              styles.buttonText,
+              { color: goalRange ? palette.onAccent : palette.ink3 },
+            ]}
+          >
             Salva
           </Text>
         </TouchableOpacity>
@@ -682,6 +740,15 @@ const styles = StyleSheet.create({
   sheetBody: { ...type.small, lineHeight: 18 },
   sheetFoot: { ...type.small, lineHeight: 16, marginTop: space.sm },
   suggestion: { ...type.small, fontWeight: "500", marginTop: 6 },
+  sliderWrap: { marginTop: space.sm },
+  impossible: {
+    flexDirection: "row",
+    gap: 8,
+    borderRadius: radius.card,
+    padding: space.md,
+    marginTop: space.sm,
+  },
+  impossibleText: { ...type.small, lineHeight: 16, flex: 1 },
   empty: { ...type.body, lineHeight: 21, textAlign: "center", marginTop: space.xl },
   note: { ...type.small, lineHeight: 17 },
   fieldLabel: { ...type.caption, marginTop: space.sm },

@@ -1,5 +1,6 @@
 import { formatAmount } from "./format";
-import { SavingsGoal, SpendingLimit } from "./types";
+import { monthlyEquivalent } from "./recurrence";
+import { InvestmentRule, SavingsGoal, SpendingLimit } from "./types";
 
 /**
  * Settimane in un mese medio: 365,25 / 12 / 7.
@@ -104,21 +105,38 @@ export type Coherence = {
 type Input = {
   goal: SavingsGoal | null;
   limits: SpendingLimit[];
+  /**
+   * Quanto va gia' in automatico verso i piani di accumulo ogni mese
+   * (`monthlyEquivalent` sommato sulle regole attive) — vedi
+   * `goal-vs-investments` piu' sotto.
+   */
+  monthlyInvestmentCommitment: number;
   /** Nome della categoria, per scrivere i messaggi. */
   categoryName: (id: string) => string;
 };
 
 /**
- * Tutti i modi in cui limiti e obiettivo possono contraddirsi.
+ * Tutti i modi in cui limiti, investimenti e obiettivo possono contraddirsi.
  *
- * Il punto non e' impedire le combinazioni incoerenti — sono legittime, e
- * bloccarle costringerebbe a rifare i conti a mano prima di poter salvare —
- * ma **dirle**, con il numero gia' calcolato che le sistema. Un limite
- * settimanale da 500 € sotto un mensile da 1.000 € non da' nessun errore:
- * semplicemente non scatta mai, e chi l'ha impostato crede di essere
- * protetto due volte mentre non lo e' nemmeno una.
+ * Per i conflitti che coinvolgono l'obiettivo, il punto d'ingresso normale
+ * non e' piu' questa funzione ma `validateGoalInput`: si blocca il salvataggio
+ * dell'obiettivo finche' non torna coerente, cosi' uno stato incoerente non
+ * nasce mai. Questa resta comunque necessaria per due motivi: primo, quei
+ * conflitti possono ripresentarsi **dopo** — un limite modificato in
+ * `LimitsScreen` o un piano di accumulo aggiunto in `PacScreen` non passano
+ * da nessuna validazione sull'obiettivo, che quindi puo' tornare incoerente
+ * senza che nessuno l'abbia toccato; secondo, i conflitti che non coinvolgono
+ * l'obiettivo (settimanale contro mensile, categoria sopra il totale) restano
+ * solo informativi per scelta — un limite settimanale da 500 € sotto un
+ * mensile da 1.000 € non e' un errore da impedire, semplicemente non scatta
+ * mai, ed e' comunque bene dirlo.
  */
-export function checkCoherence({ goal, limits, categoryName }: Input): Coherence[] {
+export function checkCoherence({
+  goal,
+  limits,
+  monthlyInvestmentCommitment,
+  categoryName,
+}: Input): Coherence[] {
   const out: Coherence[] = [];
 
   const overall = (period: SpendingLimit["period"]) =>
@@ -147,6 +165,35 @@ export function checkCoherence({ goal, limits, categoryName }: Input): Coherence
       involvesGoal: true,
     });
     return out;
+  }
+
+  // ── Obiettivo sotto quanto gia' investi in automatico ────────────────
+  // Gli investimenti contano come risparmio (`goalCeiling`, `goalVerdict`):
+  // un piano di accumulo che mette via 500 € al mese sta gia' risparmiando
+  // 500 €, indipendentemente da qualunque spesa. Un obiettivo piu' basso di
+  // quella cifra sarebbe gia' superato da solo, prima ancora di guardare una
+  // spesa — non misura niente, e va impedito fin dall'inserimento.
+  if (goal && monthlyInvestmentCommitment > Number(goal.amount)) {
+    const floor = round2(monthlyInvestmentCommitment);
+    out.push({
+      key: "goal-vs-investments",
+      severity: "conflict",
+      title: "L'obiettivo è sotto quanto già investi",
+      body: `I piani di accumulo attivi mettono via ${formatAmount(
+        floor
+      )} al mese in automatico, più dell'obiettivo di ${formatAmount(
+        Number(goal.amount)
+      )}. Gli investimenti contano come risparmio: lo staresti già superando senza guardare una sola spesa.`,
+      fixes: [
+        {
+          label: `Obiettivo a ${formatAmount(floor)}`,
+          amount: floor,
+          target: { kind: "goal" },
+        },
+      ],
+      limitIds: [],
+      involvesGoal: true,
+    });
   }
 
   // ── Obiettivo contro limite mensile complessivo ──────────────────────
@@ -384,6 +431,208 @@ export function checkCoherence({ goal, limits, categoryName }: Input): Coherence
   return out.sort((a, b) =>
     a.severity === b.severity ? 0 : a.severity === "conflict" ? -1 : 1
   );
+}
+
+/** Somma di `monthlyEquivalent` sulle sole regole attive — le stesse che `PacScreen` mostra come "in corso". */
+export function monthlyInvestmentCommitment(rules: InvestmentRule[]) {
+  return rules
+    .filter((rule) => rule.active)
+    .reduce((sum, rule) => sum + monthlyEquivalent(rule), 0);
+}
+
+export type GoalRange = { min: number; max: number };
+
+/**
+ * L'intervallo di valori validi per l'obiettivo, dati entrate, limiti e
+ * investimenti attuali. `null` = nessun obiettivo e' possibile in queste
+ * condizioni (il tetto che i limiti impongono e' sceso sotto quanto gia'
+ * si investe, o le entrate non bastano nemmeno per i soli investimenti).
+ *
+ * Guida sia lo slider di inserimento (che non puo' uscire da qui) sia
+ * `validateGoalInput` (che qui dentro trova i due estremi da proporre).
+ * Guarda solo il limite **complessivo** — mensile se c'e', altrimenti il
+ * settimanale proiettato — mai quelli di categoria: stessa scelta gia'
+ * fatta in `checkCoherence` per `goal-vs-monthly`/`goal-vs-weekly`.
+ */
+export function computeGoalRange(
+  referenceIncome: number,
+  limits: SpendingLimit[],
+  investmentFloor: number
+): GoalRange | null {
+  if (referenceIncome <= 0) return null;
+
+  const monthly = limits.find(
+    (l) => l.period === "monthly" && l.category_id === null
+  );
+  const weekly = limits.find(
+    (l) => l.period === "weekly" && l.category_id === null
+  );
+
+  let capFromLimit = referenceIncome;
+  if (monthly) {
+    capFromLimit = referenceIncome - Number(monthly.amount);
+  } else if (weekly) {
+    capFromLimit = referenceIncome - Number(weekly.amount) * WEEKS_PER_MONTH;
+  }
+
+  const max = round2(Math.min(referenceIncome, capFromLimit));
+  const min = round2(Math.max(0, investmentFloor));
+
+  if (min >= max) return null;
+  return { min, max };
+}
+
+/**
+ * Perche' nessun obiettivo e' possibile con questi numeri — usata solo
+ * quando `computeGoalRange` torna `null`, per spiegarlo nel foglio invece di
+ * limitarsi a nascondere lo slider senza dire perche'.
+ */
+export function goalRangeReason(
+  referenceIncome: number,
+  limits: SpendingLimit[],
+  investmentFloor: number
+): string {
+  const floor = round2(Math.max(0, investmentFloor));
+
+  if (floor >= referenceIncome) {
+    return `I piani di accumulo attivi mettono già via ${formatAmount(
+      floor
+    )} al mese, pari o oltre le ${formatAmount(
+      referenceIncome
+    )} di entrate dichiarate. Alza le entrate, o riduci i piani da Investimenti → Piani di accumulo.`;
+  }
+
+  const monthly = limits.find(
+    (l) => l.period === "monthly" && l.category_id === null
+  );
+  if (monthly) {
+    return `Il limite mensile di ${formatAmount(
+      Number(monthly.amount)
+    )} lascia risparmiare al massimo ${formatAmount(
+      round2(referenceIncome - Number(monthly.amount))
+    )}, meno di quanto già investi in automatico (${formatAmount(
+      floor
+    )}). Alza il limite mensile da Impostazioni → Limiti, o riduci i piani di accumulo.`;
+  }
+
+  const weekly = limits.find(
+    (l) => l.period === "weekly" && l.category_id === null
+  );
+  if (weekly) {
+    const projected = round2(Number(weekly.amount) * WEEKS_PER_MONTH);
+    return `${formatAmount(
+      Number(weekly.amount)
+    )} a settimana (${formatAmount(
+      projected
+    )} al mese) lasciano risparmiare meno di quanto già investi in automatico (${formatAmount(
+      floor
+    )}). Alza il limite settimanale da Impostazioni → Limiti, o riduci i piani di accumulo.`;
+  }
+
+  return "Con le entrate attuali non c'è margine per nessun obiettivo oltre ai piani di accumulo già attivi.";
+}
+
+export type GoalValidation = { ok: true } | { ok: false; reason: string };
+
+/**
+ * Controlla un obiettivo **prima** di salvarlo, con la motivazione esatta se
+ * non va bene — e blocca, non avvisa dopo. Copre le stesse casistiche di
+ * `checkCoherence` per l'obiettivo (irraggiungibile, sotto gli investimenti,
+ * in conflitto col limite mensile o settimanale), riscritte come un unico
+ * percorso in ordine di gravita' invece che come un elenco da filtrare: qui
+ * serve una sola ragione di blocco, la piu' urgente, non tutte insieme.
+ */
+export function validateGoalInput(
+  amount: number,
+  referenceIncome: number,
+  limits: SpendingLimit[],
+  investmentFloor: number
+): GoalValidation {
+  if (referenceIncome <= 0) {
+    return {
+      ok: false,
+      reason: "Servono le entrate mensili di riferimento per calcolare quanto puoi spendere restando dentro l'obiettivo.",
+    };
+  }
+
+  if (amount >= referenceIncome) {
+    return {
+      ok: false,
+      reason: `Risparmiare ${formatAmount(amount)} su ${formatAmount(
+        referenceIncome
+      )} di entrate non lascia niente per vivere. Abbassa l'obiettivo o correggi le entrate di riferimento.`,
+    };
+  }
+
+  if (investmentFloor > amount) {
+    const floor = round2(investmentFloor);
+    return {
+      ok: false,
+      reason: `I piani di accumulo attivi mettono già via ${formatAmount(
+        floor
+      )} al mese in automatico. Gli investimenti contano come risparmio, quindi un obiettivo più basso sarebbe già superato senza guardare una spesa: alzalo ad almeno ${formatAmount(
+        floor
+      )}, o riduci i piani da Investimenti → Piani di accumulo.`,
+    };
+  }
+
+  const ceiling = referenceIncome - amount;
+  const monthly = limits.find(
+    (l) => l.period === "monthly" && l.category_id === null
+  );
+  const weekly = limits.find(
+    (l) => l.period === "weekly" && l.category_id === null
+  );
+
+  if (monthly && Number(monthly.amount) > ceiling) {
+    const limitAmount = Number(monthly.amount);
+    const maxGoal = round2(referenceIncome - limitAmount);
+    return {
+      ok: false,
+      reason:
+        maxGoal > 0
+          ? `Il limite mensile di ${formatAmount(
+              limitAmount
+            )} lascia risparmiare al massimo ${formatAmount(
+              maxGoal
+            )}. Abbassa l'obiettivo a ${formatAmount(
+              maxGoal
+            )}, o alza il limite mensile da Impostazioni → Limiti.`
+          : `Il limite mensile di ${formatAmount(
+              limitAmount
+            )} non lascia margine per nessun obiettivo su ${formatAmount(
+              referenceIncome
+            )} di entrate: va abbassato prima da Impostazioni → Limiti.`,
+    };
+  }
+
+  if (weekly && !monthly) {
+    const projected = Number(weekly.amount) * WEEKS_PER_MONTH;
+    if (projected > ceiling) {
+      const maxGoal = round2(referenceIncome - projected);
+      return {
+        ok: false,
+        reason:
+          maxGoal > 0
+            ? `${formatAmount(
+                Number(weekly.amount)
+              )} a settimana valgono ${formatAmount(
+                round2(projected)
+              )} al mese: rispettandolo ogni settimana risparmieresti al massimo ${formatAmount(
+                maxGoal
+              )}. Abbassa l'obiettivo a ${formatAmount(
+                maxGoal
+              )}, o alza il limite settimanale da Impostazioni → Limiti.`
+            : `${formatAmount(
+                Number(weekly.amount)
+              )} a settimana (${formatAmount(
+                round2(projected)
+              )} al mese) non lasciano margine per nessun obiettivo: va alzato prima da Impostazioni → Limiti.`,
+      };
+    }
+  }
+
+  return { ok: true };
 }
 
 /**
