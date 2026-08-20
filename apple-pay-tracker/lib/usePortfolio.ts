@@ -76,6 +76,23 @@ function build(
   const positions = buildPositions(raw.assets, raw.investments, raw.prices);
   const totals = sumPositions(positions);
 
+  // Stesso perimetro delle `positions`, non tutte le `investments`.
+  //
+  // `raw.assets` arriva gia' filtrato su `archived = false`, ma
+  // `raw.investments` no: e' una lettura separata. Passando la lista intera
+  // a `portfolioXirr`, l'uscita di un asset archiviato (i soldi versati)
+  // resta nel calcolo mentre il suo valore di oggi — escluso da `totals.value`
+  // perche' l'asset non e' piu' fra i `positions` — sparisce dall'altro
+  // lato. Il risultato e' un rendimento drammaticamente falsato in negativo:
+  // l'XIRR legge quei soldi come spariti, non come "nascosti dal cruscotto
+  // ma ancora tuoi". Verificato: archiviare Bitcoin (−34% ma tutt'altro che
+  // sparito) da solo bastava a portare il rendimento annuo da positivo a
+  // −50%.
+  const assetIds = new Set(raw.assets.map((a) => a.id));
+  const visibleInvestments = raw.investments.filter(
+    (op) => op.asset_id !== null && assetIds.has(op.asset_id)
+  );
+
   return {
     assets: raw.assets,
     investments: raw.investments,
@@ -83,7 +100,7 @@ function build(
     positions,
     totals,
     series: raw.series,
-    xirr: portfolioXirr(raw.investments, totals.value),
+    xirr: portfolioXirr(visibleInvestments, totals.value),
     loading: false,
     error: null,
     staleAt: stale?.at ?? null,
