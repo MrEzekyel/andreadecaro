@@ -206,7 +206,16 @@ export function sumPositions(positions: Position[]): PortfolioTotals {
 
 export type CashFlow = { date: string; amount: number };
 
-/** Flussi di cassa nel formato che serve all'XIRR: negativi in uscita. */
+/**
+ * Flussi di cassa nel formato che serve all'XIRR: negativi in uscita.
+ *
+ * La commissione sta *fuori* da `amount` — `buildPositions` la accumula a
+ * parte, e il prezzo medio di carico si calcola senza — quindi va sottratta
+ * qui a mano, con lo stesso segno per ogni tipo di operazione: sull'acquisto
+ * si aggiunge all'esborso, sulla vendita e sul dividendo si toglie
+ * dall'incasso. Senza, il rendimento resta al lordo dei costi, cioe' una
+ * percentuale che nessuno ha mai davvero incassato.
+ */
 export function cashFlows(investments: Investment[]): CashFlow[] {
   const flows: CashFlow[] = [];
   for (const op of investments) {
@@ -215,11 +224,39 @@ export function cashFlows(investments: Investment[]): CashFlow[] {
     const amount = Number(op.amount);
     if (op.kind === "buy") flows.push({ date, amount: -amount });
     else flows.push({ date, amount });
+
+    const fee = Number(op.fee ?? 0);
+    if (fee > 0) flows.push({ date, amount: -fee });
   }
   return flows.sort((a, b) => a.date.localeCompare(b.date));
 }
 
 const YEAR_MS = 365.25 * 24 * 60 * 60 * 1000;
+
+/**
+ * Sotto questo storico un tasso annuo non si mostra.
+ *
+ * Annualizzare vuol dire elevare a `1/anni`: su cinque settimane l'esponente
+ * e' dieci, e un titolo comprato da poco che fa +1% viene stampato come
+ * "+68% annuo". E' aritmeticamente giusto e praticamente falso — nessuno sta
+ * guadagnando il 68% l'anno, sta guadagnando l'1% da una settimana. Mezzo
+ * anno e' il punto in cui l'esponente scende a 2 e il numero torna a
+ * descrivere qualcosa; sotto, si mostra il rendimento del periodo com'e',
+ * dicendo di quale periodo si tratta.
+ */
+export const MIN_ANNUALIZE_YEARS = 0.5;
+
+export type MoneyWeightedReturn = {
+  /**
+   * Tasso su base annua. `null` quando lo storico e' piu' corto di
+   * `MIN_ANNUALIZE_YEARS`: non e' un errore, e' un rifiuto di estrapolare.
+   */
+  annual: number | null;
+  /** Rendimento sull'arco di tempo davvero trascorso. Sempre disponibile. */
+  period: number;
+  /** Ampiezza dello storico, in anni. */
+  years: number;
+};
 
 /**
  * Rendimento annualizzato che tiene conto di *quando* sono entrati i soldi.
@@ -259,14 +296,52 @@ export function xirr(flows: CashFlow[]): number | null {
   return (low + high) / 2;
 }
 
-/** XIRR del portafoglio: i flussi passati piu' il valore di oggi come uscita. */
-export function portfolioXirr(
-  investments: Investment[],
+/**
+ * Il risultato completo a partire dai flussi: tasso annuo quando ha senso,
+ * rendimento del periodo sempre.
+ *
+ * `currentValue` deve essere il valore delle *sole quote*, non il saldo della
+ * posizione: gli ordini addebitati e non ancora eseguiti stanno nel saldo ma
+ * i loro flussi no — `cashFlows` salta tutto cio' che non e' `settled` —
+ * quindi passando il saldo l'XIRR leggerebbe quei soldi come valore comparso
+ * dal nulla. Su un piano da quattro anni bastano 500 euro in esecuzione per
+ * spostare il rendimento da 9,07% a 10,80%.
+ */
+function moneyWeighted(
+  flows: CashFlow[],
   currentValue: number,
+  today: string
+): MoneyWeightedReturn | null {
+  if (currentValue <= 0 || flows.length === 0) return null;
+
+  const all = [...flows, { date: today, amount: currentValue }];
+  const rate = xirr(all);
+  if (rate === null) return null;
+
+  const years =
+    (new Date(today).getTime() - new Date(all[0].date).getTime()) / YEAR_MS;
+  if (years <= 0) return null;
+
+  return {
+    annual: years >= MIN_ANNUALIZE_YEARS ? rate : null,
+    // Il tasso annuo riportato all'arco di tempo vero: e' lo stesso numero
+    // detto senza estrapolare, non un secondo calcolo.
+    period: (1 + rate) ** years - 1,
+    years,
+  };
+}
+
+/**
+ * Rendimento del portafoglio: i flussi passati piu' il valore di oggi.
+ *
+ * `marketValue`, non `value` — vedi `moneyWeighted`.
+ */
+export function portfolioReturn(
+  investments: Investment[],
+  marketValue: number,
   today = new Date().toISOString().slice(0, 10)
-): number | null {
-  if (currentValue <= 0) return null;
-  return xirr([...cashFlows(investments), { date: today, amount: currentValue }]);
+): MoneyWeightedReturn | null {
+  return moneyWeighted(cashFlows(investments), marketValue, today);
 }
 
 /**
@@ -276,20 +351,18 @@ export function portfolioXirr(
  * cui una fetta e' entrata due anni fa e un'altra sei mesi fa, il numero
  * complessivo non dice quale delle due stia effettivamente rendendo.
  */
-export function groupXirr(
+export function groupReturn(
   investments: Investment[],
   assets: Asset[],
   group: AssetGroup,
-  currentValue: number,
+  marketValue: number,
   today = new Date().toISOString().slice(0, 10)
-): number | null {
-  if (currentValue <= 0) return null;
+): MoneyWeightedReturn | null {
   const inGroup = new Set(
     assets.filter((a) => a.asset_group === group).map((a) => a.id)
   );
   const ops = investments.filter((op) => op.asset_id && inGroup.has(op.asset_id));
-  if (ops.length === 0) return null;
-  return xirr([...cashFlows(ops), { date: today, amount: currentValue }]);
+  return moneyWeighted(cashFlows(ops), marketValue, today);
 }
 
 /**
@@ -298,25 +371,60 @@ export function groupXirr(
  * `AssetDetailScreen` ne aveva solo il rendimento "da quando l'ho comprato"
  * (`priceGainPct`/`gainPct`), che tratta un versamento di due anni fa e uno
  * del mese scorso allo stesso modo — lo stesso motivo per cui esiste
- * `groupXirr` un livello sopra. Qui basta filtrare per `asset_id`, senza
+ * `groupReturn` un livello sopra. Qui basta filtrare per `asset_id`, senza
  * bisogno di risalire al gruppo.
  */
-export function assetXirr(
+export function assetReturn(
   investments: Investment[],
   assetId: string,
-  currentValue: number,
+  marketValue: number,
   today = new Date().toISOString().slice(0, 10)
-): number | null {
-  if (currentValue <= 0) return null;
+): MoneyWeightedReturn | null {
   const ops = investments.filter((op) => op.asset_id === assetId);
-  if (ops.length === 0) return null;
-  return xirr([...cashFlows(ops), { date: today, amount: currentValue }]);
+  return moneyWeighted(cashFlows(ops), marketValue, today);
+}
+
+/** "4 mesi", "3 settimane": l'arco di tempo detto come lo direbbe una persona. */
+export function formatHorizon(years: number) {
+  const months = Math.round(years * 12);
+  if (months >= 2) return `${months} mesi`;
+  const weeks = Math.max(1, Math.round(years * 52.18));
+  return weeks === 1 ? "una settimana" : `${weeks} settimane`;
+}
+
+/**
+ * Il riquadro "Rendimento" pronto da mostrare, uguale ai tre livelli.
+ *
+ * Sta qui e non nelle schermate perche' Investimenti, dettaglio sezione e
+ * dettaglio titolo mostrano lo stesso identico numero con lo stesso identico
+ * significato: tenerne tre copie a mano ha gia' prodotto tre etichette
+ * leggermente diverse per la stessa cosa.
+ *
+ * Il suggerimento dice cosa c'e' dentro invece di come e' calcolato. Serve
+ * perche' accanto a questo numero, nell'elenco titoli, ne compare un altro
+ * costruito diversamente — `priceGainPct`, solo prezzo e al lordo dei costi,
+ * quello confrontabile con l'app del broker: senza etichetta i due sembrano
+ * lo stesso dato che non torna.
+ */
+export function returnTile(r: MoneyWeightedReturn) {
+  const rate = r.annual ?? r.period;
+  return {
+    label: r.annual !== null ? "Rendimento annuo" : "Rendimento",
+    value: `${rate >= 0 ? "+" : "\u2212"}${Math.abs(rate * 100).toFixed(2)}%`,
+    hint:
+      r.annual !== null
+        ? "dividendi inclusi, al netto delle commissioni"
+        : `su ${formatHorizon(r.years)}: troppo poco per un dato annuo`,
+    tone: (rate >= 0 ? "good" : "bad") as "good" | "bad",
+  };
 }
 
 export type GroupSummary = {
   group: AssetGroup;
   label: string;
   value: number;
+  /** Solo le quote, al prezzo di oggi: e' il valore che va nel rendimento. */
+  marketValue: number;
   /** Capitale nelle quote, senza gli ordini ancora in esecuzione. */
   investedBasis: number;
   costBasis: number;
@@ -345,6 +453,7 @@ export function groupPositions(
       group,
       label: GROUP_LABEL[group],
       value,
+      marketValue: sum((p) => p.marketValue),
       investedBasis,
       costBasis: sum((p) => p.costBasis),
       pending: sum((p) => p.pending),

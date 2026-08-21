@@ -17,9 +17,10 @@ import {
   RANGES,
   RangeKey,
   daysSince,
-  groupXirr,
+  groupReturn,
   monthlyContributions,
   periodPriceGain,
+  returnTile,
   sliceSeries,
 } from "../lib/portfolio";
 import { Asset, Investment } from "../lib/types";
@@ -96,9 +97,11 @@ export default function GroupDetailScreen({
     return periodPriceGain(upTo, group.investedBasis);
   }, [visible, scrub, group.investedBasis]);
 
+  // `marketValue` e non `value`: gli ordini ancora in esecuzione stanno nel
+  // saldo ma non nei flussi, e conteggiarli da un lato solo gonfia il tasso.
   const rendimento = useMemo(
-    () => groupXirr(investments, assets, group.group, group.value),
-    [investments, assets, group.group, group.value]
+    () => groupReturn(investments, assets, group.group, group.marketValue),
+    [investments, assets, group.group, group.marketValue]
   );
 
   const versamenti = useMemo(
@@ -283,14 +286,7 @@ export default function GroupDetailScreen({
         <StatTiles
           goodColor={palette.investUp}
           tiles={[
-            ...(rendimento !== null
-              ? [{
-                  label: "Rendimento annuo",
-                  value: `${(rendimento * 100).toFixed(2)}%`,
-                  hint: "tiene conto di quando sono entrati i soldi",
-                  tone: (rendimento >= 0 ? "good" : "bad") as "good" | "bad",
-                }]
-              : []),
+            ...(rendimento !== null ? [returnTile(rendimento)] : []),
             {
               label: "Titoli",
               value: String(group.positions.length),
@@ -370,6 +366,12 @@ export default function GroupDetailScreen({
               />
             )}
           </View>
+          {/* Stessa avvertenza della schermata Investimenti: qui sotto si
+              ordina e si legge il movimento di prezzo, non il rendimento
+              del riquadro, che comprende cedole e costi. */}
+          <Text style={[styles.note, { color: palette.ink3 }]}>
+            Solo movimento di prezzo, come dal broker.
+          </Text>
           {titoli.map((position) => {
             const pos = position.priceGain >= 0;
             return (

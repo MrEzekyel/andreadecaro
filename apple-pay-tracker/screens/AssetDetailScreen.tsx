@@ -21,9 +21,10 @@ import {
   Position,
   RANGES,
   RangeKey,
-  assetXirr,
+  assetReturn,
   daysSince,
   effectiveDay,
+  returnTile,
   sliceSeries,
 } from "../lib/portfolio";
 import { supabase } from "../lib/supabase";
@@ -143,13 +144,16 @@ export default function AssetDetailScreen({
   const amount = splitAmount(heroValue);
   const gainColor = heroGain >= 0 ? palette.investUp : palette.over;
 
-  // Rendimento annualizzato di questo solo titolo — mancava anche questo:
+  // Rendimento di questo solo titolo — mancava anche questo:
   // `priceGainPct`/`gainPct` dicono quanto ha reso *da quando l'hai
   // comprato*, non se e' tanto o poco per l'anno. Stessa formula di
-  // `groupXirr`/`portfolioXirr`, ristretta a `position.asset.id`.
+  // `groupReturn`/`portfolioReturn`, ristretta a `position.asset.id`, e
+  // sempre su `marketValue`: il denaro degli ordini in esecuzione non e'
+  // ancora esposto al mercato, contarlo nel valore senza contarlo nei flussi
+  // farebbe comparire un guadagno che non c'e'.
   const rendimento = useMemo(
-    () => assetXirr(investments, position.asset.id, position.value),
-    [investments, position.asset.id, position.value]
+    () => assetReturn(investments, position.asset.id, position.marketValue),
+    [investments, position.asset.id, position.marketValue]
   );
 
   // Quanto pesa questa posizione sul totale investito: senza un riferimento,
@@ -260,14 +264,7 @@ export default function AssetDetailScreen({
         <StatTiles
           goodColor={palette.investUp}
           tiles={[
-            ...(rendimento !== null
-              ? [{
-                  label: "Rendimento annuo",
-                  value: `${(rendimento * 100).toFixed(2)}%`,
-                  hint: "tiene conto di quando sono entrati i soldi",
-                  tone: (rendimento >= 0 ? "good" : "bad") as "good" | "bad",
-                }]
-              : []),
+            ...(rendimento !== null ? [returnTile(rendimento)] : []),
             ...(weight !== null
               ? [{
                   label: "Peso nel portafoglio",

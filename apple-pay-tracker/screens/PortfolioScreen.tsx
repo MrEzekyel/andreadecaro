@@ -24,6 +24,7 @@ import {
   RangeKey,
   daysSince,
   groupPositions,
+  returnTile,
   sliceSeries,
 } from "../lib/portfolio";
 import { AssetGroup } from "../lib/types";
@@ -89,7 +90,7 @@ type Props = {
 export default function PortfolioScreen({ addNonce }: Props) {
   const { palette } = useTheme();
   const portfolio = usePortfolio();
-  const { positions, totals, series, xirr, rules, loading, error, staleLabel } =
+  const { positions, totals, series, annualReturn, rules, loading, error, staleLabel } =
     portfolio;
 
   // Un anno racconta gia' un andamento senza schiacciare gli ultimi mesi
@@ -351,14 +352,7 @@ export default function PortfolioScreen({ addNonce }: Props) {
       <StatTiles
         goodColor={palette.investUp}
         tiles={[
-          ...(xirr !== null
-            ? [{
-                label: "Rendimento annuo",
-                value: `${(xirr * 100).toFixed(2)}%`,
-                hint: "tiene conto di quando sono entrati i soldi",
-                tone: (xirr >= 0 ? "good" : "bad") as "good" | "bad",
-              }]
-            : []),
+          ...(annualReturn !== null ? [returnTile(annualReturn)] : []),
           {
             label: "Capitale versato",
             value: formatAmount(totals.investedBasis),
@@ -417,6 +411,18 @@ export default function PortfolioScreen({ addNonce }: Props) {
       {!loading && open.length === 0 && (
         <Text style={[styles.note, { color: palette.ink3 }]}>
           Nessuna posizione aperta.
+        </Text>
+      )}
+
+      {/* Due percentuali diverse sulla stessa schermata sembrano un errore di
+          conto finche' non si dice che misurano cose diverse: nei riquadri
+          c'e' il rendimento vero, negli elenchi quello che mostra il broker. */}
+      {annualReturn !== null && open.length > 0 && (
+        <Text style={[styles.note, { color: palette.ink3 }]}>
+          Le percentuali accanto ai titoli sono il solo movimento del prezzo,
+          le stesse che vedi dal broker. Il rendimento qui sopra comprende
+          anche dividendi e commissioni, e pesa ogni versamento per il tempo
+          in cui e' rimasto investito.
         </Text>
       )}
 
@@ -567,6 +573,11 @@ function AssetRow({
   // In elenco si mostra il rendimento di prezzo, lo stesso che mostra il
   // broker: e' il numero che verra' confrontato con la sua app. I dividendi
   // sono guadagno vero ma non stanno nel prezzo, e compaiono nel dettaglio.
+  // Non e' lo stesso dato del riquadro "Rendimento annuo" qui sopra, che
+  // include cedole e commissioni e pesa ogni euro per il tempo in cui e'
+  // rimasto investito: la didascalia della sezione lo dice, perche' due
+  // percentuali diverse sulla stessa schermata senza spiegazione si leggono
+  // come un errore di conto.
   const pct = position.priceGainPct;
   const positive = position.priceGain >= 0;
 

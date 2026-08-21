@@ -4,11 +4,12 @@ import { firstError } from "./loadError";
 import { supabase } from "./supabase";
 import {
   LatestPrice,
+  MoneyWeightedReturn,
   Position,
   PortfolioTotals,
   SeriesPoint,
   buildPositions,
-  portfolioXirr,
+  portfolioReturn,
   sumPositions,
 } from "./portfolio";
 import { Asset, AssetGroup, Investment, InvestmentRule } from "./types";
@@ -39,7 +40,7 @@ type State = {
   positions: Position[];
   totals: PortfolioTotals;
   series: SeriesPoint[];
-  xirr: number | null;
+  annualReturn: MoneyWeightedReturn | null;
   loading: boolean;
   /** Messaggio dell'ultima lettura fallita, `null` quando l'ultima e' riuscita. */
   error: string | null;
@@ -80,7 +81,7 @@ function build(
   //
   // `raw.assets` arriva gia' filtrato su `archived = false`, ma
   // `raw.investments` no: e' una lettura separata. Passando la lista intera
-  // a `portfolioXirr`, l'uscita di un asset archiviato (i soldi versati)
+  // a `portfolioReturn`, l'uscita di un asset archiviato (i soldi versati)
   // resta nel calcolo mentre il suo valore di oggi — escluso da `totals.value`
   // perche' l'asset non e' piu' fra i `positions` — sparisce dall'altro
   // lato. Il risultato e' un rendimento drammaticamente falsato in negativo:
@@ -100,7 +101,10 @@ function build(
     positions,
     totals,
     series: raw.series,
-    xirr: portfolioXirr(visibleInvestments, totals.value),
+    // `marketValue` e non `value`: gli ordini in esecuzione stanno nel saldo
+    // ma i loro flussi non entrano in `cashFlows`, e passarli qui li
+    // farebbe leggere come guadagno venuto dal nulla.
+    annualReturn: portfolioReturn(visibleInvestments, totals.marketValue),
     loading: false,
     error: null,
     staleAt: stale?.at ?? null,
@@ -116,7 +120,7 @@ export function usePortfolio() {
     positions: [],
     totals: EMPTY_TOTALS,
     series: [],
-    xirr: null,
+    annualReturn: null,
     loading: true,
     error: null,
     staleAt: null,

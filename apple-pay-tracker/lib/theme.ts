@@ -97,6 +97,21 @@ const DARK_CATEGORY_OVERRIDES: Record<string, string> = {
   "#0d9488": "#14b8a6", // Cultura
   "#65a30d": "#84cc16", // Sport
   "#71717a": "#8b8b96", // non categorizzata
+
+  // Seconda serie della tavolozza (`CATEGORY_COLOR_CHOICES`). Verde bosco e
+  // grigio blu saltano di due gradini invece che di uno: a un gradino solo
+  // finivano addosso al verde e al grigio gia' presenti, che su fondo scuro
+  // restano al loro valore chiaro.
+  "#15803d": "#4ade80", // verde bosco
+  "#0284c7": "#38bdf8", // azzurro
+  "#92400e": "#d97706", // marrone
+  "#e11d48": "#f43f5e", // lampone
+  "#9333ea": "#a855f7", // porpora
+  "#059669": "#10b981", // smeraldo
+  "#ca8a04": "#eab308", // giallo
+  "#c026d3": "#d946ef", // magenta
+  "#831843": "#be185d", // bordeaux
+  "#475569": "#94a3b8", // grigio blu
 };
 
 export function categoryColor(hex: string | null | undefined, dark: boolean) {

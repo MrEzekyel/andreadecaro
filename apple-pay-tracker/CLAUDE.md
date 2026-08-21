@@ -130,6 +130,17 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
 - Categorie, persone e metodi di pagamento si possono **creare al volo**
   da qualunque selettore (chip "+"), non solo dalle rispettive schermate in
   Impostazioni.
+- **La tavolozza e il catalogo icone delle categorie stanno in
+  `CategoryFormSheet.tsx`**: 22 colori (`CATEGORY_COLOR_CHOICES`) e 44 icone
+  divise in sei gruppi (`CATEGORY_ICON_GROUPS`). Tre regole quando si tocca:
+  ogni colore nuovo vuole la sua riga in `DARK_CATEGORY_OVERRIDES`
+  (lib/theme.ts) o resta al valore chiaro anche su fondo scuro, e due tinte
+  non devono collassare sullo stesso valore in tema scuro; ogni nome di icona
+  va verificato sui file di `lucide-react-native`, perché `Icon` ripiega in
+  silenzio su `CircleHelp`; l'icona di partenza è `DEFAULT_CATEGORY_ICON`,
+  dichiarata e non presa come primo elemento della lista, che cambia ordine.
+  Il catalogo sta dentro un riquadro con scorrimento proprio (`iconBox`): a
+  44 icone distese il tasto "Salva" finiva due schermate sotto il nome.
 - I grafici mostrano sempre valori di riferimento sugli assi, non solo le
   barre/linee nude.
 - **Uno stato vuoto non deve mai poter significare "non ho letto".** Il modo
@@ -658,6 +669,36 @@ grafici e le liste sotto rispondono a "quanto ho diviso con Leonardo", non a
   a volte no, secondo la cache dello schema). Successo con `portfolio_daily`
   fra la 0021 e la 0024: prima di aggiungere un parametro con default a una
   funzione esistente, droppare la firma vecchia nella stessa migrazione.
+- **Il riquadro "Rendimento" e le percentuali negli elenchi non sono lo stesso
+  numero, di proposito.** Il riquadro e' money-weighted (`portfolioReturn` /
+  `groupReturn` / `assetReturn`, tutti su `moneyWeighted`): comprende
+  dividendi e commissioni e pesa ogni versamento per il tempo in cui e'
+  rimasto investito. Le percentuali accanto ai titoli sono `priceGainPct`,
+  solo movimento di prezzo, perche' quelle vanno confrontate con l'app del
+  broker. Due percentuali diverse sulla stessa schermata si leggono come un
+  errore di conto finche' non si dice cosa misurano: le didascalie sotto gli
+  elenchi in `PortfolioScreen` e `GroupDetailScreen` esistono per questo, non
+  sono decorazione.
+- **All'XIRR va `marketValue`, mai `value`.** `value` comprende il denaro
+  degli ordini addebitati e non ancora eseguiti, ma `cashFlows` salta tutto
+  cio' che non e' `settled`: passando il saldo, quei soldi entrano nel valore
+  finale senza essere mai usciti da nessuna parte e l'XIRR li legge come
+  guadagno venuto dal nulla. Misurato: su un piano da quattro anni bastano
+  500 euro in esecuzione per portare il rendimento da 9,07% a 10,80%.
+- **Le commissioni sono un flusso, non un dettaglio.** `fee` sta fuori da
+  `amount` — il prezzo medio di carico si calcola senza — quindi `cashFlows`
+  la sottrae a mano, con lo stesso segno per ogni tipo di operazione. Senza,
+  il rendimento e' al lordo dei costi: 9,07% invece di 8,66% sullo stesso
+  piano con 2 euro di commissione a rata.
+- **Sotto sei mesi di storia non si annualizza** (`MIN_ANNUALIZE_YEARS`).
+  Annualizzare eleva a `1/anni`: su cinque settimane l'esponente e' dieci e un
+  titolo a +1% viene stampato come "+68% annuo" — giusto in aritmetica, falso
+  in pratica. `MoneyWeightedReturn` porta sia `annual` (nullo quando lo
+  storico e' corto) sia `period`, e `returnTile()` sceglie quale mostrare
+  cambiando anche l'etichetta: "Rendimento annuo" contro "Rendimento · su 5
+  settimane". Il riquadro si costruisce li' e non nelle tre schermate proprio
+  perche' tre copie a mano avevano gia' prodotto tre etichette diverse per lo
+  stesso dato.
 - `periodPriceGain()` (lib/portfolio.ts) isola il guadagno di prezzo fra due
   punti di una serie, al netto dei versamenti fatti nel mezzo — altrimenti un
   mese in cui è entrata una rata sembrerebbe sempre "in guadagno" anche a
