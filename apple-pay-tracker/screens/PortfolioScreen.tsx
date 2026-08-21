@@ -174,6 +174,7 @@ export default function PortfolioScreen({ addNonce }: Props) {
           investments={portfolio.investments.filter(
             (op) => op.asset_id === openAsset.asset.id
           )}
+          portfolioValue={portfolio.totals.value}
           onBack={() => setOpenAsset(null)}
           onSaved={async () => {
             const fresh = await portfolio.reload();

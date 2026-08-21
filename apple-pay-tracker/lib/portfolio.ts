@@ -292,6 +292,27 @@ export function groupXirr(
   return xirr([...cashFlows(ops), { date: today, amount: currentValue }]);
 }
 
+/**
+ * Lo stesso rendimento annualizzato, per un singolo titolo.
+ *
+ * `AssetDetailScreen` ne aveva solo il rendimento "da quando l'ho comprato"
+ * (`priceGainPct`/`gainPct`), che tratta un versamento di due anni fa e uno
+ * del mese scorso allo stesso modo — lo stesso motivo per cui esiste
+ * `groupXirr` un livello sopra. Qui basta filtrare per `asset_id`, senza
+ * bisogno di risalire al gruppo.
+ */
+export function assetXirr(
+  investments: Investment[],
+  assetId: string,
+  currentValue: number,
+  today = new Date().toISOString().slice(0, 10)
+): number | null {
+  if (currentValue <= 0) return null;
+  const ops = investments.filter((op) => op.asset_id === assetId);
+  if (ops.length === 0) return null;
+  return xirr([...cashFlows(ops), { date: today, amount: currentValue }]);
+}
+
 export type GroupSummary = {
   group: AssetGroup;
   label: string;

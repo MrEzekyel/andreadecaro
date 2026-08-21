@@ -11,6 +11,7 @@ import {
 import { Icon } from "../components/Icon";
 import { ScrubChart } from "../components/ScrubChart";
 import { Sheet } from "../components/Sheet";
+import { StatTiles } from "../components/StatTiles";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, formatDate, splitAmount } from "../lib/format";
@@ -20,6 +21,7 @@ import {
   Position,
   RANGES,
   RangeKey,
+  assetXirr,
   daysSince,
   effectiveDay,
   sliceSeries,
@@ -43,6 +45,8 @@ const KIND_LABEL: Record<Investment["kind"], string> = {
 type Props = {
   position: Position;
   investments: Investment[];
+  /** Valore di tutto il portafoglio, per il peso di questa posizione. */
+  portfolioValue: number;
   onBack: () => void;
   /** Ricarica il portafoglio dopo un aggiornamento manuale del valore. */
   onSaved: () => void;
@@ -51,6 +55,7 @@ type Props = {
 export default function AssetDetailScreen({
   position,
   investments,
+  portfolioValue,
   onBack,
   onSaved,
 }: Props) {
@@ -129,9 +134,29 @@ export default function AssetDetailScreen({
 
   const at = scrub === null ? null : visible[scrub];
   const heroValue = at ? at.value_eur : position.value;
+  const heroBasis = at ? at.invested_eur : position.investedBasis;
   const heroGain = at ? at.value_eur - at.invested_eur : position.gain;
+  // Stessa formula dell'hero di Investimenti e del dettaglio di gruppo: qui
+  // mancava del tutto, e c'era solo il guadagno in euro — che da solo non
+  // dice se e' tanto o poco senza sapere quanto era stato versato.
+  const heroPct = heroBasis > 0 ? heroGain / heroBasis : null;
   const amount = splitAmount(heroValue);
   const gainColor = heroGain >= 0 ? palette.investUp : palette.over;
+
+  // Rendimento annualizzato di questo solo titolo — mancava anche questo:
+  // `priceGainPct`/`gainPct` dicono quanto ha reso *da quando l'hai
+  // comprato*, non se e' tanto o poco per l'anno. Stessa formula di
+  // `groupXirr`/`portfolioXirr`, ristretta a `position.asset.id`.
+  const rendimento = useMemo(
+    () => assetXirr(investments, position.asset.id, position.value),
+    [investments, position.asset.id, position.value]
+  );
+
+  // Quanto pesa questa posizione sul totale investito: senza un riferimento,
+  // il valore da solo non dice se e' una scommessa piccola o gran parte del
+  // portafoglio.
+  const weight =
+    portfolioValue > 0 ? position.value / portfolioValue : null;
 
   const operazioni = useMemo(
     () =>
@@ -180,6 +205,12 @@ export default function AssetDetailScreen({
               {heroGain >= 0 ? "+" : "−"}
               {formatAmount(Math.abs(heroGain))}
             </Text>
+            {heroPct !== null && (
+              <Text style={[styles.gain, { color: gainColor }]}>
+                {heroGain >= 0 ? "+" : "−"}
+                {Math.abs(heroPct * 100).toFixed(1)}%
+              </Text>
+            )}
             <Text style={[styles.heroMeta, { color: palette.ink3 }]}>
               {at ? formatDate(at.on_date) : "da inizio piano"}
             </Text>
@@ -220,6 +251,47 @@ export default function AssetDetailScreen({
             })}
           </View>
         </View>
+
+        {/* Stessi "quadratini" del dettaglio di gruppo e della schermata
+            Investimenti: prima qui c'erano solo righe di testo, e mancavano
+            del tutto il rendimento annualizzato e il peso sul portafoglio —
+            l'unico modo di sapere se una posizione e' una scommessa piccola
+            o gran parte di quello che possiedi. */}
+        <StatTiles
+          goodColor={palette.investUp}
+          tiles={[
+            ...(rendimento !== null
+              ? [{
+                  label: "Rendimento annuo",
+                  value: `${(rendimento * 100).toFixed(2)}%`,
+                  hint: "tiene conto di quando sono entrati i soldi",
+                  tone: (rendimento >= 0 ? "good" : "bad") as "good" | "bad",
+                }]
+              : []),
+            ...(weight !== null
+              ? [{
+                  label: "Peso nel portafoglio",
+                  value: `${(weight * 100).toFixed(1)}%`,
+                  hint: "quota sul valore totale investito",
+                }]
+              : []),
+            ...(position.dividends > 0
+              ? [{
+                  label: "Dividendi incassati",
+                  value: formatAmount(position.dividends),
+                  hint: "fuori dal prezzo, gia' sul conto",
+                  tone: "good" as const,
+                }]
+              : []),
+            ...(position.pending > 0
+              ? [{
+                  label: "In esecuzione",
+                  value: formatAmount(position.pending),
+                  hint: "non ancora convertiti in quote",
+                }]
+              : []),
+          ]}
+        />
 
         <View>
           <Text style={[styles.label, { color: palette.ink3 }]}>Posizione</Text>
@@ -264,15 +336,14 @@ export default function AssetDetailScreen({
           {position.sold > 0 && (
             <Fact label="Disinvestito" value={formatAmount(position.sold)} />
           )}
+          {/* Dividendi e In esecuzione sono nei quadratini qui sopra; questa
+              coppia resta come riga perche' e' un dettaglio in piu' del solo
+              titolo, non uno dei numeri generali che si ripetono a ogni
+              livello — il rendimento di prezzo e' quello che mostra il
+              broker, ma su un titolo che distribuisce racconta meta' storia:
+              le cedole escono dal prezzo e finiscono sul conto. */}
           {position.dividends > 0 && (
             <>
-              <Fact
-                label="Dividendi incassati"
-                value={formatAmount(position.dividends)}
-              />
-              {/* Il rendimento di prezzo e' quello che mostra il broker, ma su
-                  un titolo che distribuisce racconta meta' storia: le cedole
-                  escono dal prezzo e finiscono sul conto. */}
               <Fact
                 label="Rendimento di prezzo"
                 value={signedPct(position.priceGainPct)}
@@ -282,9 +353,6 @@ export default function AssetDetailScreen({
                 value={signedPct(position.gainPct)}
               />
             </>
-          )}
-          {position.pending > 0 && (
-            <Fact label="In esecuzione" value={formatAmount(position.pending)} />
           )}
           {position.fees > 0 && (
             <Fact label="Commissioni" value={formatAmount(position.fees)} />
