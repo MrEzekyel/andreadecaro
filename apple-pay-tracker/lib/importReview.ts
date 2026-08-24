@@ -693,6 +693,84 @@ export function applicaDecisione(
 }
 
 /**
+ * Sposta una data di N mesi tenendo il giorno, o l'ultimo disponibile.
+ *
+ * `setMonth` da solo trabocca: il 31 gennaio meno un mese diventa il 3 marzo,
+ * perche' il 31 febbraio non esiste e JavaScript lo fa scivolare avanti. Su
+ * uno stipendio spostato in blocco vorrebbe dire mandarlo nel mese
+ * *sbagliato*, che e' esattamente il problema che lo spostamento esiste per
+ * risolvere.
+ */
+export function spostaMesi(data: Date, mesi: number): Date {
+  const giorno = data.getDate();
+  const spostata = new Date(data.getTime());
+  spostata.setDate(1);
+  spostata.setMonth(spostata.getMonth() + mesi);
+
+  const ultimoDelMese = new Date(
+    spostata.getFullYear(),
+    spostata.getMonth() + 1,
+    0
+  ).getDate();
+  spostata.setDate(Math.min(giorno, ultimoDelMese));
+  return spostata;
+}
+
+/** Un mese dell'import, con quante righe ci finiscono e per quanto. */
+export type MeseImport = {
+  /** `2026-03`, per confrontare e ordinare. */
+  chiave: string;
+  inizio: Date;
+  righe: number;
+  totale: number;
+};
+
+/**
+ * Come si distribuiscono per mese le righe che entreranno.
+ *
+ * Serve prima di spostare un blocco di date: lo stipendio arriva il 27 ma e'
+ * lo stipendio del mese dopo, e senza vedere la distribuzione si sposta alla
+ * cieca — un mese resta con due stipendi e un altro con nessuno, che e'
+ * proprio come si era ridotto l'import fatto a mano.
+ *
+ * Conta solo le righe che entrano: quelle escluse non finiranno in nessun
+ * mese, e mostrarle qui gonfierebbe l'anteprima di movimenti che non
+ * arriveranno. Un mese con pochissime righe rispetto agli altri si vede da
+ * solo, ed e' come si riconosce il "dicembre da una riga" di un estratto che
+ * in realta' comincia a gennaio.
+ */
+export function distribuzionePerMese(
+  righe: RigaRivista[],
+  decisioni: Decisione[]
+): MeseImport[] {
+  const mesi = new Map<string, MeseImport>();
+
+  righe.forEach((riga, i) => {
+    const decisione = decisioni[i] ?? decisioneIniziale(riga);
+    if (decisione.esclusa) return;
+
+    const finale = applicaDecisione(riga, decisione);
+    const data = finale.date;
+    const chiave = `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}`;
+
+    const esistente = mesi.get(chiave);
+    if (esistente) {
+      esistente.righe += 1;
+      esistente.totale += finale.amount;
+    } else {
+      mesi.set(chiave, {
+        chiave,
+        inizio: new Date(data.getFullYear(), data.getMonth(), 1),
+        righe: 1,
+        totale: finale.amount,
+      });
+    }
+  });
+
+  return [...mesi.values()].sort((a, b) => a.chiave.localeCompare(b.chiave));
+}
+
+/**
  * Il conto che deve tornare sempre: lette = quelle che entrano + escluse.
  *
  * Si calcola sulle **decisioni**, non sulle proposte: la testata si aggiorna

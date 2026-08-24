@@ -8,6 +8,7 @@ import {
   View,
 } from "react-native";
 import { Icon } from "../components/Icon";
+import { ImportGroupSheet, type Gruppo } from "../components/ImportGroupSheet";
 import { ImportRowSheet } from "../components/ImportRowSheet";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { formatAmount, formatDate } from "../lib/format";
@@ -15,6 +16,8 @@ import {
   applicaDecisione,
   conteggia,
   decisioneIniziale,
+  distribuzionePerMese,
+  spostaMesi,
   type Decisione,
   type RigaRivista,
 } from "../lib/importReview";
@@ -71,8 +74,16 @@ export default function ImportReviewScreen({
   );
   const [aperto, setAperto] = useState<Set<string>>(new Set());
   const [inModifica, setInModifica] = useState<number | null>(null);
+  const [gruppoAperto, setGruppoAperto] = useState<Gruppo | null>(null);
 
   const conti = useMemo(() => conteggia(righe, decisioni), [righe, decisioni]);
+  const mesi = useMemo(
+    () => distribuzionePerMese(righe, decisioni),
+    [righe, decisioni]
+  );
+
+  /** La data di una riga, gia' corretta a mano se lo e'. */
+  const dataDi = (i: number) => decisioni[i]?.data ?? righe[i].row.date;
 
   /** Il nome che una riga porta adesso, correzioni comprese. */
   const nomeDi = (i: number) =>
@@ -81,6 +92,23 @@ export default function ImportReviewScreen({
   function cambia(indice: number, decisione: Decisione) {
     setDecisioni((precedenti) =>
       precedenti.map((d, i) => (i === indice ? decisione : d))
+    );
+  }
+
+  /**
+   * Applica la stessa trasformazione a tutte le righe di un gruppo.
+   *
+   * Passa anche l'indice perche' certe azioni non sono uguali per tutte: lo
+   * spostamento delle date parte dalla data di *quella* riga, non da una sola
+   * per tutto il gruppo.
+   */
+  function applicaAlGruppo(
+    indici: number[],
+    trasforma: (decisione: Decisione, indice: number) => Decisione
+  ) {
+    const insieme = new Set(indici);
+    setDecisioni((precedenti) =>
+      precedenti.map((d, i) => (insieme.has(i) ? trasforma(d, i) : d))
     );
   }
 
@@ -229,7 +257,7 @@ export default function ImportReviewScreen({
                 }
               />
             ) : (
-              <Gruppo
+              <GruppoRow
                 nome={item.nome}
                 righe={item.righe}
                 aperto={aperto.has(item.nome)}
@@ -239,6 +267,16 @@ export default function ImportReviewScreen({
                     if (nuovo.has(item.nome)) nuovo.delete(item.nome);
                     else nuovo.add(item.nome);
                     return nuovo;
+                  })
+                }
+                onAzioni={() =>
+                  setGruppoAperto({
+                    nome: item.nome,
+                    indici: item.righe.map((r) => r.indice),
+                    totale: item.righe.reduce((s, r) => s + r.row.amount, 0),
+                    tutteEscluse: item.righe.every(
+                      (r) => decisioni[r.indice]?.esclusa
+                    ),
                   })
                 }
                 decisioni={decisioni}
@@ -274,6 +312,27 @@ export default function ImportReviewScreen({
             )}
           </TouchableOpacity>
         </View>
+
+        <ImportGroupSheet
+          visible={gruppoAperto !== null}
+          gruppo={gruppoAperto}
+          onClose={() => setGruppoAperto(null)}
+          onApply={(trasforma) => {
+            if (gruppoAperto) applicaAlGruppo(gruppoAperto.indici, trasforma);
+          }}
+          mesi={mesi}
+          anteprimaSpostamento={(quanti) => {
+            if (!gruppoAperto) return mesi;
+            const insieme = new Set(gruppoAperto.indici);
+            return distribuzionePerMese(
+              righe,
+              decisioni.map((d, i) =>
+                insieme.has(i) ? { ...d, data: spostaMesi(dataDi(i), quanti) } : d
+              )
+            );
+          }}
+          dataDi={dataDi}
+        />
 
         <ImportRowSheet
           visible={inModifica !== null}
@@ -371,11 +430,12 @@ function RigaRow({
 }
 
 /** Un esercente con tutte le sue righe, richiuso finche' non serve. */
-function Gruppo({
+function GruppoRow({
   nome,
   righe,
   aperto,
   onToggle,
+  onAzioni,
   decisioni,
   nomeDi,
   onApriRiga,
@@ -385,6 +445,7 @@ function Gruppo({
   righe: RigaRivista[];
   aperto: boolean;
   onToggle: () => void;
+  onAzioni: () => void;
   decisioni: Decisione[];
   nomeDi: (i: number) => string;
   onApriRiga: (indice: number) => void;
@@ -417,6 +478,18 @@ function Gruppo({
         <Text style={[styles.rigaImporto, { color: palette.ink }]}>
           {formatAmount(totale)}
         </Text>
+
+        {/* Bersaglio separato da quello che apre il gruppo: con un tocco solo
+            che fa due cose diverse a seconda di dove cade, l'una si scopre
+            per sbaglio mentre si cercava l'altra. */}
+        <TouchableOpacity
+          onPress={onAzioni}
+          hitSlop={{ top: 14, bottom: 14, left: 12, right: 12 }}
+          accessibilityRole="button"
+          accessibilityLabel={`Azioni su tutte le righe di ${nome}`}
+        >
+          <Icon name="sliders-horizontal" size={16} color={palette.ink3} />
+        </TouchableOpacity>
       </TouchableOpacity>
 
       {aperto &&

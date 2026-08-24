@@ -19,6 +19,8 @@
 
 import {
   applicaDecisione,
+  distribuzionePerMese,
+  spostaMesi,
   containsOwnName,
   conteggia,
   decisioneIniziale,
@@ -266,6 +268,49 @@ check("persona", "contatto collegato", "p-1",
   applicaDecisione(out[4], { esclusa: false, personaId: "p-1" }).personId);
 check("persona", "nessun contatto = null", null,
   applicaDecisione(out[4], { esclusa: false }).personId);
+
+/* ---------------------------------------------------------------- *
+ * Spostare le date di un mese
+ * ---------------------------------------------------------------- */
+
+const giorno = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+// Il caso che rompe `setMonth` da solo: il 31 non esiste nel mese di arrivo e
+// JavaScript lo fa scivolare *avanti*, mandando la riga nel mese sbagliato —
+// cioe' facendo esattamente il danno che lo spostamento deve riparare.
+check("sposta", "31 gennaio +1 mese", "2026-02-28", giorno(spostaMesi(new Date(2026, 0, 31), 1)));
+check("sposta", "31 marzo -1 mese", "2026-02-28", giorno(spostaMesi(new Date(2026, 2, 31), -1)));
+check("sposta", "31 gennaio +1 in bisestile", "2028-02-29", giorno(spostaMesi(new Date(2028, 0, 31), 1)));
+check("sposta", "29 dicembre +1 cambia anno", "2027-01-29", giorno(spostaMesi(new Date(2026, 11, 29), 1)));
+check("sposta", "1 gennaio -1 torna indietro di anno", "2025-12-01", giorno(spostaMesi(new Date(2026, 0, 1), -1)));
+check("sposta", "27 del mese, il caso stipendio", "2026-09-27", giorno(spostaMesi(new Date(2026, 7, 27), 1)));
+// Non deve toccare l'ora: una riga spostata resta nello stesso momento del
+// giorno, altrimenti il confronto per vicinanza si sposterebbe di ore.
+check("sposta", "ora invariata", 10, spostaMesi(new Date(2026, 0, 15, 10, 30), 1).getHours());
+
+/* ---------------------------------------------------------------- *
+ * L'anteprima della distribuzione per mese
+ * ---------------------------------------------------------------- */
+
+const mesi = distribuzionePerMese(out, decisioni);
+check("distribuzione", "solo i mesi delle righe che entrano", ["2026-01", "2026-03"], mesi.map((m) => m.chiave));
+// Le escluse non finiscono in nessun mese: mostrarle qui prometterebbe
+// movimenti che non arriveranno.
+check("distribuzione", "gennaio conta le sole non escluse", 3, mesi[0].righe);
+check("distribuzione", "febbraio sparisce, erano entrambe doppioni", true, !mesi.some((m) => m.chiave === "2026-02"));
+
+const spostate = out.map((r, i) =>
+  i === 9 ? { ...decisioni[i], data: spostaMesi(r.row.date, 1) } : decisioni[i]
+);
+// Marzo resta: ci vive anche la rata Santander, che non e' stata spostata.
+const dopo = distribuzionePerMese(out, spostate);
+check("distribuzione", "spostare una riga apre il mese di arrivo", ["2026-01", "2026-03", "2026-04"],
+  dopo.map((m) => m.chiave));
+check("distribuzione", "e lo svuota di una in partenza", 1,
+  dopo.find((m) => m.chiave === "2026-03").righe);
+check("distribuzione", "il totale non si perde per strada",
+  distribuzionePerMese(out, decisioni).reduce((s, m) => s + m.righe, 0),
+  dopo.reduce((s, m) => s + m.righe, 0));
 
 console.log(bad === 0 ? "\n✅ tutti i casi passano" : `\n❌ ${bad} casi falliti`);
 process.exit(bad === 0 ? 0 : 1);

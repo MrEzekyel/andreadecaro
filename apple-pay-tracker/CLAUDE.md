@@ -879,6 +879,25 @@ di un comando rapido).
   reversibili, perché una riga tolta che sparisce è una riga persa senza
   saperlo. In testa il conto che si aggiorna a ogni modifica: **lette = quelle
   che entrano + escluse**, e deve tornare sempre.
+- **Le azioni di gruppo stanno dietro un bersaglio separato** da quello che
+  apre il gruppo (`ImportGroupSheet`, icona a destra sulla riga): con un tocco
+  solo che fa due cose diverse a seconda di dove cade, l'una si scopre per
+  sbaglio mentre si cercava l'altra. Rinomina, categoria, contatto, esclusione
+  e **spostamento delle date di ±1 mese** su tutte le righe insieme.
+- **Lo spostamento delle date mostra l'anteprima prima di confermare.** È il
+  caso dello stipendio: arriva il 27, 28 o 29 ma è quello del mese successivo,
+  e va spostato in blocco o non serve a niente. `distribuzionePerMese()` dice
+  come sarebbero distribuite le righe *dopo*, coi mesi che cambiano
+  evidenziati — senza, si sposta alla cieca e un mese resta con due stipendi e
+  un altro con nessuno, che è esattamente come si era ridotto l'import fatto a
+  mano. Conta solo le righe che entrano, così un mese con pochissime righe
+  rispetto agli altri (il «dicembre da una riga» di un estratto che comincia a
+  gennaio) si vede da solo.
+- **`spostaMesi()` non usa `setMonth` da solo**, perché trabocca: il 31
+  gennaio meno un mese diventa il 3 marzo, e su uno stipendio spostato in
+  blocco vorrebbe dire mandarlo nel mese *sbagliato* — cioè fare esattamente
+  il danno che lo spostamento deve riparare. Si clampa all'ultimo giorno del
+  mese di arrivo, e c'è un test per ogni bordo (bisestili compresi).
 - **Correggere una riga non tocca mai il suo `dedup_key`.** Quella chiave
   identifica «questa riga di questo file», non ciò che l'utente ne ha fatto:
   rigenerarla dopo una rinomina spezzerebbe la difesa che rende innocuo
