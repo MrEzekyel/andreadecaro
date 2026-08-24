@@ -17,6 +17,12 @@
  * 2. Un confronto per importo e data ravvicinata contro cio' che c'e' gia',
  *    che e' l'unico modo di riconoscere una spesa che era entrata da Apple Pay
  *    con un'altra chiave.
+ *
+ * Le prime due impediscono di sbagliare. La terza — `import_batches` — serve a
+ * **rimediare** quando si sbaglia lo stesso: ogni riga scritta qui porta il suo
+ * `import_batch_id`, e da quello si annulla l'import intero. Prima non
+ * esisteva, e due import diversi si distinguevano solo guardando `created_at`
+ * a mano sul database: un import andato male non si poteva togliere.
  */
 
 import { resolveMerchant } from "./merchants";
@@ -30,6 +36,14 @@ export type ImportOutcome = {
   giaPresenti: number;
   /** Righe valide che il database ha rifiutato: vanno dette. */
   fallite: number;
+  /**
+   * Il lotto sotto cui sono entrate, da cui si annulla.
+   *
+   * `null` quando non e' stata scritta nessuna riga: un lotto vuoto
+   * nell'elenco degli import sarebbe una voce da annullare che non ha niente
+   * da togliere.
+   */
+  batchId: string | null;
 };
 
 /** Quanto puo' distare la data della banca da quella dell'acquisto. */
@@ -121,9 +135,16 @@ function consumeMatch(pool: Existing[], used: Set<string>, amount: number, time:
 
 export async function importStatementRows(
   rows: StatementRow[],
+  fileNames: string[],
   onProgress?: (done: number, total: number) => void
 ): Promise<ImportOutcome> {
-  const empty: ImportOutcome = { spese: 0, entrate: 0, giaPresenti: 0, fallite: 0 };
+  const empty: ImportOutcome = {
+    spese: 0,
+    entrate: 0,
+    giaPresenti: 0,
+    fallite: 0,
+    batchId: null,
+  };
   if (rows.length === 0) return empty;
 
   const { data: auth } = await supabase.auth.getSession();
@@ -177,6 +198,32 @@ export async function importStatementRows(
   }
 
   const total = toInsertOut.length + toInsertIn.length;
+  if (total === 0) {
+    // Niente da scrivere: non si apre nessun lotto. Un import in cui era gia'
+    // tutto presente non ha righe da annullare, e una voce "0 movimenti"
+    // nell'elenco sarebbe solo un tasto che non fa niente.
+    return { ...empty, giaPresenti };
+  }
+
+  // Il lotto **prima** delle righe, non dopo.
+  //
+  // Ogni riga nasce gia' col suo lotto addosso: scriverle prima e marcarle
+  // poi lascerebbe una finestra in cui un import interrotto a meta' produce
+  // spese senza lotto, cioe' esattamente le righe non annullabili che questa
+  // colonna esiste per eliminare.
+  const { data: batch, error: batchError } = await supabase
+    .from("import_batches")
+    .insert({ user_id: userId, file_names: fileNames })
+    .select("id")
+    .single();
+
+  if (batchError || !batch) {
+    throw new Error(
+      "Non sono riuscito ad aprire il lotto di import, quindi non importo niente: senza, queste righe non si potrebbero più annullare. Riprova fra poco."
+    );
+  }
+  const batchId = batch.id as string;
+
   let done = 0;
   let fallite = 0;
 
@@ -215,6 +262,7 @@ export async function importStatementRows(
         raw_notification_text: row.rawDescription,
         source: "import",
         dedup_key: row.dedupKey,
+        import_batch_id: batchId,
       };
     });
 
@@ -255,6 +303,7 @@ export async function importStatementRows(
         ? `${row.rawDescription} · importo in ${row.currency}`
         : row.rawDescription,
       occurred_at: row.date.toISOString(),
+      import_batch_id: batchId,
     }));
 
     const { error } = await supabase.from("incomes").insert(payload);
@@ -273,7 +322,24 @@ export async function importStatementRows(
     onProgress?.(done, total);
   }
 
-  return { spese, entrate, giaPresenti, fallite };
+  if (spese + entrate === 0) {
+    // Tutte rifiutate dal database: il lotto resterebbe come voce vuota. Si
+    // toglie, e l'errore lo racconta `fallite`. `on delete set null` fa si'
+    // che questa cancellazione non possa portarsi via righe.
+    await supabase.from("import_batches").delete().eq("id", batchId);
+    return { spese, entrate, giaPresenti, fallite, batchId: null };
+  }
+
+  // I conteggi si scrivono a fine corsa e non si ricalcolano leggendo le
+  // righe: servono a mostrare l'import com'era **quando e' avvenuto**, e
+  // `gia_presenti` non e' nemmeno ricostruibile dopo, perche' quelle righe
+  // non sono state scritte da nessuna parte.
+  await supabase
+    .from("import_batches")
+    .update({ spese, entrate, gia_presenti: giaPresenti })
+    .eq("id", batchId);
+
+  return { spese, entrate, giaPresenti, fallite, batchId };
 }
 
 function* chunks<T>(items: T[], size: number) {

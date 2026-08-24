@@ -77,6 +77,8 @@ export type Payment = {
   excluded_from_stats: boolean;
   source: string;
   dedup_key: string | null;
+  /** Il lotto d'import da cui e' entrata. `null` = non viene da un file. */
+  import_batch_id: string | null;
   created_at: string;
   /**
    * Le quote di questa spesa, quando la query le richiede esplicitamente
@@ -323,6 +325,27 @@ export type Income = {
   label: string;
   note: string | null;
   occurred_at: string;
+  /** Il lotto d'import da cui e' entrata. `null` = non viene da un file. */
+  import_batch_id: string | null;
+  created_at: string;
+};
+
+/**
+ * Un import, come lotto annullabile.
+ *
+ * Esiste per una ragione sola: rendere un import **reversibile**. Prima le
+ * righe di due import diversi erano indistinguibili se non guardando
+ * `created_at` a mano sul database, quindi un import andato male non si
+ * poteva togliere.
+ */
+export type ImportBatch = {
+  id: string;
+  user_id: string;
+  file_names: string[];
+  spese: number;
+  entrate: number;
+  /** Righe riconosciute come gia' registrate: mai scritte, mai da togliere. */
+  gia_presenti: number;
   created_at: string;
 };
 

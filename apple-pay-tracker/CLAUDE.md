@@ -870,6 +870,41 @@ di un comando rapido).
   la data dentro la stringa renderebbe ogni spesa un esercente nuovo. Toglie
   solo pezzi riconoscibili con certezza, non svuota mai il campo, e la riga
   originale resta comunque in `payments.raw_notification_text`.
+- **Un import si può annullare** (`import_batches`, migrazione 0044). Ogni riga
+  scritta da un estratto conto porta `import_batch_id`, e da lì
+  `undo_import_batch()` toglie *esattamente* quel lotto. Prima non era
+  possibile: le righe di due import diversi erano indistinguibili se non
+  leggendo `created_at` a mano sul database, quindi chi sbagliava un import
+  non aveva nessuna strada per tornare indietro. È la premessa di tutto il
+  resto della revisione dell'import (`PROMPT-IMPORT.md`): dare più modi di
+  intervenire su un file ha senso solo dopo che sbagliare è reversibile.
+  Quattro dettagli che sembrano dettagli e non lo sono:
+  - **Il lotto si crea prima delle righe**, non dopo: marcarle in un secondo
+    momento lascerebbe una finestra in cui un import interrotto produce
+    proprio le righe non annullabili che la colonna esiste per eliminare.
+  - **`on delete set null`** sulle due colonne, mai `cascade`: cancellare la
+    riga del lotto non deve poter cancellare le spese. Le righe si tolgono
+    solo dalla funzione, che dichiara e conta cosa ha tolto.
+  - **La cancellazione sta nel database**, in una transazione sola. Dalle tre
+    chiamate separate lato app si può uscire a metà, con le spese tolte e le
+    entrate dentro: il lotto risulterebbe annullato senza esserlo, che è lo
+    stato peggiore perché l'elenco direbbe di sì.
+  - **Nella conferma si dichiarano le divisioni**: `payment_splits` cancella a
+    cascata sulla spesa, quindi annullare porta via anche i debiti collegati.
+    È l'unico effetto che va oltre le righe importate.
+- **La stringa `null` in coda ai nomi non la produce Clinck**, arriva così
+  dalla cella del CSV: è l'export di una banca che concatena l'esercente con
+  un campo vuoto («SUPERMERCATO SGM SRLnull»). Verificato sul database: 39
+  righe su 125, tutte dallo stesso file, sempre in coda e mai in mezzo.
+  `cleanDescription()` la toglie **per prima**, e solo quando è incollata a un
+  carattere non-spazio: un «Null» staccato può essere un cognome vero.
+  Toglierla ripara anche un danno invisibile — con le minuscole di «null» la
+  stringa non è uguale al proprio `toUpperCase()`, quindi il controllo "tutto
+  maiuscolo" non scattava e il nome restava URLATO mentre lo stesso negozio
+  letto da un altro file diventava «Alicam Srl». È così che la stessa insegna
+  finisce in quattro grafie e `merchants.parent_id` non la raggruppa più.
+  **I `merchants` già creati restano sporchi**: il fix ferma i nuovi, non
+  ripulisce i vecchi.
 - Le spese passano da `resolve_merchant()` come tutte le altre (una chiamata
   per **nome distinto**, non per riga), quindi un esercente già noto porta con
   sé categoria e insegna. Le entrate finiscono in `incomes`, che non ha

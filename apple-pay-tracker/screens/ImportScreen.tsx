@@ -1,5 +1,5 @@
 import * as DocumentPicker from "expo-document-picker";
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -12,7 +12,12 @@ import {
 import { Icon } from "../components/Icon";
 import { RecoverSheet } from "../components/RecoverSheet";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
-import { formatAmount, formatDate } from "../lib/format";
+import { formatAmount, formatDate, shortDateTime } from "../lib/format";
+import {
+  BatchSummary,
+  readImportBatches,
+  undoImportBatch,
+} from "../lib/importBatches";
 import {
   StatementParse,
   importFloor,
@@ -51,11 +56,27 @@ export default function ImportScreen({ onBack, onImported }: Props) {
   const [writing, setWriting] = useState<{ done: number; total: number } | null>(
     null
   );
+  // Tre stati e non un elenco solo: un elenco vuoto perche' la lettura e'
+  // fallita direbbe "non hai mai importato niente" a chi ha appena importato,
+  // e con esso sparirebbe l'unico modo di annullare.
+  const [lotti, setLotti] = useState<BatchSummary[] | null>(null);
+  const [lottiRotti, setLottiRotti] = useState(false);
+  const [annullando, setAnnullando] = useState<string | null>(null);
 
   const floor = importFloor();
   const rows = (parses ?? []).flatMap((p) => p.rows);
   const uscite = rows.filter((r) => r.direction === "out").length;
   const entrate = rows.length - uscite;
+
+  const rileggiLotti = useCallback(async () => {
+    const letti = await readImportBatches();
+    setLottiRotti(letti === null);
+    if (letti !== null) setLotti(letti);
+  }, []);
+
+  useEffect(() => {
+    rileggiLotti();
+  }, [rileggiLotti]);
 
   async function scegli() {
     const scelta = await DocumentPicker.getDocumentAsync({
@@ -99,8 +120,10 @@ export default function ImportScreen({ onBack, onImported }: Props) {
     if (rows.length === 0) return;
     setWriting({ done: 0, total: rows.length });
     try {
-      const esito = await importStatementRows(rows, (done, total) =>
-        setWriting({ done, total })
+      const esito = await importStatementRows(
+        rows,
+        (parses ?? []).map((p) => p.fileName),
+        (done, total) => setWriting({ done, total })
       );
 
       // Si parte dal totale letto e si rende conto di ogni riga: senza il
@@ -120,8 +143,13 @@ export default function ImportScreen({ onBack, onImported }: Props) {
         );
       }
 
+      if (esito.batchId) {
+        righe.push("Puoi annullarlo da «Import fatti», qui sotto.");
+      }
+
       Alert.alert("Import completato", righe.join("\n"));
       setParses(null);
+      await rileggiLotti();
       onImported();
     } catch (error) {
       Alert.alert(
@@ -130,6 +158,55 @@ export default function ImportScreen({ onBack, onImported }: Props) {
       );
     } finally {
       setWriting(null);
+    }
+  }
+
+  function chiediAnnulla(lotto: BatchSummary) {
+    const quante = `${lotto.ancora} ${lotto.ancora === 1 ? "movimento" : "movimenti"}`;
+
+    // Le divisioni si dichiarano **prima**, non dopo: `payment_splits`
+    // cancella a cascata sulla spesa, quindi annullare l'import porta via
+    // anche i debiti collegati. E' l'unico effetto che va oltre le righe
+    // importate, ed e' quello che nessuno si aspetta.
+    const avviso =
+      lotto.divise > 0
+        ? `\n\nAttenzione: ${lotto.divise} ${lotto.divise === 1 ? "di queste spese è divisa" : "di queste spese sono divise"} con qualcuno. Annullando ${lotto.divise === 1 ? "sparisce anche la sua divisione" : "spariscono anche le loro divisioni"}.`
+        : "";
+
+    Alert.alert(
+      "Annullare questo import?",
+      `Tolgo ${quante} di questo import, e nient'altro. Le spese che avevi già prima restano dove sono.${avviso}`,
+      [
+        { text: "Lascia stare", style: "cancel" },
+        {
+          text: "Annulla l'import",
+          style: "destructive",
+          onPress: () => annulla(lotto),
+        },
+      ]
+    );
+  }
+
+  async function annulla(lotto: BatchSummary) {
+    setAnnullando(lotto.id);
+    try {
+      const esito = await undoImportBatch(lotto.id);
+      if (!esito) {
+        Alert.alert(
+          "Non sono riuscito ad annullare",
+          "Il lotto è rimasto dov'era: non ho tolto niente a metà. Riprova fra poco."
+        );
+        return;
+      }
+
+      Alert.alert(
+        "Import annullato",
+        `Tolte ${esito.spese} ${esito.spese === 1 ? "spesa" : "spese"} e ${esito.entrate} ${esito.entrate === 1 ? "entrata" : "entrate"}.`
+      );
+      await rileggiLotti();
+      onImported();
+    } finally {
+      setAnnullando(null);
     }
   }
 
@@ -228,6 +305,49 @@ export default function ImportScreen({ onBack, onImported }: Props) {
           )}
         </View>
 
+        {(lottiRotti || (lotti !== null && lotti.length > 0)) && (
+          <View style={[styles.card, { backgroundColor: palette.surface2 }]}>
+            <View style={styles.head}>
+              <Icon name="rotate-ccw-clock" size={16} color={palette.ink2} />
+              <Text style={[styles.cardTitle, { color: palette.ink }]}>
+                Import fatti
+              </Text>
+            </View>
+
+            {lottiRotti ? (
+              // Non "nessun import": qui la differenza fra "non ne hai mai
+              // fatti" e "non sono riuscito a leggerli" e' la differenza fra
+              // una schermata vuota e un annullamento che sembra sparito.
+              <View style={styles.retryRow}>
+                <Text style={[styles.body, { color: palette.over }]}>
+                  Non sono riuscito a leggere gli import fatti, quindi non so
+                  dirti cosa c'è da annullare.
+                </Text>
+                <TouchableOpacity onPress={rileggiLotti}>
+                  <Text style={[styles.retryText, { color: palette.accent }]}>
+                    Riprova
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <>
+                <Text style={[styles.body, { color: palette.ink3 }]}>
+                  Annullare toglie esattamente le righe di quell'import, e
+                  nient'altro.
+                </Text>
+                {(lotti ?? []).map((lotto) => (
+                  <BatchRow
+                    key={lotto.id}
+                    lotto={lotto}
+                    busy={annullando === lotto.id}
+                    onUndo={() => chiediAnnulla(lotto)}
+                  />
+                ))}
+              </>
+            )}
+          </View>
+        )}
+
         <RecoverSheet onDone={onImported} />
 
         <Text style={[styles.note, { color: palette.ink3 }]}>
@@ -237,6 +357,77 @@ export default function ImportScreen({ onBack, onImported }: Props) {
         </Text>
       </ScrollView>
     </SwipeBack>
+  );
+}
+
+/**
+ * Un import fatto, con il tasto per disfarlo.
+ *
+ * Mostra due numeri diversi apposta: quello di quando l'import e' avvenuto e
+ * quello di cosa ne resta oggi. Divergono appena si cancella una spesa a
+ * mano, e mostrarne uno solo renderebbe bugiarda la conferma — "tolgo 40
+ * movimenti" quando ne sono rimasti 12.
+ */
+function BatchRow({
+  lotto,
+  busy,
+  onUndo,
+}: {
+  lotto: BatchSummary;
+  busy: boolean;
+  onUndo: () => void;
+}) {
+  const { palette } = useTheme();
+  const scritte = lotto.spese + lotto.entrate;
+
+  return (
+    <View style={styles.batchRow}>
+      <View style={styles.batchMain}>
+        <Text style={[styles.batchFiles, { color: palette.ink }]} numberOfLines={1}>
+          {lotto.file_names.length > 0
+            ? lotto.file_names.join(" · ")
+            : "file senza nome"}
+        </Text>
+        <Text style={[styles.batchMeta, { color: palette.ink3 }]}>
+          {shortDateTime(lotto.created_at)} · {lotto.spese}{" "}
+          {lotto.spese === 1 ? "spesa" : "spese"}, {lotto.entrate}{" "}
+          {lotto.entrate === 1 ? "entrata" : "entrate"}
+          {lotto.gia_presenti > 0 ? ` · ${lotto.gia_presenti} già presenti` : ""}
+        </Text>
+        {lotto.ancora !== scritte && (
+          <Text style={[styles.batchMeta, { color: palette.ink3 }]}>
+            {lotto.ancora === 0
+              ? "non ne resta nessuno: le hai già tolte a mano"
+              : `${lotto.ancora} ancora ${lotto.ancora === 1 ? "presente" : "presenti"}`}
+          </Text>
+        )}
+      </View>
+
+      {busy ? (
+        <ActivityIndicator color={palette.over} />
+      ) : (
+        <TouchableOpacity
+          onPress={onUndo}
+          disabled={lotto.ancora === 0}
+          // Il bersaglio e' alto quanto una riga di testo piccolo: senza
+          // allargarlo il tocco manca quasi sempre, e l'unica via d'uscita da
+          // un import sbagliato diventa un tasto che sembra rotto. Provato nel
+          // simulatore, dove due tocchi di fila non hanno aperto niente.
+          hitSlop={{ top: 14, bottom: 14, left: 16, right: 16 }}
+          accessibilityRole="button"
+          accessibilityLabel={`Annulla l'import di ${lotto.file_names.join(", ")}`}
+        >
+          <Text
+            style={[
+              styles.batchUndo,
+              { color: lotto.ancora === 0 ? palette.ink3 : palette.over },
+            ]}
+          >
+            Annulla
+          </Text>
+        </TouchableOpacity>
+      )}
+    </View>
   );
 }
 
@@ -375,6 +566,18 @@ const styles = StyleSheet.create({
   },
   primaryText: { ...type.caption, fontWeight: "500" },
   busyRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  batchRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: space.sm,
+    paddingVertical: 7,
+  },
+  batchMain: { flex: 1, gap: 1 },
+  batchFiles: { ...type.caption, fontWeight: "500" },
+  batchMeta: { ...type.small, lineHeight: 15 },
+  batchUndo: { ...type.small, fontWeight: "500" },
+  retryRow: { gap: space.xs },
+  retryText: { ...type.small, fontWeight: "500" },
   ghost: { alignItems: "center", paddingVertical: 4 },
   ghostText: { ...type.small },
   note: { ...type.small, lineHeight: 16 },

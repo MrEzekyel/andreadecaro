@@ -509,6 +509,38 @@ function looksLikeCurrency(value: string) {
 export function cleanDescription(raw: string): string {
   let text = ` ${raw} `;
 
+  // La stringa "null" attaccata in coda al nome.
+  //
+  // Non la produce Clinck: arriva gia' cosi' dalla cella del CSV. E' l'export
+  // di una banca che concatena il nome dell'esercente con un campo vuoto e
+  // scrive il `null` di un linguaggio invece di lasciare la cella vuota —
+  // "SUPERMERCATO SGM SRLnull", "MC DONALD'Snull". Verificato sul database:
+  // 39 righe su un import di 125, tutte con la coda a fine stringa e mai in
+  // mezzo, tutte dallo stesso file; il file Revolut dello stesso periodo non
+  // ne ha nessuna.
+  //
+  // Va tolta **qui e prima di tutto il resto**, non lasciata alla revisione
+  // manuale, perche' fa due danni e il secondo e' invisibile:
+  //
+  //  1. sporca il nome dell'esercente, e quindi ne crea uno nuovo per ogni
+  //     insegna gia' conosciuta;
+  //  2. rompe il controllo "tutto maiuscolo" qui sotto — "ALICAM SRLnull"
+  //     non e' uguale al suo `toUpperCase()` per via delle minuscole di
+  //     "null", quindi il nome resta URLATO mentre lo stesso negozio letto da
+  //     un altro file diventa "Alicam Srl". E' cosi' che la stessa insegna
+  //     finisce in quattro grafie diverse e `merchants.parent_id` non la
+  //     raggruppa piu'.
+  //
+  // Si toglie **solo quando e' incollata** a una parola, che e' come si
+  // presenta in tutti e 39 i casi osservati. Un "null" staccato potrebbe
+  // essere un nome vero — Null e' un cognome tedesco — e sarebbe l'app a
+  // rovinare il dato invece che a ripararlo: "Bar Null" deve restare
+  // "Bar Null". Basta un carattere non-spazio davanti, non una lettera:
+  // "PERUGIA CLUB S.R.L.null" ha un punto, ed e' un caso reale. Il gruppo di
+  // cattura ricuce cio' che precede, perche' qui non si puo' sostituire con
+  // uno spazio come per il resto del rumore.
+  text = text.replace(/(\S)null(?=\s*$)/i, "$1");
+
   const noise = [
     /\bpagamento\s+pos\b/gi,
     /\bpag\.?\s*pos\b/gi,
