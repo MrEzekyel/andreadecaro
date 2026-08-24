@@ -879,6 +879,30 @@ di un comando rapido).
   reversibili, perché una riga tolta che sparisce è una riga persa senza
   saperlo. In testa il conto che si aggiorna a ogni modifica: **lette = quelle
   che entrano + escluse**, e deve tornare sempre.
+- **Le regole si ricordano fra un import e l'altro** (`import_rules`,
+  migrazione 0046). Certe risposte non cambiano mai: il conto cointestato
+  torna in ogni estratto, la stessa insegna arriva in quattro grafie, il conto
+  che si ricarica va escluso tutti i mesi. Richiedere la stessa decisione
+  dodici volte non è rigore, è il modo più sicuro perché alla terza si smetta
+  di correggere. Tre cose da non rompere:
+  - **Una regola non agisce mai da sola.** `decisioneIniziale()` la usa per
+    *compilare* la proposta — rinomina già scritta, esclusione già spuntata —
+    e la riga arriva in revisione dicendo «una tua regola dice: …», visibile e
+    modificabile. È la differenza fra «te l'ho preparato» e «l'ho fatto e non
+    te l'ho detto».
+  - **Il criterio si calcola sul nome ORIGINALE** (`regolaDaDecisione()`), mai
+    su quello riscritto: una regola che dicesse «quando trovi McDonald's
+    chiamalo McDonald's» non combacerebbe mai più con «MC DONALD S», cioè con
+    le righe per cui è nata — e non darebbe nessun errore, semplicemente non
+    succederebbe niente import dopo import.
+  - **La chiave sta sulla controparte, non sulla riga** (`chiaveRegola()`, che
+    ripiega e toglie il prefisso): così una regola sola vale per «To Andrea De
+    Caro» in uscita e «Pagamento da ANDREA DE CARO» in entrata, cioè per
+    entrambe le metà del giro interno. La stessa funzione crea e confronta: se
+    divergessero, una regola appena creata non combacerebbe più con niente.
+  Si scrivono **dopo** l'import riuscito, non quando si spunta la casella: chi
+  corregge, ci ripensa e torna indietro non deve ritrovarsi una regola che gli
+  riscriverà gli import futuri.
 - **Le azioni di gruppo stanno dietro un bersaglio separato** da quello che
   apre il gruppo (`ImportGroupSheet`, icona a destra sulla riga): con un tocco
   solo che fa due cose diverse a seconda di dove cade, l'una si scopre per

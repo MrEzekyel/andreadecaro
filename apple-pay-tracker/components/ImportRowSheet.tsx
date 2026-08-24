@@ -66,6 +66,7 @@ export function ImportRowSheet({
   const [rimborso, setRimborso] = useState(false);
   const [aggiungoPersona, setAggiungoPersona] = useState(false);
   const [aTutte, setATutte] = useState(false);
+  const [ricorda, setRicorda] = useState(false);
   const [mostraData, setMostraData] = useState(false);
 
   useEffect(() => {
@@ -84,6 +85,10 @@ export function ImportRowSheet({
           (decisione.direzione ?? riga.row.direction) === "in")
     );
     setATutte(false);
+    // Gia' spuntata se questa riga viene da una regola: chi ha gia' detto
+    // "ricordalo" una volta non deve ridirlo a ogni import, e togliendo la
+    // spunta puo' comunque disfare la regola.
+    setRicorda(riga.regola !== null);
     setMostraData(false);
   }, [visible, riga, decisione]);
 
@@ -108,6 +113,7 @@ export function ImportRowSheet({
       categoriaId,
       personaId,
       rimborso: direzione === "in" ? rimborso : undefined,
+      ricorda,
     });
 
     if (rinominata && aTutte) onRenameAll(nomeAttuale, nuovoNome);
@@ -343,6 +349,24 @@ export function ImportRowSheet({
           </Text>
         </TouchableOpacity>
       )}
+
+      <TouchableOpacity
+        style={styles.checkRow}
+        onPress={() => setRicorda((v) => !v)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: ricorda }}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Icon
+          name={ricorda ? "square-check" : "square"}
+          size={17}
+          color={ricorda ? palette.accent : palette.ink3}
+        />
+        <Text style={[styles.checkText, { color: palette.ink2 }]}>
+          Ricorda per i prossimi import: le righe con questo nome arriveranno
+          già corrette, da confermare.
+        </Text>
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.button, { backgroundColor: palette.accent }]}

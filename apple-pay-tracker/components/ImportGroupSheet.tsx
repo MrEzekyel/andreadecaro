@@ -75,11 +75,13 @@ export function ImportGroupSheet({
   const [aggiungoPersona, setAggiungoPersona] = useState(false);
   /** Lo spostamento scelto ma non ancora applicato: prima si guarda. */
   const [spostamento, setSpostamento] = useState(0);
+  const [ricorda, setRicorda] = useState(false);
 
   useEffect(() => {
     if (!visible || !gruppo) return;
     setNome(gruppo.nome);
     setSpostamento(0);
+    setRicorda(false);
   }, [visible, gruppo]);
 
   if (!gruppo) return null;
@@ -91,7 +93,10 @@ export function ImportGroupSheet({
   function applica(
     trasforma: (decisione: Decisione, indice: number) => Decisione
   ) {
-    onApply(trasforma);
+    // La spunta "ricorda" viaggia insieme all'azione: cosi' vale per
+    // qualunque delle azioni qui sotto si scelga, senza doverla ripetere
+    // accanto a ognuna.
+    onApply((d, i) => ({ ...trasforma(d, i), ricorda: ricorda || d.ricorda }));
     onClose();
   }
 
@@ -286,6 +291,23 @@ export function ImportGroupSheet({
       </View>
 
       <TouchableOpacity
+        style={styles.checkRow}
+        onPress={() => setRicorda((v) => !v)}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: ricorda }}
+        hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+      >
+        <Icon
+          name={ricorda ? "square-check" : "square"}
+          size={17}
+          color={ricorda ? palette.accent : palette.ink3}
+        />
+        <Text style={[styles.checkText, { color: palette.ink2 }]}>
+          Ricorda quello che scelgo qui per i prossimi import.
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
         style={styles.ghost}
         onPress={() =>
           applica((d) => ({ ...d, esclusa: !gruppo.tutteEscluse }))
@@ -362,6 +384,8 @@ const styles = StyleSheet.create({
     marginTop: space.sm,
   },
   buttonText: { ...type.caption, fontWeight: "500" },
+  checkRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  checkText: { ...type.small, flex: 1, lineHeight: 16 },
   ghost: { alignItems: "center", paddingVertical: 6 },
   ghostText: { ...type.caption, fontWeight: "500" },
 });

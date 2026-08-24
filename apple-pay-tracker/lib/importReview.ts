@@ -349,6 +349,83 @@ const TOLERANCE: Record<ExistingKind, number> = {
   entrata: 4,
 };
 
+/* ------------------------------------------------------------------ *
+ * Le regole che si ricordano
+ * ------------------------------------------------------------------ */
+
+export type RegolaImport = {
+  id: string;
+  /** Gia' ripiegato da `chiaveRegola()`. */
+  criterio: string;
+  confronto: "esatto" | "contiene";
+  ignora: boolean;
+  rinominaIn: string | null;
+  categoriaId: string | null;
+  personaId: string | null;
+  rimborso: boolean;
+};
+
+/**
+ * La chiave con cui una riga si confronta con le regole.
+ *
+ * Si calcola sul **nome della controparte** e non sulla riga intera:
+ * "Pagamento a favore di LEONARDO BARESE" e "Pagamento da parte di LEONARDO
+ * BARESE" sono la stessa persona in due versi diversi, e una regola che non lo
+ * vedesse andrebbe creata due volte — poi tre, quando la banca cambia il
+ * prefisso.
+ *
+ * Parte dalla descrizione **gia' ripulita**, non da quella grezza: e' cosi'
+ * che "SUPERMERCATO SGM SRLnull" e "SUPERMERCATO SGM SRL" ricadono sotto la
+ * stessa regola invece di essere due esercenti diversi.
+ *
+ * La stessa funzione serve a creare una regola e a confrontarla: se le due
+ * strade divergessero, una regola appena creata non combacerebbe mai piu' con
+ * niente, e sarebbe invisibile perche' non da' nessun errore.
+ */
+export function chiaveRegola(descrizionePulita: string): string {
+  return fold(readCounterparty(descrizionePulita).name);
+}
+
+/**
+ * La regola che vale per questa riga, o `null`.
+ *
+ * A parita' di applicabilita' vince `esatto` su `contiene`: la piu' specifica
+ * e' quella che l'utente ha scritto pensando proprio a quella riga.
+ */
+export function regolaPerRiga(
+  descrizionePulita: string,
+  regole: RegolaImport[]
+): RegolaImport | null {
+  const chiave = chiaveRegola(descrizionePulita);
+  if (!chiave) return null;
+
+  const applicabili = regole.filter((r) =>
+    r.confronto === "esatto" ? chiave === r.criterio : chiave.includes(r.criterio)
+  );
+  if (applicabili.length === 0) return null;
+
+  return (
+    applicabili.find((r) => r.confronto === "esatto") ??
+    // Fra due "contiene" vince il criterio piu' lungo: e' quello che descrive
+    // meno righe, quindi quello scritto con piu' intenzione.
+    applicabili.sort((a, b) => b.criterio.length - a.criterio.length)[0]
+  );
+}
+
+/** Cosa dice all'utente una regola che ha fatto qualcosa. */
+export function descriviRegola(regola: RegolaImport): string {
+  const cosa: string[] = [];
+  if (regola.ignora) cosa.push("da escludere");
+  if (regola.rinominaIn) cosa.push(`rinominata in «${regola.rinominaIn}»`);
+  if (regola.categoriaId) cosa.push("con la categoria che hai scelto");
+  if (regola.personaId) cosa.push("collegata al contatto che hai scelto");
+  if (regola.rimborso) cosa.push("segnata come rimborso");
+
+  return cosa.length > 0
+    ? `una tua regola dice: ${cosa.join(", ")}`
+    : "c'è una tua regola su questo nome";
+}
+
 export type Contesto = {
   /** Da `profiles.display_name`. `null` = la difesa sui giri interni non si applica. */
   displayName: string | null;
@@ -357,6 +434,7 @@ export type Contesto = {
   ricorrenti: ExistingRow[];
   spese: ExistingRow[];
   entrate: ExistingRow[];
+  regole: RegolaImport[];
 };
 
 export const CONTESTO_VUOTO: Contesto = {
@@ -365,6 +443,7 @@ export const CONTESTO_VUOTO: Contesto = {
   ricorrenti: [],
   spese: [],
   entrate: [],
+  regole: [],
 };
 
 function dayDistance(a: string, b: string) {
@@ -423,7 +502,8 @@ export type Sospetto =
   | { tipo: "ricarica"; motivo: string }
   | { tipo: "coppia"; motivo: string; conIndice: number }
   | { tipo: "gia_presente"; motivo: string; riscontro: Riscontro }
-  | { tipo: "persona"; motivo: string; nome: string };
+  | { tipo: "persona"; motivo: string; nome: string }
+  | { tipo: "regola"; motivo: string; regola: RegolaImport };
 
 /** Una riga letta, con quello che si e' notato addosso. */
 export type RigaRivista = {
@@ -431,6 +511,8 @@ export type RigaRivista = {
   row: StatementRow;
   fileName: string;
   sospetti: Sospetto[];
+  /** La regola che si applica a questa riga, se ce n'e' una. */
+  regola: RegolaImport | null;
   /**
    * L'esclusione arriva **preselezionata**, mai gia' applicata.
    *
@@ -520,6 +602,7 @@ export function rivedi(
     row: r.row,
     fileName: r.fileName,
     sospetti: [],
+    regola: null,
     escludiProposto: false,
   }));
 
@@ -536,6 +619,24 @@ export function rivedi(
     const { row } = riga;
     const day = row.date.toISOString().slice(0, 10);
     const { name } = readCounterparty(row.rawDescription);
+
+    // --- una regola gia' scritta da chi importa ------------------------
+    //
+    // Va per prima perche' e' l'unica voce che non e' un'ipotesi dell'app: e'
+    // una decisione che l'utente ha gia' preso su questo nome, e le altre
+    // segnalazioni le restano accanto invece di sostituirla.
+    // `?? []` e non `contesto.regole` secco: un contesto costruito a pezzi
+    // (o venuto da una lettura parziale) non deve far saltare tutta la
+    // revisione per un campo mancante — si perderebbero anche i sospetti.
+    const regola = regolaPerRiga(row.description, contesto.regole ?? []);
+    if (regola) {
+      riga.regola = regola;
+      riga.sospetti.push({
+        tipo: "regola",
+        motivo: descriviRegola(regola),
+        regola,
+      });
+    }
 
     // --- giri fra conti propri ---------------------------------------
     const altri = otherNamesBesideOwn(row.rawDescription, contesto.displayName);
@@ -649,11 +750,30 @@ export type Decisione = {
   personaId?: string | null;
   /** Solo sulle entrate: denaro tornato indietro, non guadagnato. */
   rimborso?: boolean;
+  /** Ricorda questa scelta per i prossimi import. */
+  ricorda?: boolean;
 };
 
-/** La proposta di partenza: l'esclusione preselezionata, nient'altro. */
+/**
+ * La proposta di partenza: cio' che i sospetti suggeriscono, piu' cio' che una
+ * regola dice gia'.
+ *
+ * La regola **compila** i campi, non li applica: la riga arriva in revisione
+ * con la rinomina gia' scritta e l'esclusione gia' spuntata, ma tutto resta
+ * visibile e modificabile. E' la differenza fra "te l'ho preparato" e "l'ho
+ * fatto e non te l'ho detto".
+ */
 export function decisioneIniziale(riga: RigaRivista): Decisione {
-  return { esclusa: riga.escludiProposto };
+  const regola = riga.regola;
+  if (!regola) return { esclusa: riga.escludiProposto };
+
+  return {
+    esclusa: riga.escludiProposto || regola.ignora,
+    descrizione: regola.rinominaIn ?? undefined,
+    categoriaId: regola.categoriaId ?? undefined,
+    personaId: regola.personaId ?? undefined,
+    rimborso: regola.rimborso || undefined,
+  };
 }
 
 /**
@@ -768,6 +888,62 @@ export function distribuzionePerMese(
   });
 
   return [...mesi.values()].sort((a, b) => a.chiave.localeCompare(b.chiave));
+}
+
+/** Una regola da scrivere, come esce dalle scelte fatte su una riga. */
+export type NuovaRegola = {
+  criterio: string;
+  confronto: "esatto" | "contiene";
+  ignora: boolean;
+  rinominaIn: string | null;
+  categoriaId: string | null;
+  personaId: string | null;
+  rimborso: boolean;
+};
+
+/**
+ * La regola che nasce da cio' che si e' deciso su una riga.
+ *
+ * Il criterio si calcola sul nome **originale**, non su quello riscritto: una
+ * regola che dice «quando trovi McDonald's, chiamalo McDonald's» non
+ * combacerebbe mai piu' con "MC DONALD S", cioe' proprio con le righe per cui
+ * e' stata creata. E' l'errore che rende una regola invisibile invece che
+ * sbagliata, perche' non da' nessun errore: semplicemente non succede niente,
+ * import dopo import.
+ *
+ * `null` quando non c'e' niente da ricordare: una riga toccata e poi rimessa
+ * com'era non deve lasciare dietro di se' una regola che non fa nulla.
+ */
+export function regolaDaDecisione(
+  riga: RigaRivista,
+  decisione: Decisione
+): NuovaRegola | null {
+  const criterio = chiaveRegola(riga.row.description);
+  if (!criterio) return null;
+
+  const rinominaIn =
+    decisione.descrizione && decisione.descrizione !== riga.row.description
+      ? decisione.descrizione
+      : null;
+
+  const regola: NuovaRegola = {
+    criterio,
+    confronto: "esatto",
+    ignora: decisione.esclusa,
+    rinominaIn,
+    categoriaId: decisione.categoriaId ?? null,
+    personaId: decisione.personaId ?? null,
+    rimborso: decisione.rimborso ?? false,
+  };
+
+  const dicequalcosa =
+    regola.ignora ||
+    regola.rinominaIn !== null ||
+    regola.categoriaId !== null ||
+    regola.personaId !== null ||
+    regola.rimborso;
+
+  return dicequalcosa ? regola : null;
 }
 
 /**

@@ -19,6 +19,9 @@
 
 import {
   applicaDecisione,
+  chiaveRegola,
+  regolaDaDecisione,
+  regolaPerRiga,
   distribuzionePerMese,
   spostaMesi,
   containsOwnName,
@@ -203,6 +206,7 @@ const contesto = {
   ],
   spese: [],
   entrate: [],
+  regole: [],
 };
 
 const out = rivedi(righe, contesto);
@@ -311,6 +315,113 @@ check("distribuzione", "e lo svuota di una in partenza", 1,
 check("distribuzione", "il totale non si perde per strada",
   distribuzionePerMese(out, decisioni).reduce((s, m) => s + m.righe, 0),
   dopo.reduce((s, m) => s + m.righe, 0));
+
+/* ---------------------------------------------------------------- *
+ * Le regole che si ricordano
+ * ---------------------------------------------------------------- */
+
+// La chiave si calcola sul nome della controparte: gli stessi soldi verso la
+// stessa persona, in due versi diversi, devono cadere sotto una regola sola.
+check("chiave", "prefisso in uscita", "leonardo barese",
+  chiaveRegola("Pagamento a favore di LEONARDO BARESE"));
+check("chiave", "prefisso in entrata, stessa chiave", "leonardo barese",
+  chiaveRegola("Pagamento da parte di LEONARDO BARESE"));
+check("chiave", "un terzo prefisso, sempre la stessa", "leonardo barese",
+  chiaveRegola("Incoming transfer from LEONARDO BARESE (IT46M0503401753000000080712)"));
+// Il null era gia' tolto da cleanDescription: le due grafie non devono
+// diventare due regole diverse.
+check("chiave", "esercente da carta", "supermercato sgm srl",
+  chiaveRegola("Supermercato Sgm Srl"));
+
+const regole = [
+  { id: "r1", criterio: "leonardo barese", confronto: "esatto", ignora: false,
+    rinominaIn: "Leonardo", categoriaId: "cat-1", personaId: "p-9", rimborso: true },
+  { id: "r2", criterio: "revolut", confronto: "contiene", ignora: true,
+    rinominaIn: null, categoriaId: null, personaId: null, rimborso: false },
+  { id: "r3", criterio: "revolut bank uab", confronto: "contiene", ignora: false,
+    rinominaIn: "Revolut", categoriaId: null, personaId: null, rimborso: false },
+];
+
+check("regole", "esatto combacia", "r1",
+  regolaPerRiga("Pagamento a favore di LEONARDO BARESE", regole)?.id);
+check("regole", "contiene combacia", "r2",
+  regolaPerRiga("Revolut**0519", regole)?.id);
+// Fra due "contiene" vince il criterio piu' lungo: descrive meno righe, quindi
+// e' quello scritto con piu' intenzione.
+check("regole", "fra due contiene vince il piu' lungo", "r3",
+  regolaPerRiga("Revolut Bank UAB", regole)?.id);
+check("regole", "nessuna regola", undefined,
+  regolaPerRiga("Esselunga Spa Milano", regole)?.id);
+check("regole", "criterio vuoto non prende tutto", undefined,
+  regolaPerRiga("", regole)?.id);
+
+// Una regola **compila** la proposta, non la applica di nascosto: la riga
+// arriva con i campi gia' scritti e resta modificabile.
+const conRegole = rivedi(righe, { ...contesto, regole });
+const rigaBarese = conRegole[4];
+check("regole", "la riga porta la regola", "r1", rigaBarese.regola?.id);
+check("regole", "e lo dice fra i sospetti", true,
+  rigaBarese.sospetti.some((s) => s.tipo === "regola"));
+
+const propostaBarese = decisioneIniziale(rigaBarese);
+check("regole", "rinomina precompilata", "Leonardo", propostaBarese.descrizione);
+check("regole", "categoria precompilata", "cat-1", propostaBarese.categoriaId);
+check("regole", "contatto precompilato", "p-9", propostaBarese.personaId);
+// r1 non dice "ignora", quindi la riga resta dentro come prima.
+check("regole", "senza ignora la riga resta", false, propostaBarese.esclusa);
+
+// Una regola che dice "ignora" propone l'esclusione, ma resta una proposta.
+const conIgnora = rivedi(
+  [riga("2026-04-01", "Revolut**0519", 50, "out")],
+  { ...contesto, regole }
+);
+check("regole", "ignora propone l'esclusione", true,
+  decisioneIniziale(conIgnora[0]).esclusa);
+check("regole", "e la riga resta visibile e spiegata", true,
+  conIgnora[0].sospetti.some((s) => s.tipo === "regola" && s.motivo.includes("escludere")));
+
+// Il rimborso resta soggetto alla regola del verso: su un'uscita cade.
+check("regole", "rimborso da regola su un'uscita cade", false,
+  applicaDecisione(rigaBarese, propostaBarese).isReimbursement);
+
+/* ---------------------------------------------------------------- *
+ * Da una scelta a una regola
+ * ---------------------------------------------------------------- */
+
+// LA trappola: il criterio va sul nome **originale**. Una regola che dicesse
+// "quando trovi McDonald's chiamalo McDonald's" non combacerebbe mai piu' con
+// "Mc Donald S", cioe' con le righe per cui e' nata — e non darebbe nessun
+// errore, semplicemente non succederebbe niente import dopo import.
+const rinominata = regolaDaDecisione(conRegole[9], {
+  esclusa: false,
+  descrizione: "McDonald's",
+});
+check("nuova regola", "criterio sul nome originale", "kfc roma da vinci", rinominata.criterio);
+check("nuova regola", "rinomina nel nome nuovo", "McDonald's", rinominata.rinominaIn);
+
+// Una riga toccata e rimessa com'era non deve lasciare una regola che non fa
+// niente: sarebbe una riga in piu' nel database e un'azione in meno da capire.
+check("nuova regola", "niente da ricordare = nessuna regola", null,
+  regolaDaDecisione(conRegole[9], { esclusa: false }));
+check("nuova regola", "stessa descrizione non e' una rinomina", null,
+  regolaDaDecisione(conRegole[9], { esclusa: false, descrizione: conRegole[9].row.description }));
+
+// "Escludilo sempre" e' la regola che serve di piu', e nasce da una riga che
+// non entrera' nell'import.
+const daEscludere = regolaDaDecisione(conRegole[0], { esclusa: true });
+check("nuova regola", "l'esclusione si ricorda", true, daEscludere.ignora);
+// Il criterio perde il prefisso, ed e' il punto: la stessa regola vale per
+// "To Andrea De Caro" in uscita e "Pagamento da ANDREA DE CARO" in entrata,
+// cioe' per entrambe le meta' del giro interno.
+check("nuova regola", "e porta il suo criterio, senza prefisso", "andrea de caro", daEscludere.criterio);
+check("nuova regola", "vale anche per l'altro verso", true,
+  regolaPerRiga("Pagamento da ANDREA DE CARO", [{ ...daEscludere, id: "x" }]) !== null);
+
+// Il giro completo: quello che si ricorda deve ritrovare la riga da cui nasce.
+const tornata = regolaPerRiga(conRegole[9].row.description, [
+  { ...rinominata, id: "nuova" },
+]);
+check("nuova regola", "la regola ritrova la sua riga", "nuova", tornata?.id);
 
 console.log(bad === 0 ? "\n✅ tutti i casi passano" : `\n❌ ${bad} casi falliti`);
 process.exit(bad === 0 ? 0 : 1);

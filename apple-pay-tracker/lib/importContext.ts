@@ -1,4 +1,4 @@
-import type { Contesto, ExistingRow } from "./importReview";
+import type { Contesto, ExistingRow, RegolaImport } from "./importReview";
 import type { StatementRow } from "./statementImport";
 import { supabase } from "./supabase";
 
@@ -87,6 +87,13 @@ export async function readImportContext(
     .maybeSingle();
   if (profilo.error) return null;
 
+  // Le regole non hanno una finestra temporale: valgono per ogni import.
+  const regole = await supabase
+    .from("import_rules")
+    .select("*")
+    .order("created_at", { ascending: false });
+  if (regole.error) return null;
+
   const [investimenti, ricorrenti, spese, entrate] = await Promise.all([
     leggiTutto<{ id: string; label: string; amount: number | string; occurred_at: string; settled_on: string | null }>(
       "investments",
@@ -131,6 +138,16 @@ export async function readImportContext(
 
   return {
     displayName: profilo.data?.display_name ?? null,
+    regole: (regole.data ?? []).map<RegolaImport>((r: any) => ({
+      id: r.id,
+      criterio: r.criterio,
+      confronto: r.confronto,
+      ignora: r.ignora,
+      rinominaIn: r.rinomina_in,
+      categoriaId: r.categoria_id,
+      personaId: r.persona_id,
+      rimborso: r.rimborso,
+    })),
     investimenti: investimenti.map<ExistingRow>((r) => ({
       id: r.id,
       label: r.label,

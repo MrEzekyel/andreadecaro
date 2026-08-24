@@ -17,8 +17,10 @@ import {
   conteggia,
   decisioneIniziale,
   distribuzionePerMese,
+  regolaDaDecisione,
   spostaMesi,
   type Decisione,
+  type NuovaRegola,
   type RigaRivista,
 } from "../lib/importReview";
 import type { ImportableRow } from "../lib/statementWriter";
@@ -31,7 +33,7 @@ type Props = {
   contestoLetto: boolean;
   scrivendo: { done: number; total: number } | null;
   onBack: () => void;
-  onConfirm: (righe: ImportableRow[]) => void;
+  onConfirm: (righe: ImportableRow[], regole: NuovaRegola[]) => void;
 };
 
 type Voce =
@@ -162,12 +164,24 @@ export default function ImportReviewScreen({
 
   function conferma() {
     const finali: ImportableRow[] = [];
+    const regole: NuovaRegola[] = [];
+
     righe.forEach((riga, i) => {
       const decisione = decisioni[i] ?? decisioneIniziale(riga);
+
+      // Le regole si raccolgono anche dalle righe escluse: "questo escludilo
+      // sempre" e' proprio la regola che serve di piu', ed e' su una riga che
+      // non entrera'.
+      if (decisione.ricorda) {
+        const regola = regolaDaDecisione(riga, decisione);
+        if (regola) regole.push(regola);
+      }
+
       if (decisione.esclusa) return;
       finali.push(applicaDecisione(riga, decisione));
     });
-    onConfirm(finali);
+
+    onConfirm(finali, regole);
   }
 
   const rigaInModifica = inModifica === null ? null : righe[inModifica];

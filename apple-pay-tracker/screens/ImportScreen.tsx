@@ -19,7 +19,13 @@ import {
   undoImportBatch,
 } from "../lib/importBatches";
 import { readImportContext } from "../lib/importContext";
-import { CONTESTO_VUOTO, rivedi, type RigaRivista } from "../lib/importReview";
+import {
+  CONTESTO_VUOTO,
+  rivedi,
+  type NuovaRegola,
+  type RigaRivista,
+} from "../lib/importReview";
+import { salvaRegole } from "../lib/importRules";
 import {
   StatementParse,
   importFloor,
@@ -150,7 +156,7 @@ export default function ImportScreen({ onBack, onImported }: Props) {
     }
   }
 
-  async function importa(finali: ImportableRow[]) {
+  async function importa(finali: ImportableRow[], regole: NuovaRegola[]) {
     if (finali.length === 0) return;
     setWriting({ done: 0, total: finali.length });
     try {
@@ -174,6 +180,20 @@ export default function ImportScreen({ onBack, onImported }: Props) {
       if (esito.fallite > 0) {
         righe.push(
           `⚠️ ${esito.fallite} ${esito.fallite === 1 ? "non è stata salvata" : "non sono state salvate"} dal database. Riprova: i doppioni vengono riconosciuti.`
+        );
+      }
+
+      // Le regole **dopo** l'import riuscito, non prima: si ricorda cio' che
+      // e' stato fatto davvero. Un import fallito che lasciasse dietro di se'
+      // delle regole riscriverebbe i prossimi in base a una cosa mai avvenuta.
+      const ricordate = await salvaRegole(regole);
+      if (ricordate > 0) {
+        righe.push(
+          `${ricordate} ${ricordate === 1 ? "scelta ricordata" : "scelte ricordate"} per i prossimi import.`
+        );
+      } else if (regole.length > 0) {
+        righe.push(
+          "⚠️ Non sono riuscito a ricordare le scelte per i prossimi import: i movimenti però sono entrati."
         );
       }
 
