@@ -18,12 +18,15 @@ import {
   readImportBatches,
   undoImportBatch,
 } from "../lib/importBatches";
+import { readImportContext } from "../lib/importContext";
+import { CONTESTO_VUOTO, rivedi, type RigaRivista } from "../lib/importReview";
 import {
   StatementParse,
   importFloor,
   parseStatementFile,
 } from "../lib/statementImport";
-import { importStatementRows } from "../lib/statementWriter";
+import { importStatementRows, type ImportableRow } from "../lib/statementWriter";
+import ImportReviewScreen from "./ImportReviewScreen";
 import { useTheme } from "../lib/ThemeContext";
 import { radius, space, type } from "../lib/theme";
 
@@ -62,6 +65,12 @@ export default function ImportScreen({ onBack, onImported }: Props) {
   const [lotti, setLotti] = useState<BatchSummary[] | null>(null);
   const [lottiRotti, setLottiRotti] = useState(false);
   const [annullando, setAnnullando] = useState<string | null>(null);
+  // La revisione: `null` finche' non si e' scelto di aprirla.
+  const [revisione, setRevisione] = useState<{
+    righe: RigaRivista[];
+    contestoLetto: boolean;
+  } | null>(null);
+  const [preparando, setPreparando] = useState(false);
 
   const floor = importFloor();
   const rows = (parses ?? []).flatMap((p) => p.rows);
@@ -116,12 +125,37 @@ export default function ImportScreen({ onBack, onImported }: Props) {
     }
   }
 
-  async function importa() {
+  /**
+   * Prepara la revisione: legge cio' che esiste gia' e annota i sospetti.
+   *
+   * Un contesto non letto non blocca la revisione — le difese in scrittura
+   * restano tutte — ma va **dichiarato**: senza quel confronto i doppioni non
+   * si sono potuti cercare, e un elenco senza segnalazioni direbbe "non ce ne
+   * sono" a chi ne ha cinquanta.
+   */
+  async function apriRevisione() {
     if (rows.length === 0) return;
-    setWriting({ done: 0, total: rows.length });
+    setPreparando(true);
+    try {
+      const contesto = await readImportContext(rows);
+      const daRivedere = (parses ?? []).flatMap((p) =>
+        p.rows.map((row) => ({ row, fileName: p.fileName }))
+      );
+      setRevisione({
+        righe: rivedi(daRivedere, contesto ?? CONTESTO_VUOTO),
+        contestoLetto: contesto !== null,
+      });
+    } finally {
+      setPreparando(false);
+    }
+  }
+
+  async function importa(finali: ImportableRow[]) {
+    if (finali.length === 0) return;
+    setWriting({ done: 0, total: finali.length });
     try {
       const esito = await importStatementRows(
-        rows,
+        finali,
         (parses ?? []).map((p) => p.fileName),
         (done, total) => setWriting({ done, total })
       );
@@ -129,7 +163,7 @@ export default function ImportScreen({ onBack, onImported }: Props) {
       // Si parte dal totale letto e si rende conto di ogni riga: senza il
       // denominatore, "40 importate" su 300 sembra un successo.
       const righe = [
-        `${rows.length} ${rows.length === 1 ? "movimento letto" : "movimenti letti"}.`,
+        `${rows.length} ${rows.length === 1 ? "movimento letto" : "movimenti letti"}, ${finali.length} ${finali.length === 1 ? "scelto" : "scelti"} in revisione.`,
         `${esito.spese} ${esito.spese === 1 ? "spesa" : "spese"} e ${esito.entrate} ${esito.entrate === 1 ? "entrata" : "entrate"} aggiunte.`,
       ];
       if (esito.giaPresenti > 0) {
@@ -149,6 +183,7 @@ export default function ImportScreen({ onBack, onImported }: Props) {
 
       Alert.alert("Import completato", righe.join("\n"));
       setParses(null);
+      setRevisione(null);
       await rileggiLotti();
       onImported();
     } catch (error) {
@@ -210,6 +245,18 @@ export default function ImportScreen({ onBack, onImported }: Props) {
     }
   }
 
+  if (revisione) {
+    return (
+      <ImportReviewScreen
+        righe={revisione.righe}
+        contestoLetto={revisione.contestoLetto}
+        scrivendo={writing}
+        onBack={() => setRevisione(null)}
+        onConfirm={importa}
+      />
+    );
+  }
+
   return (
     <SwipeBack onBack={onBack}>
       <ScrollView
@@ -267,21 +314,24 @@ export default function ImportScreen({ onBack, onImported }: Props) {
               {rows.length > 0 && (
                 <>
                   <Preview parse={parses} />
+                  {/* Il tasto non scrive piu' niente: apre la revisione. Fra
+                      la lettura e la scrittura ci deve stare un momento in cui
+                      si puo' correggere, ed e' li' che si conferma davvero. */}
                   <TouchableOpacity
                     style={[styles.primary, { backgroundColor: palette.accent }]}
-                    onPress={importa}
-                    disabled={writing !== null}
+                    onPress={apriRevisione}
+                    disabled={preparando}
                   >
-                    {writing ? (
+                    {preparando ? (
                       <View style={styles.busyRow}>
                         <ActivityIndicator color={palette.onAccent} />
                         <Text style={[styles.primaryText, { color: palette.onAccent }]}>
-                          {writing.done} di {writing.total}
+                          Cerco doppioni e giri interni…
                         </Text>
                       </View>
                     ) : (
                       <Text style={[styles.primaryText, { color: palette.onAccent }]}>
-                        Importa {rows.length}{" "}
+                        Rivedi {rows.length}{" "}
                         {rows.length === 1 ? "movimento" : "movimenti"}
                         {entrate > 0 && uscite > 0
                           ? ` (${uscite} in uscita, ${entrate} in entrata)`

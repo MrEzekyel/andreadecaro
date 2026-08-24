@@ -18,8 +18,10 @@
  */
 
 import {
+  applicaDecisione,
   containsOwnName,
   conteggia,
+  decisioneIniziale,
   looksLikePerson,
   looksLikeTopUp,
   otherNamesBesideOwn,
@@ -220,9 +222,35 @@ check("revisione", "Santander NON e' un doppione", [], tipi(8));
 check("revisione", "Santander si tiene", false, out[8].escludiProposto);
 check("revisione", "spesa da carta senza sospetti", [], tipi(9));
 
-const c = conteggia(out);
+const decisioni = out.map(decisioneIniziale);
+const c = conteggia(out, decisioni);
 check("conteggi", "lette = tenute + escluse", righe.length, c.uscite + c.entrate + c.escluse);
 check("conteggi", "escluse proposte", 5, c.escluse);
+
+// La testata segue le decisioni, non le proposte: reincludere una riga la
+// deve far ricomparire nei totali.
+const riprese = out.map((r, i) => (i === 2 ? { esclusa: false } : decisioneIniziale(r)));
+check("conteggi", "reincludere una riga aggiorna i totali", 4, conteggia(out, riprese).escluse);
+
+// Correggere una riga non tocca la chiave che rende innocuo reimportare lo
+// stesso file: e' la riga del file, non cio' che ne hai fatto.
+const corretta = applicaDecisione(out[9], {
+  esclusa: false,
+  descrizione: "KFC Roma Da Vinci",
+  importo: 25,
+  direzione: "in",
+  categoriaId: null,
+});
+check("decisioni", "dedupKey invariato dopo la correzione", out[9].row.dedupKey, corretta.dedupKey);
+check("decisioni", "esercente corretto", "KFC Roma Da Vinci", corretta.description);
+check("decisioni", "importo corretto", 25, corretta.amount);
+check("decisioni", "verso corretto", "in", corretta.direction);
+check("decisioni", "categoria volutamente vuota", null, corretta.categoryId);
+
+// `undefined` e `null` non sono la stessa cosa: il primo lascia decidere
+// l'esercente, il secondo toglie la categoria apposta.
+check("decisioni", "categoria non toccata resta assente", undefined,
+  applicaDecisione(out[9], { esclusa: false }).categoryId);
 
 console.log(bad === 0 ? "\n✅ tutti i casi passano" : `\n❌ ${bad} casi falliti`);
 process.exit(bad === 0 ? 0 : 1);

@@ -29,6 +29,24 @@ import { resolveMerchant } from "./merchants";
 import type { StatementRow } from "./statementImport";
 import { supabase } from "./supabase";
 
+/**
+ * Una riga pronta da scrivere, con le correzioni fatte in revisione.
+ *
+ * `dedupKey` **non** si tocca mai quando si corregge una riga, ed e' una
+ * scelta e non una dimenticanza: quella chiave identifica "questa riga di
+ * questo file", non cio' che l'utente ne ha fatto. Ricalcolarla dopo una
+ * rinomina spezzerebbe la difesa che rende innocuo reimportare lo stesso
+ * file — il secondo import produrrebbe la chiave originale, non la troverebbe
+ * fra quelle registrate, e riscriverebbe tutto da capo.
+ */
+export type ImportableRow = StatementRow & {
+  /**
+   * Categoria scelta a mano. `undefined` = decide `resolve_merchant()` come
+   * sempre; `null` = si vuole esplicitamente senza categoria.
+   */
+  categoryId?: string | null;
+};
+
 export type ImportOutcome = {
   spese: number;
   entrate: number;
@@ -134,7 +152,7 @@ function consumeMatch(pool: Existing[], used: Set<string>, amount: number, time:
 }
 
 export async function importStatementRows(
-  rows: StatementRow[],
+  rows: ImportableRow[],
   fileNames: string[],
   onProgress?: (done: number, total: number) => void
 ): Promise<ImportOutcome> {
@@ -166,8 +184,8 @@ export async function importStatementRows(
   const usedPayments = new Set<string>();
   const usedIncomes = new Set<string>();
 
-  const toInsertOut: StatementRow[] = [];
-  const toInsertIn: StatementRow[] = [];
+  const toInsertOut: ImportableRow[] = [];
+  const toInsertIn: ImportableRow[] = [];
   let giaPresenti = 0;
 
   // In ordine di data: il confronto per vicinanza deve incontrare prima le
@@ -257,7 +275,12 @@ export async function importStatementRows(
         merchant_raw: row.description,
         merchant_name: merchant.name,
         merchant_id: merchant.id,
-        category_id: merchant.category,
+        // La scelta fatta in revisione batte quella dedotta dall'esercente.
+        // `undefined` e `null` vanno distinti: il primo vuol dire "decidi tu",
+        // il secondo "lasciala senza categoria", e collassarli con `??`
+        // riscriverebbe di nascosto una categoria che era stata tolta apposta.
+        category_id:
+          row.categoryId !== undefined ? row.categoryId : merchant.category,
         occurred_at: row.date.toISOString(),
         raw_notification_text: row.rawDescription,
         source: "import",

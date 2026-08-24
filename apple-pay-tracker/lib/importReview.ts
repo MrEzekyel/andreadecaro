@@ -29,7 +29,7 @@
  *    queste regole sui casi veri senza un database davanti.
  */
 
-import type { StatementRow } from "./statementImport";
+import type { Direction, StatementRow } from "./statementImport";
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -629,29 +629,98 @@ export function rivedi(
   return riviste;
 }
 
-/** Il conto che deve tornare sempre: lette = importate + escluse. */
-export function conteggia(righe: RigaRivista[]) {
+/* ------------------------------------------------------------------ *
+ * Le decisioni prese in revisione
+ * ------------------------------------------------------------------ */
+
+/**
+ * Cosa l'utente ha deciso su una riga. I campi non toccati restano
+ * `undefined`: cosi' si distingue "non l'ho cambiato" da "l'ho messo a zero".
+ */
+export type Decisione = {
+  esclusa: boolean;
+  descrizione?: string;
+  data?: Date;
+  importo?: number;
+  direzione?: Direction;
+  /** `undefined` = decide l'esercente, `null` = volutamente senza categoria. */
+  categoriaId?: string | null;
+};
+
+/** La proposta di partenza: l'esclusione preselezionata, nient'altro. */
+export function decisioneIniziale(riga: RigaRivista): Decisione {
+  return { esclusa: riga.escludiProposto };
+}
+
+/**
+ * La riga come verra' scritta, con le correzioni applicate.
+ *
+ * `dedupKey` resta **quello del file**, mai ricalcolato: identifica "questa
+ * riga di questo file", non cio' che l'utente ne ha fatto. Rigenerarlo dopo
+ * una rinomina spezzerebbe la difesa che rende innocuo reimportare lo stesso
+ * estratto — al secondo giro il file produrrebbe la chiave originale, non la
+ * troverebbe fra quelle registrate, e riscriverebbe tutto da capo.
+ */
+export function applicaDecisione(
+  riga: RigaRivista,
+  decisione: Decisione
+): StatementRow & { categoryId?: string | null } {
+  const row = riga.row;
+  return {
+    ...row,
+    description: decisione.descrizione ?? row.description,
+    date: decisione.data ?? row.date,
+    amount: decisione.importo ?? row.amount,
+    direction: decisione.direzione ?? row.direction,
+    ...(decisione.categoriaId !== undefined
+      ? { categoryId: decisione.categoriaId }
+      : {}),
+  };
+}
+
+/**
+ * Il conto che deve tornare sempre: lette = quelle che entrano + escluse.
+ *
+ * Si calcola sulle **decisioni**, non sulle proposte: la testata si aggiorna
+ * a ogni modifica, e un totale fermo alla proposta iniziale sarebbe un numero
+ * vero riferito a uno stato che non esiste piu'.
+ */
+export function conteggia(righe: RigaRivista[], decisioni: Decisione[]) {
   let uscite = 0;
   let entrate = 0;
   let totaleUscite = 0;
   let totaleEntrate = 0;
   let escluse = 0;
   let daControllare = 0;
+  let giaPresenti = 0;
 
-  for (const riga of righe) {
+  righe.forEach((riga, i) => {
+    const decisione = decisioni[i] ?? decisioneIniziale(riga);
     if (riga.sospetti.length > 0) daControllare += 1;
-    if (riga.escludiProposto) {
+
+    if (decisione.esclusa) {
       escluse += 1;
-      continue;
+      if (riga.sospetti.some((s) => s.tipo === "gia_presente")) giaPresenti += 1;
+      return;
     }
-    if (riga.row.direction === "out") {
+
+    const finale = applicaDecisione(riga, decisione);
+    if (finale.direction === "out") {
       uscite += 1;
-      totaleUscite += riga.row.amount;
+      totaleUscite += finale.amount;
     } else {
       entrate += 1;
-      totaleEntrate += riga.row.amount;
+      totaleEntrate += finale.amount;
     }
-  }
+  });
 
-  return { uscite, entrate, totaleUscite, totaleEntrate, escluse, daControllare };
+  return {
+    uscite,
+    entrate,
+    totaleUscite,
+    totaleEntrate,
+    escluse,
+    giaPresenti,
+    daControllare,
+  };
 }

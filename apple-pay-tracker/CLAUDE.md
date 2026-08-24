@@ -870,6 +870,27 @@ di un comando rapido).
   la data dentro la stringa renderebbe ogni spesa un esercente nuovo. Toglie
   solo pezzi riconoscibili con certezza, non svuota mai il campo, e la riga
   originale resta comunque in `payments.raw_notification_text`.
+- **Fra l'anteprima e la scrittura c'è la revisione** (`ImportReviewScreen`).
+  Il tasto in `ImportScreen` non scrive più niente: apre la revisione, ed è lì
+  che si conferma. Tre sezioni in quest'ordine, e l'ordine è il punto:
+  *Da controllare* in cima perché sono le righe che cambiano i totali,
+  *Per esercente* in mezzo raggruppate (trecento righe in elenco piatto non si
+  guardano, quaranta gruppi sì), *Escluse* in fondo — sempre visibili e sempre
+  reversibili, perché una riga tolta che sparisce è una riga persa senza
+  saperlo. In testa il conto che si aggiorna a ogni modifica: **lette = quelle
+  che entrano + escluse**, e deve tornare sempre.
+- **Correggere una riga non tocca mai il suo `dedup_key`.** Quella chiave
+  identifica «questa riga di questo file», non ciò che l'utente ne ha fatto:
+  rigenerarla dopo una rinomina spezzerebbe la difesa che rende innocuo
+  reimportare lo stesso estratto, perché al secondo giro il file produrrebbe
+  la chiave originale, non la troverebbe registrata e riscriverebbe tutto.
+  `applicaDecisione()` lo garantisce, ed è provato.
+- **Nella correzione c'è anche il verso**, non solo esercente/categoria/data/
+  importo: un'uscita letta come entrata inventa denaro, ed è l'errore più
+  costoso che un import possa fare. Sulla categoria `undefined` e `null` non
+  sono la stessa cosa — il primo lascia decidere `resolve_merchant()`, il
+  secondo la toglie apposta — e collassarli con `??` riscriverebbe di nascosto
+  una categoria tolta a mano.
 - **I sospetti si calcolano in `lib/importReview.ts`, tutte funzioni pure**, e
   cio' che esiste gia' nel database arriva come argomento da
   `lib/importContext.ts`. La separazione è il punto: così le regole si provano
