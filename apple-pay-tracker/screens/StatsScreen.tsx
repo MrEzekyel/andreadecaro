@@ -228,6 +228,9 @@ export default function StatsScreen() {
       supabase
         .from("incomes")
         .select("amount, occurred_at")
+        // Stesso filtro della Home: un rimborso non e' un introito, e nelle
+        // medie mensili pesa come se lo fosse.
+        .eq("is_reimbursement", false)
         .gte("occurred_at", historyStart.toISOString()),
       supabase
         .from("investments")

@@ -77,6 +77,8 @@ export type Payment = {
   excluded_from_stats: boolean;
   source: string;
   dedup_key: string | null;
+  /** Chi c'e' dall'altra parte, quando si sa. */
+  person_id: string | null;
   /** Il lotto d'import da cui e' entrata. `null` = non viene da un file. */
   import_batch_id: string | null;
   created_at: string;
@@ -325,6 +327,17 @@ export type Income = {
   label: string;
   note: string | null;
   occurred_at: string;
+  /**
+   * Denaro tornato indietro, non guadagnato.
+   *
+   * Resta in elenco e nel saldo, ma **non conta come introito** nelle medie e
+   * nel "Risparmiato": i rimborsi da una persona sono decine di righe in un
+   * estratto conto, e contarli come stipendio gonfia ogni statistica che
+   * dipende dal reddito.
+   */
+  is_reimbursement: boolean;
+  /** Chi c'e' dall'altra parte, quando si sa. */
+  person_id: string | null;
   /** Il lotto d'import da cui e' entrata. `null` = non viene da un file. */
   import_batch_id: string | null;
   created_at: string;

@@ -645,6 +645,10 @@ export type Decisione = {
   direzione?: Direction;
   /** `undefined` = decide l'esercente, `null` = volutamente senza categoria. */
   categoriaId?: string | null;
+  /** Il contatto dall'altra parte del movimento. */
+  personaId?: string | null;
+  /** Solo sulle entrate: denaro tornato indietro, non guadagnato. */
+  rimborso?: boolean;
 };
 
 /** La proposta di partenza: l'esclusione preselezionata, nient'altro. */
@@ -664,17 +668,27 @@ export function decisioneIniziale(riga: RigaRivista): Decisione {
 export function applicaDecisione(
   riga: RigaRivista,
   decisione: Decisione
-): StatementRow & { categoryId?: string | null } {
+): StatementRow & {
+  categoryId?: string | null;
+  personId?: string | null;
+  isReimbursement?: boolean;
+} {
   const row = riga.row;
+  const direction = decisione.direzione ?? row.direction;
   return {
     ...row,
     description: decisione.descrizione ?? row.description,
     date: decisione.data ?? row.date,
     amount: decisione.importo ?? row.amount,
-    direction: decisione.direzione ?? row.direction,
+    direction,
     ...(decisione.categoriaId !== undefined
       ? { categoryId: decisione.categoriaId }
       : {}),
+    personId: decisione.personaId ?? null,
+    // Solo un'entrata puo' essere un rimborso: il flag vive su `incomes`, e
+    // portarselo dietro su un'uscita lo renderebbe un dato che non ha dove
+    // andare a finire — silenziosamente perso, che e' il modo peggiore.
+    isReimbursement: direction === "in" ? (decisione.rimborso ?? false) : false,
   };
 }
 

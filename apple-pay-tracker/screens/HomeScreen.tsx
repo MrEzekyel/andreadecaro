@@ -197,6 +197,11 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
       supabase
         .from("incomes")
         .select("amount,label,occurred_at")
+        // I rimborsi restano in elenco ma **non** contano come introito: sono
+        // denaro tornato indietro, non guadagnato. Contarli qui gonfia gli
+        // introiti del mese e con loro l'avanzo, ed e' esattamente il numero
+        // su cui si decide quanto si puo' spendere.
+        .eq("is_reimbursement", false)
         .gte("occurred_at", start.toISOString())
         .lt("occurred_at", end.toISOString()),
       supabase

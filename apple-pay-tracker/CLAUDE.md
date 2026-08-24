@@ -885,6 +885,18 @@ di un comando rapido).
   reimportare lo stesso estratto, perché al secondo giro il file produrrebbe
   la chiave originale, non la troverebbe registrata e riscriverebbe tutto.
   `applicaDecisione()` lo garantisce, ed è provato.
+- **Un rimborso non è un introito** (`incomes.is_reimbursement`, migrazione
+  0045). I soldi che tornano indietro da una persona sono decine di righe in
+  un estratto conto — 14 righe per 664,95 € da un solo contatto, sull'import
+  vero — e contarli come stipendio gonfia ogni statistica che dipende dal
+  reddito. La riga resta in elenco e nel saldo (cancellarla sarebbe peggio:
+  quel denaro è arrivato davvero, e un elenco che non lo mostra non torna più
+  con l'estratto della banca), ma esce da **tre** posti, e devono essere tutti
+  e tre o il flag è applicato a metà: la Home, le Statistiche e — quello che
+  si dimentica — `monthly_totals()`, da cui esce il reddito di riferimento
+  proposto per l'obiettivo di risparmio. Il flag vive solo sulle entrate:
+  `applicaDecisione()` lo lascia cadere se il verso passa a uscita, altrimenti
+  sarebbe un dato senza posto dove finire, perso in silenzio.
 - **Nella correzione c'è anche il verso**, non solo esercente/categoria/data/
   importo: un'uscita letta come entrata inventa denaro, ed è l'errore più
   costoso che un import possa fare. Sulla categoria `undefined` e `null` non

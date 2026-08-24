@@ -252,5 +252,20 @@ check("decisioni", "categoria volutamente vuota", null, corretta.categoryId);
 check("decisioni", "categoria non toccata resta assente", undefined,
   applicaDecisione(out[9], { esclusa: false }).categoryId);
 
+// Il flag del rimborso vive su `incomes`: portarselo dietro su un'uscita lo
+// renderebbe un dato senza posto dove finire, cioe' perso in silenzio.
+check("rimborso", "su un'entrata resta", true,
+  applicaDecisione(out[5], { esclusa: false, rimborso: true }).isReimbursement);
+check("rimborso", "su un'uscita cade", false,
+  applicaDecisione(out[4], { esclusa: false, rimborso: true }).isReimbursement);
+check("rimborso", "cade anche se il verso passa a uscita", false,
+  applicaDecisione(out[5], { esclusa: false, rimborso: true, direzione: "out" }).isReimbursement);
+check("rimborso", "regge se il verso passa a entrata", true,
+  applicaDecisione(out[4], { esclusa: false, rimborso: true, direzione: "in" }).isReimbursement);
+check("persona", "contatto collegato", "p-1",
+  applicaDecisione(out[4], { esclusa: false, personaId: "p-1" }).personId);
+check("persona", "nessun contatto = null", null,
+  applicaDecisione(out[4], { esclusa: false }).personId);
+
 console.log(bad === 0 ? "\n✅ tutti i casi passano" : `\n❌ ${bad} casi falliti`);
 process.exit(bad === 0 ? 0 : 1);

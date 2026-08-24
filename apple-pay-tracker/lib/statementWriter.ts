@@ -45,6 +45,16 @@ export type ImportableRow = StatementRow & {
    * sempre; `null` = si vuole esplicitamente senza categoria.
    */
   categoryId?: string | null;
+  /** Il contatto collegato in revisione. */
+  personId?: string | null;
+  /**
+   * Solo sulle entrate: denaro tornato indietro, non guadagnato.
+   *
+   * Resta in elenco e nel saldo ma esce dalle medie degli introiti. Quattordici
+   * righe di "Pagamento da parte di ROSA PADUANO" contate come stipendio
+   * spostano il reddito medio, e con lui l'obiettivo di risparmio.
+   */
+  isReimbursement?: boolean;
 };
 
 export type ImportOutcome = {
@@ -281,6 +291,7 @@ export async function importStatementRows(
         // riscriverebbe di nascosto una categoria che era stata tolta apposta.
         category_id:
           row.categoryId !== undefined ? row.categoryId : merchant.category,
+        person_id: row.personId ?? null,
         occurred_at: row.date.toISOString(),
         raw_notification_text: row.rawDescription,
         source: "import",
@@ -326,6 +337,8 @@ export async function importStatementRows(
         ? `${row.rawDescription} · importo in ${row.currency}`
         : row.rawDescription,
       occurred_at: row.date.toISOString(),
+      person_id: row.personId ?? null,
+      is_reimbursement: row.isReimbursement ?? false,
       import_batch_id: batchId,
     }));
 

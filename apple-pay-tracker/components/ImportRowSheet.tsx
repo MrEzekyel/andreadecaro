@@ -2,16 +2,19 @@ import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useEffect, useState } from "react";
 import {
   Platform,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { useData } from "../lib/DataContext";
 import { formatAmount, formatDate } from "../lib/format";
 import type { Decisione, RigaRivista } from "../lib/importReview";
 import { useTheme } from "../lib/ThemeContext";
 import { radius, space, type } from "../lib/theme";
+import { AddPersonSheet } from "./AddPersonSheet";
 import { CategoryPicker } from "./CategoryPicker";
 import { Icon } from "./Icon";
 import { Sheet } from "./Sheet";
@@ -52,12 +55,16 @@ export function ImportRowSheet({
   quanteConQuestoNome,
 }: Props) {
   const { palette } = useTheme();
+  const { people, reload } = useData();
 
   const [descrizione, setDescrizione] = useState("");
   const [importo, setImporto] = useState("");
   const [data, setData] = useState(new Date());
   const [direzione, setDirezione] = useState<"out" | "in">("out");
   const [categoriaId, setCategoriaId] = useState<string | null | undefined>();
+  const [personaId, setPersonaId] = useState<string | null>(null);
+  const [rimborso, setRimborso] = useState(false);
+  const [aggiungoPersona, setAggiungoPersona] = useState(false);
   const [aTutte, setATutte] = useState(false);
   const [mostraData, setMostraData] = useState(false);
 
@@ -68,6 +75,14 @@ export function ImportRowSheet({
     setData(decisione.data ?? riga.row.date);
     setDirezione(decisione.direzione ?? riga.row.direction);
     setCategoriaId(decisione.categoriaId);
+    setPersonaId(decisione.personaId ?? null);
+    // Proposto, non applicato: su un'entrata che sembra un rimborso la casella
+    // arriva gia' spuntata, ma resta una casella.
+    setRimborso(
+      decisione.rimborso ??
+        (riga.sospetti.some((s) => s.tipo === "persona") &&
+          (decisione.direzione ?? riga.row.direction) === "in")
+    );
     setATutte(false);
     setMostraData(false);
   }, [visible, riga, decisione]);
@@ -91,6 +106,8 @@ export function ImportRowSheet({
       data,
       direzione,
       categoriaId,
+      personaId,
+      rimborso: direzione === "in" ? rimborso : undefined,
     });
 
     if (rinominata && aTutte) onRenameAll(nomeAttuale, nuovoNome);
@@ -254,6 +271,79 @@ export function ImportRowSheet({
         </View>
       )}
 
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Persona</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.strip}
+        >
+          {people.map((persona) => {
+            const scelta = personaId === persona.id;
+            return (
+              <TouchableOpacity
+                key={persona.id}
+                // Toccare quella gia' scelta la toglie: senza, un contatto
+                // messo per sbaglio non si potrebbe piu' levare.
+                onPress={() => setPersonaId(scelta ? null : persona.id)}
+                style={[
+                  styles.chip,
+                  {
+                    backgroundColor: scelta ? palette.surface : "transparent",
+                    borderColor: scelta ? palette.accent : palette.hairline,
+                  },
+                ]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: scelta }}
+              >
+                <Text
+                  style={[
+                    styles.chipText,
+                    { color: scelta ? palette.accent : palette.ink2 },
+                  ]}
+                >
+                  {persona.name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+          <TouchableOpacity
+            onPress={() => setAggiungoPersona(true)}
+            style={[styles.chip, { borderColor: palette.hairline }]}
+            accessibilityLabel="Nuovo contatto"
+          >
+            <Icon name="plus" size={14} color={palette.ink3} />
+          </TouchableOpacity>
+        </ScrollView>
+        {/* Senza contatti la striscia sarebbe un "+" muto, e chi non ha mai
+            aperto Dividi spese non ha modo di sapere cosa apra. */}
+        {people.length === 0 && (
+          <Text style={[styles.raw, { color: palette.ink3 }]}>
+            Non hai ancora contatti: con il «+» ne crei uno al volo.
+          </Text>
+        )}
+      </View>
+
+      {direzione === "in" && (
+        <TouchableOpacity
+          style={styles.checkRow}
+          onPress={() => setRimborso((v) => !v)}
+          accessibilityRole="checkbox"
+          accessibilityState={{ checked: rimborso }}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Icon
+            name={rimborso ? "square-check" : "square"}
+            size={17}
+            color={rimborso ? palette.accent : palette.ink3}
+          />
+          <Text style={[styles.checkText, { color: palette.ink2 }]}>
+            È un rimborso, non un introito: resta in elenco e nel saldo, ma non
+            conta nella media delle entrate né nel «Risparmiato».
+          </Text>
+        </TouchableOpacity>
+      )}
+
       <TouchableOpacity
         style={[styles.button, { backgroundColor: palette.accent }]}
         onPress={salva}
@@ -281,6 +371,18 @@ export function ImportRowSheet({
             : `Escludi dall'import (${formatAmount(riga.row.amount)})`}
         </Text>
       </TouchableOpacity>
+
+      {/* Aperto sopra a questo foglio: `dim` vela cio' che sta sotto,
+          altrimenti si vedono due intestazioni impilate. */}
+      <AddPersonSheet
+        visible={aggiungoPersona}
+        onClose={() => setAggiungoPersona(false)}
+        onCreated={async (persona) => {
+          setAggiungoPersona(false);
+          await reload();
+          setPersonaId(persona.id);
+        }}
+      />
     </Sheet>
   );
 }
@@ -301,6 +403,14 @@ const styles = StyleSheet.create({
   motivoText: { ...type.small, lineHeight: 16, flex: 1 },
   checkRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 9 },
   checkText: { ...type.small, flex: 1, lineHeight: 16 },
+  strip: { gap: 8, paddingVertical: 2, paddingRight: 8 },
+  chip: {
+    borderWidth: 1,
+    borderRadius: radius.pill,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  chipText: { ...type.caption, fontWeight: "500" },
   versoRow: { flexDirection: "row", gap: 9 },
   verso: {
     flex: 1,
