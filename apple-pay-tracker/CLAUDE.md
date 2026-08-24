@@ -870,6 +870,31 @@ di un comando rapido).
   la data dentro la stringa renderebbe ogni spesa un esercente nuovo. Toglie
   solo pezzi riconoscibili con certezza, non svuota mai il campo, e la riga
   originale resta comunque in `payments.raw_notification_text`.
+- **I sospetti si calcolano in `lib/importReview.ts`, tutte funzioni pure**, e
+  cio' che esiste gia' nel database arriva come argomento da
+  `lib/importContext.ts`. La separazione è il punto: così le regole si provano
+  sui casi veri senza un database davanti (`lib/__tests__/import-review.test.mjs`,
+  56 casi presi dall'import reale, `node lib/__tests__/import-review.test.mjs`).
+  Tre regole che sembrano dettagli e sono la differenza fra utile e dannoso:
+  - **Una persona si riconosce dal prefisso, non dal nome.** «Giannantonio
+    Giuseppe» e «Emiliano Pilia» sono esercenti da carta, non persone a cui
+    hai dato dei soldi: quello che li distingue da «LEONARDO BARESE» non è
+    come sono scritti — sono identici — è che un acquisto non ha un
+    «Pagamento a favore di» davanti. Senza questo cancello: tre falsi
+    positivi su dieci società, misurati.
+  - **Il confronto per i doppioni si fa sulle righe vere, mai sul nome di una
+    regola.** Una `recurring_rule` non è una spesa, è la promessa di spese
+    future: la regola Santander ha lo stesso nome e lo stesso importo delle
+    rate di gennaio-maggio ma parte ad agosto, e confrontarsi con lei avrebbe
+    cancellato 1.911,90 € di costi fissi veri.
+  - **Un investimento si confronta con due date.** Sui private market fra
+    l'addebito e l'assegnazione delle quote passano settimane: sull'import
+    vero 12 righe su 34 hanno `settled_on` diverso da `occurred_at`, e con
+    una data sola resterebbero fuori.
+  Il riscontro dice sempre **contro cosa** combacia («già presente come un
+  investimento del 2/2 — iShares Core S&P 500»): senza, chi guarda non ha modo
+  di giudicare se lo sia davvero. E niente viene escluso da solo —
+  `escludiProposto` è una casella preselezionata, mai un'azione.
 - **Un import si può annullare** (`import_batches`, migrazione 0044). Ogni riga
   scritta da un estratto conto porta `import_batch_id`, e da lì
   `undo_import_batch()` toglie *esattamente* quel lotto. Prima non era
