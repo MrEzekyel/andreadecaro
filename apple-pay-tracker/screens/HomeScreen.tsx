@@ -430,27 +430,53 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
   }, [incomes, payments, investments, daysInMonth, elapsedDays]);
 
   /**
-   * Sei mesi di spesa che finiscono al mese sfogliato, per la carta di
-   * confronto.
+   * Sei mesi di spesa per la carta di confronto: la finestra "di sempre"
+   * (gli ultimi sei mesi reali) finche' il mese sfogliato ci rientra, e si
+   * sposta indietro solo quando serve per farcelo entrare.
    *
-   * `history` arriva sempre ancorata a oggi (`monthly_totals` la calcola dal
-   * mese reale corrente all'indietro), ma la pagina puo' mostrare un mese
-   * passato. Prima la finestra era sempre `slice(-6)` — gli ultimi sei mesi
-   * *reali* — quindi sfogliando indietro il grafico restava lo stesso e la
-   * barra accesa era sempre quella di oggi, mai quella che si stava
-   * guardando. Si cerca il mese sfogliato in `history` e si prendono lui e i
-   * cinque prima; se non c'e' (fuori dai 12 mesi letti) si ripiega sul
-   * comportamento di sempre.
+   * Non e' "gli ultimi sei mesi prima del mese sfogliato": da agosto
+   * (oggi) fino a marzo la finestra resta sempre mar-ago, e a cambiare e'
+   * solo quale barra si accende — altrimenti scorrere di un mese avanti e
+   * indietro dentro lo stesso semestre farebbe traballare tutto il
+   * grafico per un dettaglio che non serve a vedere. La finestra si sposta
+   * **solo** quando il mese sfogliato e' piu' vecchio del suo inizio, e di
+   * esattamente tanti mesi quanti ne mancano per farcelo rientrare (da agosto,
+   * gennaio e' due mesi prima di marzo: la finestra scala di due e diventa
+   * gen-giu, con gennaio primo e acceso).
+   *
+   * `history` resta ancorata a oggi (`monthly_totals` la calcola dal mese
+   * reale corrente all'indietro): e' la finestra "di sempre"
+   * (`history.slice(-6)`) a fare da riferimento fisso, non il mese
+   * sfogliato.
    */
   const selectedMonthKey = monthKey(month);
   const spesaBars = useMemo<MonthBar[]>(() => {
-    const index = history.findIndex(
+    const selectedIndex = history.findIndex(
       (row) => monthKey(new Date(`${row.month}T00:00:00`)) === selectedMonthKey
     );
-    const window =
-      index === -1
-        ? history.slice(-6)
-        : history.slice(Math.max(0, index - 5), index + 1);
+
+    let window: MonthTotal[];
+    if (selectedIndex === -1) {
+      // Fuori dai 12 mesi letti (troppo indietro, o nel futuro): si ripiega
+      // sulla finestra di sempre, senza inventare una barra accesa che non
+      // corrisponde a niente di scaricato davvero.
+      window = history.slice(-6);
+    } else {
+      const defaultEnd = history.length - 1;
+      const defaultStart = Math.max(0, defaultEnd - 5);
+      if (selectedIndex >= defaultStart) {
+        // Dentro alla finestra di sempre: non si tocca, cambia solo quale
+        // barra prende il colore.
+        window = history.slice(defaultStart, defaultEnd + 1);
+      } else {
+        // Piu' vecchio dell'inizio: si scala la finestra indietro di
+        // esattamente la distanza che manca, cosi' il mese sfogliato
+        // diventa il primo della finestra invece di restare fuori.
+        const shift = defaultStart - selectedIndex;
+        window = history.slice(selectedIndex, defaultEnd - shift + 1);
+      }
+    }
+
     return window.map((row) => ({
       key: monthKey(new Date(`${row.month}T00:00:00`)),
       label: monthAbbr(new Date(`${row.month}T00:00:00`)),
