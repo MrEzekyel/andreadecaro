@@ -6,6 +6,8 @@ import { compactAmount, formatAmount } from "../lib/format";
 import { type } from "../lib/theme";
 
 export type MonthBar = {
+  /** "2026-08": per confrontare con il mese sfogliato, non con l'ultima posizione. */
+  key: string;
   /** Etichetta breve sull'asse: "gen", "feb". */
   label: string;
   value: number;
@@ -14,6 +16,14 @@ export type MonthBar = {
 type Props = {
   bars: MonthBar[];
   color: string;
+  /**
+   * Il mese che la pagina sta mostrando, non necessariamente l'ultimo
+   * dell'array: chi sfoglia Home su un mese passato deve vedere acceso
+   * *quel* mese, non agosto solo perche' e' oggi. Senza combaciare con
+   * nessuna barra, restano tutte spente — meglio che accendere quella
+   * sbagliata.
+   */
+  selectedKey?: string;
   /** Larghezza del viewBox: la carta a meta' schermo ne usa una piu' stretta. */
   width?: number;
   height?: number;
@@ -28,16 +38,20 @@ export function monthBarsAverage(bars: MonthBar[]) {
 }
 
 /**
- * Un mese per barra, l'ultimo acceso.
+ * Un mese per barra, quello sfogliato acceso.
  *
  * Serve alla domanda che il totale del mese da solo non puo' rispondere:
  * "sto spendendo tanto?" non ha senso in assoluto, solo confrontato con i
- * mesi che hai gia' vissuto. I mesi passati restano spenti e solo quello
- * corrente prende il colore pieno: e' l'unico ancora in movimento.
+ * mesi che hai gia' vissuto. Gli altri mesi restano spenti e solo quello che
+ * la pagina sta mostrando prende il colore pieno — non "l'ultimo dell'elenco":
+ * chi sfoglia Home indietro deve vedere acceso il mese che sta guardando, non
+ * sempre oggi. Prima il confronto era sulla posizione (`index === length-1`),
+ * e fuori dal mese corrente il colore restava sbagliato senza dare errore.
  */
 export function MonthBars({
   bars,
   color,
+  selectedKey,
   width = 128,
   height = 76,
   showLabels = true,
@@ -66,7 +80,7 @@ export function MonthBars({
           (bar.value / peak) * (plotH - headroom),
           bar.value > 0 ? 2 : 0
         );
-        const last = index === bars.length - 1;
+        const selected = bar.key === selectedKey;
         return (
           <Rect
             key={`${bar.label}-${index}`}
@@ -79,7 +93,7 @@ export function MonthBars({
             // fondo pagina, e a piena larghezza (fuori da una carta) i mesi
             // passati sparivano — restava la loro etichetta sospesa sul
             // vuoto, che e' peggio di non disegnarli affatto.
-            fill={last ? color : palette.hairline}
+            fill={selected ? color : palette.hairline}
           />
         );
       })}
@@ -87,7 +101,7 @@ export function MonthBars({
       {bars.map((bar, index) => {
         if (bar.value <= 0) return null;
         const h = Math.max((bar.value / peak) * (plotH - headroom), 2);
-        const last = index === bars.length - 1;
+        const selected = bar.key === selectedKey;
         return (
           <SvgText
             key={`v-${bar.label}-${index}`}
@@ -95,8 +109,8 @@ export function MonthBars({
             y={plotH - h - 3.5}
             textAnchor="middle"
             fontSize={valueFont}
-            fontWeight={last ? "600" : "400"}
-            fill={last ? color : palette.ink3}
+            fontWeight={selected ? "600" : "400"}
+            fill={selected ? color : palette.ink3}
           >
             {compactAmount(bar.value)}
           </SvgText>
@@ -114,7 +128,7 @@ export function MonthBars({
 
       {showLabels &&
         bars.map((bar, index) => {
-          const last = index === bars.length - 1;
+          const selected = bar.key === selectedKey;
           return (
             <SvgText
               key={`l-${bar.label}-${index}`}
@@ -122,8 +136,8 @@ export function MonthBars({
               y={plotH + 9}
               textAnchor="middle"
               fontSize={7.5}
-              fontWeight={last ? "600" : "400"}
-              fill={last ? color : palette.ink3}
+              fontWeight={selected ? "600" : "400"}
+              fill={selected ? color : palette.ink3}
             >
               {bar.label}
             </SvgText>

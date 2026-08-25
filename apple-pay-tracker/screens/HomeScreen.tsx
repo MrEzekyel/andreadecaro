@@ -38,6 +38,7 @@ import {
   dayLabel,
   formatAmount,
   monthAbbr,
+  monthKey,
   monthName,
   monthTitle,
   percentChange,
@@ -428,15 +429,34 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     return points;
   }, [incomes, payments, investments, daysInMonth, elapsedDays]);
 
-  /** Ultimi sei mesi di spesa, per la carta di confronto. */
-  const spesaBars = useMemo<MonthBar[]>(
-    () =>
-      history.slice(-6).map((row) => ({
-        label: monthAbbr(new Date(`${row.month}T00:00:00`)),
-        value: row.spese,
-      })),
-    [history]
-  );
+  /**
+   * Sei mesi di spesa che finiscono al mese sfogliato, per la carta di
+   * confronto.
+   *
+   * `history` arriva sempre ancorata a oggi (`monthly_totals` la calcola dal
+   * mese reale corrente all'indietro), ma la pagina puo' mostrare un mese
+   * passato. Prima la finestra era sempre `slice(-6)` — gli ultimi sei mesi
+   * *reali* — quindi sfogliando indietro il grafico restava lo stesso e la
+   * barra accesa era sempre quella di oggi, mai quella che si stava
+   * guardando. Si cerca il mese sfogliato in `history` e si prendono lui e i
+   * cinque prima; se non c'e' (fuori dai 12 mesi letti) si ripiega sul
+   * comportamento di sempre.
+   */
+  const selectedMonthKey = monthKey(month);
+  const spesaBars = useMemo<MonthBar[]>(() => {
+    const index = history.findIndex(
+      (row) => monthKey(new Date(`${row.month}T00:00:00`)) === selectedMonthKey
+    );
+    const window =
+      index === -1
+        ? history.slice(-6)
+        : history.slice(Math.max(0, index - 5), index + 1);
+    return window.map((row) => ({
+      key: monthKey(new Date(`${row.month}T00:00:00`)),
+      label: monthAbbr(new Date(`${row.month}T00:00:00`)),
+      value: row.spese,
+    }));
+  }, [history, selectedMonthKey]);
 
   /** Introiti dei mesi dell'anno in corso, per la scheda Entrate. */
   const introitiBars = useMemo<MonthBar[]>(() => {
@@ -444,6 +464,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     return history
       .filter((row) => new Date(`${row.month}T00:00:00`).getFullYear() === year)
       .map((row) => ({
+        key: monthKey(new Date(`${row.month}T00:00:00`)),
         label: monthAbbr(new Date(`${row.month}T00:00:00`)),
         value: row.introiti,
       }));
@@ -1088,7 +1109,11 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                         <Text style={[styles.cardLabel, { color: palette.ink3 }]}>
                           Sui mesi
                         </Text>
-                        <MonthBars bars={spesaBars} color={palette.accent} />
+                        <MonthBars
+                          bars={spesaBars}
+                          color={palette.accent}
+                          selectedKey={selectedMonthKey}
+                        />
                         <Text style={[styles.cardFoot, { color: palette.ink3 }]}>
                           media {formatAmount(monthBarsAverage(spesaBars))}
                         </Text>
@@ -1377,6 +1402,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                     <MonthBars
                       bars={introitiBars}
                       color={palette.good}
+                      selectedKey={selectedMonthKey}
                       width={320}
                       height={104}
                     />
