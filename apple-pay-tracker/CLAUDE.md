@@ -60,7 +60,7 @@ produzione.
 
 ## Stack
 
-- **Expo SDK 54**, React Native, TypeScript, nessun modulo nativo custom
+- **Expo SDK 57**, React Native 0.86, TypeScript, nessun modulo nativo custom
   (deve restare compatibile con Expo Go)
 - **Supabase**: Postgres + Row Level Security + Edge Function + pg_cron
   - project ref: `wcmxwhmiexhhbqvadbig`
@@ -1330,7 +1330,7 @@ di un comando rapido).
 
 - `lib/AppLockContext.tsx` + `components/LockScreen.tsx`: Face ID / Touch ID
   davanti all'app, opzionale, spento di default. Usa
-  `expo-local-authentication`, che è nell'SDK 54 e quindi **dentro Expo Go** —
+  `expo-local-authentication`, che è nell'SDK e quindi **dentro Expo Go** —
   nessuna build nativa.
 - È un **context, non un hook usato due volte**: il gate che copre l'app e
   l'interruttore in Impostazioni devono condividere lo stato, altrimenti
@@ -1479,6 +1479,30 @@ Se il `git pull` desse conflitti (è già successo: Andrea a volte modifica
 eventualmente scartare le modifiche locali superate invece di lasciare i
 marcatori di conflitto (`<<<<<<<`) nel file — è già successo che
 finissero committati per sbaglio.
+
+## Expo Go e la versione dell'SDK
+
+Expo Go supporta **un solo SDK alla volta**: quando l'App Store aggiorna
+l'app sul telefono, gli update pubblicati su un SDK più vecchio smettono di
+comparire e di aprirsi — il progetto sparisce dalla lista in home, senza
+messaggi d'errore. È già successo passando da 54 a 57: l'unico segnale era
+"non vedo più il progetto".
+
+- La versione supportata si legge in **Expo Go → Settings**. Se non coincide
+  con `expo` in `package.json`, è quello il problema, non l'update.
+- L'allineamento si fa aggiornando `expo` e tutte le dipendenze alle
+  versioni dell'SDK nuovo. Da qui `npx expo install --fix` non funziona
+  (`api.expo.dev` è fuori dalla rete di questa sessione): le versioni esatte
+  stanno in `node_modules/expo/bundledNativeModules.json` del pacchetto
+  `expo` della versione target — `npm pack expo@<versione>` e leggere quel
+  file è la via offline.
+- Dopo l'aggiornamento, prima del commit: `npx tsc --noEmit` **e**
+  `EXPO_OFFLINE=1 npx expo export --platform ios`. Il secondo è quello che
+  conta davvero: il typecheck non vede i moduli che Metro non riesce a
+  risolvere.
+- `runtimeVersion: { policy: "sdkVersion" }` in `app.json` va lasciato:
+  diventa da solo `exposdk:<versione>` ed è ciò che fa combaciare l'update
+  con l'Expo Go installato.
 
 ## Xcode / Simulatore iOS
 
