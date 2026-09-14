@@ -30,6 +30,7 @@ import {
   monthsBetween,
   paymentsIn,
   sameMonth,
+  WEEK_BAR_MIN_COLUMN_WIDTH,
 } from "../lib/aggregate";
 import { formatAmount, monthName, monthShort, splitAmount } from "../lib/format";
 import { supabase } from "../lib/supabase";
@@ -181,9 +182,12 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
   );
 
   const months = useMemo(() => groupByMonth(payments), [payments]);
+  // Su schermo largo c'e' piu' spazio orizzontale per le settimane: se ne
+  // mostrano di piu' in una volta invece di far scorrere quasi subito.
+  const weekBucketLimit = wide ? 18 : 10;
   const buckets = useMemo(
-    () => bucketize(payments, grain, grain === "week" ? 10 : 8),
-    [payments, grain]
+    () => bucketize(payments, grain, grain === "week" ? weekBucketLimit : 8),
+    [payments, grain, weekBucketLimit]
   );
 
   // L'ultimo intervallo — quello in corso — e' la selezione naturale: la
@@ -363,6 +367,7 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
             selectedKey={selected?.key ?? null}
             onSelect={(bucket) => setSelectedKey(bucket.key)}
             average={averageTotal}
+            minColumnWidth={grain === "week" ? WEEK_BAR_MIN_COLUMN_WIDTH : undefined}
           />
           {statPair(
             {
@@ -398,6 +403,7 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
             selectedKey={selected?.key ?? null}
             onSelect={(bucket) => setSelectedKey(bucket.key)}
             average={averageCount}
+            minColumnWidth={grain === "week" ? WEEK_BAR_MIN_COLUMN_WIDTH : undefined}
           />
           {statPair(
             { label: "Spesa media", value: formatAmount(averagePerPayment) },

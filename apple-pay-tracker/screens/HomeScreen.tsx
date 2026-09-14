@@ -133,7 +133,6 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     usePayments(month);
   const {
     monthlyOverall,
-    weeklyOverall,
     categoryLimits,
     alerts,
     goal,
@@ -402,18 +401,6 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     return points;
   }, [payments, daysInMonth, elapsedDays, isFixedCost, fixedCostsTotal]);
 
-  /** Indici (0-based) dei lunedi' del mese mostrato, escluso il primo giorno
-   *  del grafico stesso: sono dove il limite settimanale sul totale si
-   *  rinnova, quindi dove "Andamento" disegna la sua linea verticale. */
-  const weekBoundaries = useMemo(() => {
-    const indexes: number[] = [];
-    for (let day = 2; day <= daysInMonth; day++) {
-      const weekday = new Date(month.getFullYear(), month.getMonth(), day).getDay();
-      if (weekday === 1) indexes.push(day - 1);
-    }
-    return indexes;
-  }, [month, daysInMonth]);
-
   /**
    * Saldo del mese: sale a ogni introito, scende a ogni spesa e a ogni
    * investimento.
@@ -428,6 +415,12 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     const inPerDay = new Array(daysInMonth).fill(0);
     const outPerDay = new Array(daysInMonth).fill(0);
     const investPerDay = new Array(daysInMonth).fill(0);
+    // Solo per l'etichetta sul gradino: quanto di quella discesa e' un costo
+    // fisso, non una spesa nuova. Non cambia `outPerDay` (la linea scende
+    // comunque di tutto l'importo, mutuo e rate sono spesa vera) — serve
+    // solo a distinguere il gradino a schermo, come gia' fa la tacca "costi
+    // fissi" del semicerchio Uscite qui in Home.
+    const fixedPerDay = new Array(daysInMonth).fill(0);
 
     for (const row of incomes) {
       const day = new Date(row.occurred_at).getDate();
@@ -437,6 +430,9 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
       const day = new Date(payment.occurred_at).getDate();
       if (day >= 1 && day <= daysInMonth) {
         outPerDay[day - 1] += Number(payment.effective_amount);
+        if (isFixedCost(payment)) {
+          fixedPerDay[day - 1] += Number(payment.effective_amount);
+        }
       }
     }
     for (const row of investments) {
@@ -455,10 +451,11 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
         value: running,
         income: inPerDay[i] > 0 ? inPerDay[i] : undefined,
         invested: investPerDay[i] > 0 ? investPerDay[i] : undefined,
+        fixedCost: fixedPerDay[i] > 0 ? fixedPerDay[i] : undefined,
       });
     }
     return points;
-  }, [incomes, payments, investments, daysInMonth, elapsedDays]);
+  }, [incomes, payments, investments, daysInMonth, elapsedDays, isFixedCost]);
 
   /**
    * Sei mesi di spesa per la carta di confronto: la finestra "di sempre"
@@ -1241,12 +1238,6 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                       }
                       baseline={fixedCostsTotal}
                       color={palette.accent}
-                      weekBoundaries={
-                        viewingCurrentMonth && weeklyOverall ? weekBoundaries : []
-                      }
-                      weeklyLimit={
-                        weeklyOverall ? Number(weeklyOverall.limit.amount) : null
-                      }
                     />
                     {merchantsUnknown && (
                       <Text style={[styles.chartNote, { color: palette.ink3 }]}>
