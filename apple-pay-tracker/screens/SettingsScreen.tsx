@@ -18,6 +18,7 @@ import {
 import { useChangelog } from "../lib/changelog";
 import { useData } from "../lib/DataContext";
 import { SettingsPage } from "../lib/NavContext";
+import { useDetailMeasure } from "../lib/layout";
 import { ThemePreference, useTheme } from "../lib/ThemeContext";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
@@ -50,6 +51,7 @@ type Props = {
 
 export default function SettingsScreen({ initialPage = "root", openNonce }: Props) {
   const { palette, preference, setPreference } = useTheme();
+  const measure = useDetailMeasure();
   const { categories, people } = useData();
   const { statuses } = useLimits();
   const { profile, automationActive, trialDaysLeft } = useSubscription();
@@ -140,7 +142,7 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
   return (
     <ScrollView
       style={{ backgroundColor: palette.ground }}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, measure]}
     >
       <Text style={[styles.title, { color: palette.ink }]}>Impostazioni</Text>
 

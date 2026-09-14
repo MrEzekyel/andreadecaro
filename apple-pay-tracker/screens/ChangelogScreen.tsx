@@ -2,6 +2,7 @@ import React, { useEffect } from "react";
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { Icon } from "../components/Icon";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { useDetailMeasure } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { CHANGELOG, useChangelog } from "../lib/changelog";
 import { space, type } from "../lib/theme";
@@ -16,6 +17,7 @@ function formatDate(iso: string) {
 
 export default function ChangelogScreen({ onBack }: { onBack: () => void }) {
   const { palette } = useTheme();
+  const measure = useDetailMeasure();
   const { markRead } = useChangelog();
 
   // Aprire la schermata *e'* averle lette: chiedere anche un tocco su
@@ -34,7 +36,7 @@ export default function ChangelogScreen({ onBack }: { onBack: () => void }) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, measure]}>
           {CHANGELOG.map((entry) => (
             <View key={entry.id} style={styles.entry}>
               <Text style={[styles.date, { color: palette.ink3 }]}>

@@ -13,6 +13,7 @@ import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
 import { useData } from "../lib/DataContext";
+import { useDetailMeasure } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { formatForeign, formatAmount, shortDateTime, splitAmount } from "../lib/format";
 import { supabase } from "../lib/supabase";
@@ -50,6 +51,7 @@ export default function TransactionDetailScreen({
   onOpenMerchant,
 }: Props) {
   const { palette, dark } = useTheme();
+  const measure = useDetailMeasure();
   const { categoryById, personById, brandLabel, merchants, merchantById } = useData();
 
   /** L'insegna della spesa aperta, se il punto vendita ne ha una. */
@@ -174,7 +176,7 @@ export default function TransactionDetailScreen({
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, measure]}>
           <View style={styles.hero}>
             <View style={[styles.icon, { backgroundColor: tint(color, dark) }]}>
               <Icon

@@ -13,6 +13,7 @@ import { ScrubChart } from "../components/ScrubChart";
 import { Sheet } from "../components/Sheet";
 import { StatTiles } from "../components/StatTiles";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { useDetailMeasure } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, formatDate, splitAmount } from "../lib/format";
 import {
@@ -61,6 +62,7 @@ export default function AssetDetailScreen({
   onSaved,
 }: Props) {
   const { palette, dark } = useTheme();
+  const measure = useDetailMeasure();
   const { series } = usePortfolioSeries({ assetId: position.asset.id });
 
   // Come nella schermata principale: un anno racconta gia' un andamento
@@ -174,7 +176,7 @@ export default function AssetDetailScreen({
     <SwipeBack onBack={onBack}>
       <ScrollView
         style={{ backgroundColor: palette.ground }}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, measure]}
       >
         <TouchableOpacity
           onPress={onBack}

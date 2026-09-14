@@ -12,6 +12,7 @@ import {
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { useDetailMeasure } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { firstError } from "../lib/loadError";
 import { supabase } from "../lib/supabase";
@@ -22,6 +23,7 @@ const GOAL = 5;
 
 export default function ReferralScreen({ onBack }: { onBack: () => void }) {
   const { palette } = useTheme();
+  const measure = useDetailMeasure();
   const {
     profile,
     loading: profileLoading,
@@ -72,7 +74,7 @@ export default function ReferralScreen({ onBack }: { onBack: () => void }) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, measure]}>
           <Text style={[styles.intro, { color: palette.ink2 }]}>
             Invita 5 amici e falli partire con l'automazione: quando ognuno
             registra il suo primo pagamento in automatico, il referral si

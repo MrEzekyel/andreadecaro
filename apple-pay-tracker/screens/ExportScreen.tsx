@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { Icon } from "../components/Icon";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { useDetailMeasure } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { exportToCsv, ExportKind, NothingToExport } from "../lib/exportData";
 import { formatAmount } from "../lib/format";
@@ -58,6 +59,7 @@ const EXPORTS: {
  */
 export default function ExportScreen({ onBack }: { onBack: () => void }) {
   const { palette } = useTheme();
+  const measure = useDetailMeasure();
   const [running, setRunning] = useState<ExportKind | null>(null);
 
   async function run(kind: ExportKind) {
@@ -104,7 +106,7 @@ export default function ExportScreen({ onBack }: { onBack: () => void }) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, measure]}>
           <Text style={[styles.intro, { color: palette.ink2 }]}>
             I tuoi dati escono in CSV, un file per tipo. Si aprono in Numeri,
             Excel e Fogli Google senza conversioni.

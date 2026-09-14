@@ -12,6 +12,7 @@ import { AddAssetSheet } from "../components/AddAssetSheet";
 import { Icon } from "../components/Icon";
 import { Sheet } from "../components/Sheet";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { useDetailMeasure } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount } from "../lib/format";
 import { GROUP_LABEL, GROUP_ORDER } from "../lib/portfolio";
@@ -49,6 +50,7 @@ type Props = {
  */
 export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
   const { palette, dark } = useTheme();
+  const measure = useDetailMeasure();
 
   const [sheet, setSheet] = useState(false);
   const [addingAsset, setAddingAsset] = useState(false);
@@ -168,7 +170,7 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
     <SwipeBack onBack={onBack}>
       <ScrollView
         style={{ backgroundColor: palette.ground }}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, measure]}
       >
         <TouchableOpacity onPress={onBack} hitSlop={backHitSlop} style={styles.back}>
           <Icon name="chevron-left" size={18} color={palette.ink2} />

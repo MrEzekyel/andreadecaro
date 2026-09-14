@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { BarChart } from "../components/BarChart";
 import { ChartCarousel, ChartPage } from "../components/ChartCarousel";
+import { TwoColumns } from "../components/TwoColumns";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
@@ -17,6 +18,7 @@ import { MonthWheel } from "../components/MonthWheel";
 import { PaymentRow } from "../components/PaymentRow";
 import { ShareBar, Slice } from "../components/ShareBar";
 import { useData } from "../lib/DataContext";
+import { useWideLayout } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import {
   Bucket,
@@ -72,6 +74,7 @@ const SCOPE_OPTIONS = [
 
 export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
   const { palette, dark } = useTheme();
+  const wide = useWideLayout();
   const { categoryById, merchants, merchantById } = useData();
 
   /**
@@ -462,7 +465,13 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
         </Text>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, wide && styles.contentWide]}>
+        {/* Il dettaglio ricco ha un grafico e un elenco, quindi regge le due
+            colonne della Home: a sinistra i numeri del periodo, a destra
+            l'andamento e le transazioni. */}
+        <TwoColumns
+          left={
+            <>
         {!error && (
           <View>
             <View style={styles.totalRow}>
@@ -485,7 +494,10 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
             </Text>
           </View>
         )}
-
+            </>
+          }
+          right={
+            <>
         {payments.length > 0 && <ChartCarousel pages={pages} />}
 
         <View>
@@ -563,6 +575,9 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
             />
           </View>
         )}
+            </>
+          }
+        />
       </ScrollView>
     </View>
     </SwipeBack>
@@ -582,6 +597,8 @@ const styles = StyleSheet.create({
   back: { padding: 12, marginLeft: -8 },
   title: { ...type.title, flex: 1 },
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.xl },
+  // Col rail accanto, il margine di 16 stringeva troppo il contenuto.
+  contentWide: { padding: 24, paddingBottom: space.xxl },
   totalRow: {
     flexDirection: "row",
     alignItems: "baseline",

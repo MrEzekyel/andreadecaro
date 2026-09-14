@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { useDetailMeasure } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { radius, space, type } from "../lib/theme";
 import { useSubscription } from "../lib/useSubscription";
@@ -17,6 +18,7 @@ function formatDate(iso: string) {
 
 export default function SubscriptionScreen({ onBack }: { onBack: () => void }) {
   const { palette } = useTheme();
+  const measure = useDetailMeasure();
   const { profile, loading, error, automationActive, trialDaysLeft, reload } =
     useSubscription();
 
@@ -32,7 +34,7 @@ export default function SubscriptionScreen({ onBack }: { onBack: () => void }) {
           </TouchableOpacity>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, measure]}>
           {error && !profile ? (
             <LoadError message={error} onRetry={reload} />
           ) : (

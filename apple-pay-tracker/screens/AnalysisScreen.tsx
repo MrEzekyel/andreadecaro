@@ -3,6 +3,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from "react-nati
 import Svg, { G, Path } from "react-native-svg";
 import { Icon } from "../components/Icon";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { useDetailMeasure } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount } from "../lib/format";
 import { GroupSummary, Position } from "../lib/portfolio";
@@ -76,6 +77,7 @@ export default function AnalysisScreen({
   onBack,
 }: Props) {
   const { palette, dark } = useTheme();
+  const measure = useDetailMeasure();
   const [scope, setScope] = useState<AssetGroup | null>(null);
 
   const slices: Slice[] = useMemo(() => {
@@ -114,7 +116,7 @@ export default function AnalysisScreen({
     <SwipeBack onBack={onBack}>
       <ScrollView
         style={{ backgroundColor: palette.ground }}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, measure]}
       >
         <TouchableOpacity onPress={onBack} hitSlop={backHitSlop} style={styles.back}>
           <Icon name="chevron-left" size={18} color={palette.ink2} />

@@ -35,3 +35,20 @@ export const LEFT_COLUMN = 440;
  * con mezzo metro di vuoto in mezzo e l'occhio costretto a ricucirli.
  */
 export const DETAIL_MEASURE = 620;
+
+/**
+ * Stile per il contenuto di una pagina di dettaglio corta.
+ *
+ * Una pagina fatta di righe etichetta-valore non ha niente da guadagnare
+ * dall'allargarsi: restituisce una misura leggibile centrata, e sul telefono
+ * non restituisce niente perche' li' la larghezza e' gia' quella giusta.
+ */
+export function useDetailMeasure() {
+  const wide = useWideLayout();
+  if (!wide) return null;
+  return {
+    width: "100%" as const,
+    maxWidth: DETAIL_MEASURE,
+    alignSelf: "center" as const,
+  };
+}

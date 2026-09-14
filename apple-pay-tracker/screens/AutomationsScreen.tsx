@@ -12,6 +12,7 @@ import {
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { useDetailMeasure } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { SHORTCUT_INSTALL_URL } from "../lib/guide";
 import { supabase } from "../lib/supabase";
@@ -28,6 +29,7 @@ type Props = {
 
 export default function AutomationsScreen({ onBack, onOpenGuide }: Props) {
   const { palette } = useTheme();
+  const measure = useDetailMeasure();
 
   const [tokens, setTokens] = useState<IngestToken[]>([]);
   const [freshToken, setFreshToken] = useState<string | null>(null);
@@ -104,7 +106,7 @@ export default function AutomationsScreen({ onBack, onOpenGuide }: Props) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, measure]}>
         {/* Detto qui e non solo nel README: e' la schermata in cui uno decide
             se fidarsi dell'automazione, ed e' meglio che scopra il limite
             adesso invece che quando manca la bolletta della luce. */}

@@ -5,6 +5,7 @@ import { ChartCarousel, ChartPage } from "../components/ChartCarousel";
 import { GroupedBarChart } from "../components/GroupedBarChart";
 import { Icon } from "../components/Icon";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { useDetailMeasure } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, splitAmount } from "../lib/format";
 import {
@@ -35,6 +36,7 @@ export default function PersonDetailScreen({
   onBack,
 }: Props) {
   const { palette, dark } = useTheme();
+  const measure = useDetailMeasure();
   const [showAll, setShowAll] = useState(false);
 
   const mine = useMemo(
@@ -108,7 +110,7 @@ export default function PersonDetailScreen({
           </Text>
         </View>
 
-        <ScrollView contentContainerStyle={styles.content}>
+        <ScrollView contentContainerStyle={[styles.content, measure]}>
           <View>
             <View style={styles.totalRow}>
               <Text style={[styles.totalLabel, { color: palette.ink2 }]}>
