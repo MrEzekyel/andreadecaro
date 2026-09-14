@@ -34,7 +34,7 @@ function parseAmountInput(value: string): number | null {
 }
 
 export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
-  const { palette } = useTheme();
+  const { palette, dark } = useTheme();
   const { reload: reloadData } = useData();
 
   const [merchant, setMerchant] = useState("");
@@ -164,15 +164,30 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
       </View>
 
       {showDatePicker && (
-        <DateTimePicker
-          value={occurredAt}
-          mode="date"
-          display={Platform.OS === "ios" ? "inline" : "default"}
-          onChange={(_event, selected) => {
-            if (Platform.OS !== "ios") setShowDatePicker(false);
-            if (selected) setOccurredAt(selected);
-          }}
-        />
+        <>
+          <DateTimePicker
+            value={occurredAt}
+            mode="date"
+            themeVariant={dark ? "dark" : "light"}
+            display={Platform.OS === "ios" ? "inline" : "default"}
+            onChange={(_event, selected) => {
+              if (Platform.OS !== "ios") setShowDatePicker(false);
+              if (selected) setOccurredAt(selected);
+            }}
+          />
+          {/* Il calendario "inline" di iOS resta aperto finche' non lo si
+              chiude a mano: senza questo tasto non c'e' altro modo di
+              uscirne se non toccare fuori dal foglio. */}
+          {Platform.OS === "ios" && (
+            <TouchableOpacity
+              onPress={() => setShowDatePicker(false)}
+              style={styles.doneButton}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.doneText, { color: palette.accent }]}>Fatto</Text>
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
       <View>
@@ -240,6 +255,8 @@ const styles = StyleSheet.create({
     ...type.body,
   },
   inputButton: { justifyContent: "center" },
+  doneButton: { alignSelf: "flex-end", paddingVertical: 8, paddingHorizontal: 2 },
+  doneText: { ...type.bodyMedium, fontSize: 14.5 },
   button: {
     borderRadius: radius.button,
     paddingVertical: 14,

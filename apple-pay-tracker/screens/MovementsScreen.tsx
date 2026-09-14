@@ -371,7 +371,7 @@ function parseAmountInput(value: string): number | null {
  * l'aggiunta spese sulla stessa tabbar.
  */
 function IncomeList({ month }: { month: Date }) {
-  const { palette } = useTheme();
+  const { palette, dark } = useTheme();
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -569,15 +569,27 @@ function IncomeList({ month }: { month: Date }) {
         </TouchableOpacity>
 
         {showDatePicker && (
-          <DateTimePicker
-            value={occurredAt}
-            mode="date"
-            display={Platform.OS === "ios" ? "inline" : "default"}
-            onChange={(_event, selected) => {
-              if (Platform.OS !== "ios") setShowDatePicker(false);
-              if (selected) setOccurredAt(selected);
-            }}
-          />
+          <>
+            <DateTimePicker
+              value={occurredAt}
+              mode="date"
+              themeVariant={dark ? "dark" : "light"}
+              display={Platform.OS === "ios" ? "inline" : "default"}
+              onChange={(_event, selected) => {
+                if (Platform.OS !== "ios") setShowDatePicker(false);
+                if (selected) setOccurredAt(selected);
+              }}
+            />
+            {Platform.OS === "ios" && (
+              <TouchableOpacity
+                onPress={() => setShowDatePicker(false)}
+                style={styles.doneButton}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.doneText, { color: palette.good }]}>Fatto</Text>
+              </TouchableOpacity>
+            )}
+          </>
         )}
 
         <TextInput
@@ -699,6 +711,8 @@ const styles = StyleSheet.create({
     ...type.body,
   },
   inputButton: { justifyContent: "center" },
+  doneButton: { alignSelf: "flex-end", paddingVertical: 8, paddingHorizontal: 2 },
+  doneText: { ...type.bodyMedium, fontSize: 14.5 },
   button: { borderRadius: radius.button, paddingVertical: 14, alignItems: "center", marginTop: space.xs },
   buttonText: { ...type.bodyMedium, fontSize: 14.5 },
   ghost: { paddingVertical: 8, alignItems: "center" },

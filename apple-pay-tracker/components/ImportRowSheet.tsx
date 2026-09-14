@@ -54,7 +54,7 @@ export function ImportRowSheet({
   onRenameAll,
   quanteConQuestoNome,
 }: Props) {
-  const { palette } = useTheme();
+  const { palette, dark } = useTheme();
   const { people, reload } = useData();
 
   const [descrizione, setDescrizione] = useState("");
@@ -249,15 +249,27 @@ export function ImportRowSheet({
       </View>
 
       {mostraData && (
-        <DateTimePicker
-          value={data}
-          mode="date"
-          display={Platform.OS === "ios" ? "inline" : "default"}
-          onChange={(_evento, scelta) => {
-            if (Platform.OS !== "ios") setMostraData(false);
-            if (scelta) setData(scelta);
-          }}
-        />
+        <>
+          <DateTimePicker
+            value={data}
+            mode="date"
+            themeVariant={dark ? "dark" : "light"}
+            display={Platform.OS === "ios" ? "inline" : "default"}
+            onChange={(_evento, scelta) => {
+              if (Platform.OS !== "ios") setMostraData(false);
+              if (scelta) setData(scelta);
+            }}
+          />
+          {Platform.OS === "ios" && (
+            <TouchableOpacity
+              onPress={() => setMostraData(false)}
+              style={styles.doneButton}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.doneText, { color: palette.accent }]}>Fatto</Text>
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
       {direzione === "out" && (
@@ -421,6 +433,8 @@ const styles = StyleSheet.create({
     ...type.body,
   },
   inputButton: { justifyContent: "center" },
+  doneButton: { alignSelf: "flex-end", paddingVertical: 8, paddingHorizontal: 2 },
+  doneText: { ...type.bodyMedium, fontSize: 14.5 },
   raw: { ...type.small, lineHeight: 15, marginTop: 5 },
   motivi: { borderWidth: 1, borderRadius: radius.field, padding: 11, gap: 6 },
   motivo: { flexDirection: "row", alignItems: "flex-start", gap: 7 },
