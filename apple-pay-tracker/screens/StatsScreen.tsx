@@ -40,6 +40,7 @@ import {
   monthsBetween,
   paymentsIn,
   sameMonth,
+  WEEK_BAR_MIN_COLUMN_WIDTH,
 } from "../lib/aggregate";
 import { firstError } from "../lib/loadError";
 import { supabase } from "../lib/supabase";
@@ -590,9 +591,13 @@ export default function StatsScreen() {
       }));
   }, [payments]);
 
+  // Su schermo largo c'e' piu' spazio orizzontale: si mostrano piu'
+  // settimane in una volta invece di farle scorrere quasi subito. Il grado
+  // "mese" non cambia (8 e' gia' comodo su ogni larghezza).
+  const weekBucketLimit = wide ? 18 : 10;
   const buckets = useMemo(
-    () => bucketize(historyPool, grain, grain === "week" ? 10 : 8),
-    [historyPool, grain]
+    () => bucketize(historyPool, grain, grain === "week" ? weekBucketLimit : 8),
+    [historyPool, grain, weekBucketLimit]
   );
 
   const selected: Bucket | undefined =
@@ -693,6 +698,7 @@ export default function StatsScreen() {
             selectedKey={selected?.key ?? null}
             onSelect={(bucket) => setSelectedKey(bucket.key)}
             average={averageTotal}
+            minColumnWidth={grain === "week" ? WEEK_BAR_MIN_COLUMN_WIDTH : undefined}
           />
           {statPair(
             {
@@ -728,6 +734,7 @@ export default function StatsScreen() {
             selectedKey={selected?.key ?? null}
             onSelect={(bucket) => setSelectedKey(bucket.key)}
             average={averageCount}
+            minColumnWidth={grain === "week" ? WEEK_BAR_MIN_COLUMN_WIDTH : undefined}
           />
           {statPair(
             { label: "Spesa media", value: formatAmount(averagePerPayment) },

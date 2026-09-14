@@ -2,6 +2,16 @@ import { Payment } from "./types";
 
 export type Grain = "week" | "month";
 
+/**
+ * Colonna minima per una settimana nei grafici a barre.
+ *
+ * Sotto questa larghezza l'etichetta col range di date ("29/07 - 04/08") non
+ * ci sta piu'. Impostarla come `minColumnWidth` fa scorrere il grafico
+ * invece di comprimere le colonne: su schermo stretto ne restano visibili
+ * circa cinque alla volta, il resto si raggiunge scorrendo.
+ */
+export const WEEK_BAR_MIN_COLUMN_WIDTH = 68;
+
 export type Bucket = {
   key: string;
   label: string;
@@ -46,11 +56,26 @@ export function keyOf(date: Date, grain: Grain) {
   return `${anchor.getFullYear()}-${month}-${day}`;
 }
 
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/**
+ * "29/07 - 04/08": l'intervallo vero della settimana, non il nome del mese.
+ *
+ * Il mese da solo non basta a una settimana — puo' cominciare in un mese e
+ * finire nel successivo — e "29 lug" (solo il lunedi') lasciava indovinare
+ * dove finisse. Col range esplicito, e la colonna piu' larga fatta apposta
+ * per ospitarlo (`WEEK_BAR_MIN_COLUMN_WIDTH`), la colonna dice da sola quali
+ * sette giorni rappresenta.
+ */
+function weekRangeLabel(monday: Date) {
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  const fmt = (d: Date) => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
+  return `${fmt(monday)} - ${fmt(sunday)}`;
+}
+
 function labelOf(date: Date, grain: Grain) {
-  if (grain === "week") {
-    const start = startOfWeek(date);
-    return `${start.getDate()} ${MONTHS_SHORT[start.getMonth()]}`;
-  }
+  if (grain === "week") return weekRangeLabel(startOfWeek(date));
   return MONTHS_SHORT[date.getMonth()];
 }
 
