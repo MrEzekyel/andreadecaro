@@ -318,6 +318,73 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   non piena; l'URL del server sta in fondo, piccolo, etichettato "Se fai
   da te" — serve solo a chi si costruisce il comando da zero.
 
+## Schermi larghi (iPad in orizzontale)
+
+La soglia sta in `lib/layout.ts` (`useWideLayout`) e guarda **larghezza e
+altezza insieme**, non la sola larghezza: un telefono in orizzontale supera i
+900 px di larghezza ma ne lascia poco piu' di 400 di altezza, e li' due colonne
+peggiorerebbero le cose — il problema di quel formato e' l'altezza. Un iPad in
+verticale (834 px) resta a colonna singola di proposito: spezzarlo darebbe due
+colonne troppo magre perche' un grafico o un importo grande ci stiano dentro.
+
+- **La tabbar ruota e diventa un rail a sinistra** (`App.tsx`), stesso ordine
+  delle voci e stesso tasto centrale. In orizzontale l'altezza e' la risorsa
+  scarsa e una barra in fondo la consuma proprio dove serve al contenuto.
+- **`components/TwoColumns.tsx` regge la divisione.** Sul telefono non rende
+  nessun contenitore e restituisce i due gruppi cosi' come sono, quindi il
+  `gap` della schermata continua a spaziare le sezioni una per una e il layout
+  verticale non cambia di un pixel. La colonna sinistra e' larga
+  `LEFT_COLUMN` (440) fissi — a sinistra ci sono sempre gli stessi elementi,
+  tarati su quella misura — e tutta la larghezza in piu' va alla destra, dove
+  stanno grafici ed elenchi.
+- **`order` serve dove la divisione alterna le sezioni invece di tagliarle in
+  due.** In Investimenti e in Statistiche il grafico va a destra ma sul
+  telefono deve restare dov'e' sempre stato: senza quel parametro, affiancare
+  le colonne avrebbe riordinato anche la versione verticale — cioe' cambiato
+  una schermata che nessuno ha chiesto di cambiare. Quando si sposta una
+  sezione da una colonna all'altra, `order` va aggiornato di conseguenza o le
+  due viste divergono in silenzio.
+- **La divisione e' sempre stato a sinistra, lettura a destra**: l'importo
+  grande, i riquadri e i limiti da una parte; andamento, ripartizioni ed
+  elenchi dall'altra. Sono due domande diverse, ed e' il motivo per cui
+  affiancarle funziona invece di essere solo un riflusso.
+
+### I grafici seguono la larghezza che hanno
+
+`TrendChart`, `BarChart` e `MonthBars` avevano la larghezza del viewBox scritta
+nel file (320, 320, 128). Con `preserveAspectRatio` di default era **l'altezza**
+a decidere la scala, quindi su una scheda larga il grafico non si allargava:
+restava a grandezza naturale in mezzo al vuoto. E' il difetto che su iPad li
+faceva sembrare minuscoli, e per cui le due colonne da sole non sarebbero
+bastate.
+
+Ora la larghezza si misura con `onLayout` e il viewBox la segue, quindi il
+disegno e' sempre in scala 1:1 — le etichette restano nitide alla loro
+dimensione vera invece di essere ingrandite. `ScrubChart` si misurava gia' da
+se'. **Un grafico nuovo va scritto cosi' fin dall'inizio**: il confronto
+`if (measured > 0 && measured !== width)` prima di `setState` non e'
+pignoleria, senza si entra nel ciclo re-render → layout → re-render.
+
+### Le pagine di dettaglio
+
+Due trattamenti, secondo quanto contenuto ha la pagina:
+
+- **Dettaglio corto** (spesa, persona, titolo, gruppo, sottopagine di
+  Impostazioni): `useDetailMeasure()` vincola il contenuto a `DETAIL_MEASURE`
+  (620) e lo centra. Una pagina di righe etichetta-valore non guadagna niente
+  ad allargarsi: l'etichetta e il suo valore finirebbero ai due bordi opposti
+  dello schermo, con mezzo metro di vuoto in mezzo e l'occhio costretto a
+  ricucirli.
+- **Dettaglio ricco** (categoria, insegna): ha un grafico e un elenco, quindi
+  regge le due colonne come la Home.
+
+### Il carosello resta un carosello
+
+I due grafici a colonne di `ChartCarousel` (Quanto spendi / Quante volte) non
+vanno affiancati nemmeno dove lo spazio ci sarebbe: dimezzerebbe la larghezza
+proprio ai grafici che della larghezza hanno bisogno. Scelta di Andrea,
+guardando il confronto.
+
 ## Concetti chiave del dominio
 
 - `payments` = spese. `card_name` = metodo di pagamento (nome carta o
