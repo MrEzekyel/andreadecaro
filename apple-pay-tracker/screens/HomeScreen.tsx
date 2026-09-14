@@ -11,6 +11,7 @@ import {
 import { BalanceChart, BalancePoint } from "../components/BalanceChart";
 import { CategoryDonut, DonutSlice } from "../components/CategoryDonut";
 import { CategoryLimitRow } from "../components/CategoryLimitRow";
+import { EditIncomeSheet } from "../components/EditIncomeSheet";
 import { useExplorer } from "../components/Explorer";
 import { FlowCompare } from "../components/FlowCompare";
 import { Icon } from "../components/Icon";
@@ -73,8 +74,21 @@ type MonthTotal = {
   investito: number;
 };
 
-/** Introito del mese, con la data che serve al saldo giorno per giorno. */
-type IncomeRow = { amount: number; label: string; occurred_at: string };
+/**
+ * Introito del mese, con la data che serve al saldo giorno per giorno.
+ *
+ * `id` e `note` non servono al saldo ne' all'anello per fonte, ma servono
+ * a `EditIncomeSheet`: senza, "Ultimi introiti" potrebbe mostrare le righe
+ * ma non aprirle in modifica, lo stesso gesto che gia' funziona in
+ * Movimenti (`IncomeList`).
+ */
+type IncomeRow = {
+  id: string;
+  amount: number;
+  label: string;
+  note: string | null;
+  occurred_at: string;
+};
 
 /** Acquisto eseguito nel mese: anche qui la data serve al saldo. */
 type InvestmentRow = { amount: number; occurred_at: string };
@@ -110,6 +124,11 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
 
   const [month, setMonth] = useState(() => new Date());
   const [pickerOpen, setPickerOpen] = useState(false);
+  // L'introito aperto in modifica dal tocco su "Ultimi introiti": stesso
+  // foglio (`EditIncomeSheet`) e stesso gesto che gia' funziona in
+  // Movimenti, non una pagina propria — la modifica non e' mai stata
+  // raggiungibile da qui prima d'ora.
+  const [editingIncome, setEditingIncome] = useState<IncomeRow | null>(null);
   const { payments, total, previousTotal, error, staleLabel, staleReason, reload } =
     usePayments(month);
   const {
@@ -200,7 +219,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     const [incomeResult, investResult] = await Promise.all([
       supabase
         .from("incomes")
-        .select("amount,label,occurred_at")
+        .select("id,amount,label,note,occurred_at")
         // I rimborsi restano in elenco ma **non** contano come introito: sono
         // denaro tornato indietro, non guadagnato. Contarli qui gonfia gli
         // introiti del mese e con loro l'avanzo, ed e' esattamente il numero
@@ -266,6 +285,15 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
   useEffect(() => {
     loadHistory();
   }, [loadHistory]);
+
+  // Dopo una modifica/eliminazione da "Ultimi introiti": il saldo e l'anello
+  // per fonte dipendono da `incomes` (`loadBalance`), ma un introito spostato
+  // di mese o corretto nell'importo cambia anche la barra di quel mese in
+  // "Entrate mese per mese" (`loadHistory`, aggregata nel database) — senza
+  // ricaricarla resterebbe la vecchia cifra finche' non si tira giu' a mano.
+  const reloadIncomes = useCallback(async () => {
+    await Promise.all([loadBalance(), loadHistory()]);
+  }, [loadBalance, loadHistory]);
 
   const monthlyIncome = useMemo(
     () => incomes.reduce((sum, row) => sum + Number(row.amount), 0),
@@ -1476,10 +1504,12 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                     <Text style={[styles.label, { color: palette.ink3 }]}>
                       Ultimi introiti
                     </Text>
-                    {recentIncomes.map((income, index) => (
-                      <View
-                        key={`${income.occurred_at}-${income.label}-${index}`}
+                    {recentIncomes.map((income) => (
+                      <TouchableOpacity
+                        key={income.id}
                         style={[styles.incomeRow, { borderBottomColor: palette.hairline }]}
+                        onPress={() => setEditingIncome(income)}
+                        accessibilityRole="button"
                       >
                         <View style={{ flex: 1 }}>
                           <Text
@@ -1495,7 +1525,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                         <Text style={[styles.incomeAmount, { color: palette.good }]}>
                           +{formatAmount(Number(income.amount))}
                         </Text>
-                      </View>
+                      </TouchableOpacity>
                     ))}
                   </View>
                 )}
@@ -1510,6 +1540,12 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
         value={month}
         onSelect={setMonth}
         onClose={() => setPickerOpen(false)}
+      />
+
+      <EditIncomeSheet
+        income={editingIncome}
+        onClose={() => setEditingIncome(null)}
+        onSaved={reloadIncomes}
       />
 
       {explorer.overlay}
