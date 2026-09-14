@@ -23,7 +23,7 @@ type Props = {
 
 export function PaymentRow({ payment, category, onPress, exactName }: Props) {
   const { palette, dark } = useTheme();
-  const { brandLabel } = useData();
+  const { brandLabel, personById } = useData();
 
   // In elenco si legge l'insegna: "McDonald's" tre volte in una settimana
   // dice qualcosa, "McDonald's Cristoforo Col" ripetuto con tre code diverse
@@ -49,8 +49,27 @@ export function PaymentRow({ payment, category, onPress, exactName }: Props) {
   const splits = payment.payment_splits;
   const isSettled =
     isSplit && !!splits && splits.length > 0 && splits.every((s) => s.settled_at);
-  const statusLabel = isSettled ? "Saldato" : "In attesa";
-  const statusColor = isSettled ? palette.good : palette.ink3;
+  // Verde se saldata, arancione (l'accento dell'app) se no: lo stesso verso
+  // di colore usato ovunque nell'app per "aperto"/"chiuso" sul denaro.
+  const statusColor = isSettled ? palette.good : palette.accent;
+  // Con CHI si divide dice di piu' di SE: "In attesa"/"Saldato" da solo non
+  // permette di riconoscere la spesa a colpo d'occhio in un elenco con piu'
+  // spese divise. Una sola persona -> il suo nome; piu' di una -> la prima
+  // "e altri N", perche' un elenco di nomi in una riga stretta non ci sta.
+  // Il fallback generico resta per quando i nomi non sono arrivati (query
+  // che non ha richiesto il join, o spesa senza righe di quota lette).
+  const splitPeople = splits ?? [];
+  const statusLabel =
+    splitPeople.length === 0
+      ? isSettled
+        ? "Saldato"
+        : "In attesa"
+      : splitPeople.length === 1
+        ? (personById(splitPeople[0].person_id)?.name ?? "—")
+        : `${personById(splitPeople[0].person_id)?.name ?? "—"} e altri ${splitPeople.length - 1}`;
+  // Frase a parte per il lettore di schermo: `statusLabel` puo' essere un
+  // nome proprio ("Leonardo"), e "divisione leonardo" non si capirebbe.
+  const splitAccessibility = isSettled ? "saldata" : "ancora da saldare";
 
   return (
     <TouchableOpacity
@@ -59,7 +78,7 @@ export function PaymentRow({ payment, category, onPress, exactName }: Props) {
       accessibilityRole="button"
       accessibilityLabel={`${name}, ${formatAmount(
         payment.effective_amount
-      )}${isSplit ? ` su ${formatAmount(payment.amount)} totali, divisione ${statusLabel.toLowerCase()}` : ""}, ${categoryName}`}
+      )}${isSplit ? ` su ${formatAmount(payment.amount)} totali, divisione ${splitAccessibility}` : ""}, ${categoryName}`}
     >
       <View style={[styles.icon, { backgroundColor: tint(color, dark) }]}>
         <Icon name={iconName} size={17} color={color} />

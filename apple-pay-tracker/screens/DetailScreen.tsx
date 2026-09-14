@@ -116,7 +116,7 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
       .from("payments")
       // Vedi il commento in `usePayments.load`: serve il join disambiguato
       // per via del secondo riferimento a `payments` da `mirror_payment_id`.
-      .select("*, payment_splits!payment_splits_payment_id_fkey(settled_at)")
+      .select("*, payment_splits!payment_splits_payment_id_fkey(settled_at, person_id)")
       .order("occurred_at", { ascending: false });
 
     if (target.kind === "merchant") {

@@ -333,6 +333,7 @@ export function ImportGroupSheet({
           await reload();
           applica((d) => ({ ...d, personaId: persona.id }));
         }}
+        dim
       />
     </Sheet>
   );

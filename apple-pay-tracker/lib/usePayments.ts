@@ -86,9 +86,9 @@ export function usePayments(month: Date) {
         // (migrazione 0038) da' a `payment_splits` un secondo riferimento a
         // `payments`, e senza dire quale usare PostgREST rifiuta la
         // richiesta invece di indovinare — stesso caso gia' visto in
-        // `OwedScreen.load`. Serve solo `settled_at`: e' la riga (aperta o
-        // saldata) che decide "In attesa"/"Saldato" in `PaymentRow`.
-        .select("*, payment_splits!payment_splits_payment_id_fkey(settled_at)")
+        // `OwedScreen.load`. `settled_at` decide il colore in `PaymentRow`,
+        // `person_id` il nome da mostrare al posto di "In attesa"/"Saldato".
+        .select("*, payment_splits!payment_splits_payment_id_fkey(settled_at, person_id)")
         .gte("occurred_at", start.toISOString())
         .lt("occurred_at", end.toISOString())
         .order("occurred_at", { ascending: false }),

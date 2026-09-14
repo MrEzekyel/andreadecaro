@@ -20,6 +20,13 @@ import { CardPicker } from "./CardPicker";
 import { CategoryPicker } from "./CategoryPicker";
 import { MerchantPicker } from "./MerchantPicker";
 import { Sheet } from "./Sheet";
+import {
+  computeSplit,
+  emptySplit,
+  settledOnInsertIds,
+  SplitEditor,
+  SplitState,
+} from "./SplitEditor";
 
 type Props = {
   visible: boolean;
@@ -35,7 +42,7 @@ function parseAmountInput(value: string): number | null {
 
 export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
   const { palette, dark } = useTheme();
-  const { reload: reloadData } = useData();
+  const { people, reload: reloadData } = useData();
 
   const [merchant, setMerchant] = useState("");
   const [amount, setAmount] = useState("");
@@ -49,6 +56,7 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
   const [occurredAt, setOccurredAt] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [split, setSplit] = useState<SplitState>(emptySplit);
 
   function reset() {
     setMerchant("");
@@ -58,6 +66,7 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
     setCategoryTouched(false);
     setCard("");
     setOccurredAt(new Date());
+    setSplit(emptySplit);
   }
 
   async function save() {
@@ -68,6 +77,15 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
     }
     if (!merchant.trim()) {
       Alert.alert("Esercente mancante", "Inserisci il nome dell'esercente.");
+      return;
+    }
+
+    const splitResult = computeSplit(parsedAmount, split);
+    if (!splitResult.valid) {
+      Alert.alert(
+        "Quote troppo alte",
+        "La somma delle quote altrui supera il totale pagato."
+      );
       return;
     }
 
@@ -83,27 +101,64 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
 
     const resolved = await resolveMerchant(userId, merchant);
 
-    const { error } = await supabase.from("payments").insert({
-      user_id: userId,
-      amount: parsedAmount,
-      merchant_raw: merchant.trim(),
-      merchant_name: merchant.trim(),
-      merchant_id: resolved?.merchant_id ?? null,
-      // Se non scegli una categoria, eredita quella gia' ricordata
-      // per questo esercente — o per la sua insegna.
-      category_id: categoryId ?? resolved?.effective_category_id ?? null,
-      occurred_at: occurredAt.toISOString(),
-      note: note.trim() || null,
-      card_name: card.trim() || null,
-      source: "manual",
-    });
+    const { data: inserted, error } = await supabase
+      .from("payments")
+      .insert({
+        user_id: userId,
+        amount: parsedAmount,
+        merchant_raw: merchant.trim(),
+        merchant_name: merchant.trim(),
+        merchant_id: resolved?.merchant_id ?? null,
+        // Se non scegli una categoria, eredita quella gia' ricordata
+        // per questo esercente — o per la sua insegna.
+        category_id: categoryId ?? resolved?.effective_category_id ?? null,
+        occurred_at: occurredAt.toISOString(),
+        note: note.trim() || null,
+        card_name: card.trim() || null,
+        source: "manual",
+        // "Divisa" vuole almeno una persona: attivare l'interruttore senza
+        // sceglierne una non deve marcare la spesa come divisa con nessuno.
+        my_share:
+          split.enabled && split.personIds.length > 0 ? splitResult.myShare : null,
+      })
+      .select("id")
+      .single();
 
-    setSaving(false);
-
-    if (error) {
-      Alert.alert("Errore", error.message);
+    if (error || !inserted) {
+      setSaving(false);
+      Alert.alert("Errore", error?.message ?? "Salvataggio non riuscito.");
       return;
     }
+
+    // Le quote nascono insieme alla spesa, non in un secondo passaggio: ogni
+    // riga e' per forza nuova, quindi qui e' un semplice insert — nessuna
+    // quota preesistente da preservare come in `EditPaymentSheet`.
+    if (split.enabled && split.personIds.length > 0) {
+      const settleNow = settledOnInsertIds(split, people);
+      const { error: splitError } = await supabase.from("payment_splits").insert(
+        split.personIds.map((personId) => ({
+          payment_id: inserted.id,
+          person_id: personId,
+          amount_owed: splitResult.owed[personId] ?? 0,
+          settled_at: settleNow.has(personId) ? new Date().toISOString() : null,
+        }))
+      );
+
+      if (splitError) {
+        setSaving(false);
+        Alert.alert(
+          "Spesa salvata, ma non la divisione",
+          `Le quote non sono state registrate: ${splitError.message}`
+        );
+        reloadData();
+        reset();
+        onSaved();
+        onClose();
+        return;
+      }
+    }
+
+    setSaving(false);
 
     // Un esercente nuovo deve comparire fra i suggerimenti del foglio
     // successivo senza chiudere e riaprire l'app.
@@ -225,6 +280,17 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
               color: palette.ink,
             },
           ]}
+        />
+      </View>
+
+      <View>
+        <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>
+          Divisione
+        </Text>
+        <SplitEditor
+          total={parseAmountInput(amount) ?? 0}
+          split={split}
+          onChange={setSplit}
         />
       </View>
 

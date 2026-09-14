@@ -6,6 +6,9 @@ type IconProps = {
   size?: number;
   color: string;
   strokeWidth?: number;
+  /** Riempimento dell'icona — usato per uno stato "attivo" (es. il preferito
+   *  nel selettore di divisione), non necessario altrove. */
+  fill?: string;
 };
 
 function toPascalCase(slug: string) {
@@ -24,10 +27,15 @@ function toPascalCase(slug: string) {
  *
  * Lo spessore predefinito e' 1.75, allineato ai pesi tipografici del sistema.
  */
-export function Icon({ name, size = 20, color, strokeWidth = 1.75 }: IconProps) {
+export function Icon({ name, size = 20, color, strokeWidth = 1.75, fill }: IconProps) {
   const registry = Lucide as unknown as Record<
     string,
-    React.ComponentType<{ size?: number; color?: string; strokeWidth?: number }>
+    React.ComponentType<{
+      size?: number;
+      color?: string;
+      strokeWidth?: number;
+      fill?: string;
+    }>
   >;
 
   const Component =
@@ -35,5 +43,5 @@ export function Icon({ name, size = 20, color, strokeWidth = 1.75 }: IconProps) 
 
   if (!Component) return null;
 
-  return <Component size={size} color={color} strokeWidth={strokeWidth} />;
+  return <Component size={size} color={color} strokeWidth={strokeWidth} fill={fill} />;
 }
