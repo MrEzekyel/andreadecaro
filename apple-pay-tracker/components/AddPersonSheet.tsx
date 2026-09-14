@@ -22,6 +22,10 @@ type Props = {
   /** Chiamata solo quando nasce una persona subito utilizzabile — mai per
    *  una richiesta di amicizia, che resta in sospeso fino all'accettazione. */
   onCreated: (person: Person) => void;
+  /** Vero quando questo foglio si apre sopra un altro foglio (es. dentro
+   *  `SplitPeopleSheet`, `ImportRowSheet`, `ImportGroupSheet`): vela cio' che
+   *  sta sotto, altrimenti si vedono due intestazioni impilate. */
+  dim?: boolean;
 };
 
 /**
@@ -35,7 +39,7 @@ type Props = {
  * che va accettata prima di comparire in elenco — non si puo' scegliere
  * per la spesa che si sta salvando adesso.
  */
-export function AddPersonSheet({ visible, onClose, onCreated }: Props) {
+export function AddPersonSheet({ visible, onClose, onCreated, dim }: Props) {
   const { palette, dark } = useTheme();
   const [tab, setTab] = useState<"name" | "tag">("name");
 
@@ -116,7 +120,7 @@ export function AddPersonSheet({ visible, onClose, onCreated }: Props) {
   }
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="Nuova persona">
+    <Sheet visible={visible} onClose={onClose} title="Nuova persona" dim={dim}>
       <View style={[styles.segment, { backgroundColor: palette.surface2 }]}>
         {[
           { value: "name" as const, label: "Nome" },

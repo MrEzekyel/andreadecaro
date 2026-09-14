@@ -418,6 +418,7 @@ export function ImportRowSheet({
           await reload();
           setPersonaId(persona.id);
         }}
+        dim
       />
     </Sheet>
   );
