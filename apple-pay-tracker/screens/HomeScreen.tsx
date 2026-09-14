@@ -133,7 +133,6 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     usePayments(month);
   const {
     monthlyOverall,
-    weeklyOverall,
     categoryLimits,
     alerts,
     goal,
@@ -401,18 +400,6 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     }
     return points;
   }, [payments, daysInMonth, elapsedDays, isFixedCost, fixedCostsTotal]);
-
-  /** Indici (0-based) dei lunedi' del mese mostrato, escluso il primo giorno
-   *  del grafico stesso: sono dove il limite settimanale sul totale si
-   *  rinnova, quindi dove "Andamento" disegna la sua linea verticale. */
-  const weekBoundaries = useMemo(() => {
-    const indexes: number[] = [];
-    for (let day = 2; day <= daysInMonth; day++) {
-      const weekday = new Date(month.getFullYear(), month.getMonth(), day).getDay();
-      if (weekday === 1) indexes.push(day - 1);
-    }
-    return indexes;
-  }, [month, daysInMonth]);
 
   /**
    * Saldo del mese: sale a ogni introito, scende a ogni spesa e a ogni
@@ -1241,12 +1228,6 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                       }
                       baseline={fixedCostsTotal}
                       color={palette.accent}
-                      weekBoundaries={
-                        viewingCurrentMonth && weeklyOverall ? weekBoundaries : []
-                      }
-                      weeklyLimit={
-                        weeklyOverall ? Number(weeklyOverall.limit.amount) : null
-                      }
                     />
                     {merchantsUnknown && (
                       <Text style={[styles.chartNote, { color: palette.ink3 }]}>
