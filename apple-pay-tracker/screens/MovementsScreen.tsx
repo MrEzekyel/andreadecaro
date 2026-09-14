@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  Alert,
   RefreshControl,
   ScrollView,
   SectionList,
@@ -12,10 +11,10 @@ import {
 } from "react-native";
 import { useExplorer } from "../components/Explorer";
 import ImportScreen from "./ImportScreen";
+import { EditIncomeSheet } from "../components/EditIncomeSheet";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { ScreenHeader } from "../components/ScreenHeader";
-import { Sheet } from "../components/Sheet";
 import { StaleNote } from "../components/StaleNote";
 import { PaymentRow } from "../components/PaymentRow";
 import { useData } from "../lib/DataContext";
@@ -24,7 +23,6 @@ import {
   dayKey,
   dayLabel,
   formatAmount,
-  formatDate,
   monthName,
   shortDateTime,
 } from "../lib/format";
@@ -32,8 +30,6 @@ import { supabase } from "../lib/supabase";
 import { categoryColor, radius, space, tint, type } from "../lib/theme";
 import { Income, Payment } from "../lib/types";
 import { monthRange, usePayments } from "../lib/usePayments";
-import DateTimePicker from "@react-native-community/datetimepicker";
-import { Platform } from "react-native";
 import { MoneyMode } from "../lib/moneyMode";
 
 type Props = {
@@ -357,11 +353,6 @@ function ExpensesList({
   );
 }
 
-function parseAmountInput(value: string): number | null {
-  const parsed = Number(value.replace(",", ".").trim());
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
-}
-
 /**
  * L'elenco introiti, con modifica/eliminazione al tocco sulla riga.
  *
@@ -376,13 +367,7 @@ function IncomeList({ month }: { month: Date }) {
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
 
-  const [sheet, setSheet] = useState(false);
   const [editing, setEditing] = useState<Income | null>(null);
-  const [label, setLabel] = useState("");
-  const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
-  const [occurredAt, setOccurredAt] = useState(new Date());
-  const [showDatePicker, setShowDatePicker] = useState(false);
 
   const load = useCallback(async () => {
     const { start, end } = monthRange(month);
@@ -407,68 +392,6 @@ function IncomeList({ month }: { month: Date }) {
   }
 
   const total = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
-
-  function openEdit(income: Income) {
-    setEditing(income);
-    setLabel(income.label);
-    setAmount(String(income.amount).replace(".", ","));
-    setNote(income.note ?? "");
-    setOccurredAt(new Date(income.occurred_at));
-    setSheet(true);
-  }
-
-  async function save() {
-    if (!editing) return;
-    const parsed = parseAmountInput(amount);
-    if (!label.trim()) {
-      Alert.alert("Nome mancante", "Dai un nome all'introito.");
-      return;
-    }
-    if (parsed === null) {
-      Alert.alert("Importo non valido", "Inserisci un importo maggiore di zero.");
-      return;
-    }
-
-    const { error: failure } = await supabase
-      .from("incomes")
-      .update({
-        label: label.trim(),
-        amount: parsed,
-        note: note.trim() || null,
-        occurred_at: occurredAt.toISOString(),
-      })
-      .eq("id", editing.id);
-
-    if (failure) {
-      Alert.alert("Errore", failure.message);
-      return;
-    }
-
-    setSheet(false);
-    await load();
-  }
-
-  function confirmDelete(income: Income) {
-    Alert.alert(`Eliminare "${income.label}"?`, "L'operazione non è reversibile.", [
-      { text: "Annulla", style: "cancel" },
-      {
-        text: "Elimina",
-        style: "destructive",
-        onPress: async () => {
-          const { error: failure } = await supabase
-            .from("incomes")
-            .delete()
-            .eq("id", income.id);
-          if (failure) {
-            Alert.alert("Errore", failure.message);
-            return;
-          }
-          setSheet(false);
-          await load();
-        },
-      },
-    ]);
-  }
 
   return (
     <>
@@ -505,7 +428,8 @@ function IncomeList({ month }: { month: Date }) {
                 )}
                 <TouchableOpacity
                   style={styles.entryRow}
-                  onPress={() => openEdit(entry)}
+                  onPress={() => setEditing(entry)}
+                  accessibilityRole="button"
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={[styles.entryLabel, { color: palette.ink }]}>
@@ -532,92 +456,11 @@ function IncomeList({ month }: { month: Date }) {
         )}
       </ScrollView>
 
-      <Sheet visible={sheet} onClose={() => setSheet(false)} title="Modifica introito">
-        <TextInput
-          value={label}
-          onChangeText={setLabel}
-          placeholder="Es. Stipendio"
-          placeholderTextColor={palette.ink3}
-          style={[
-            styles.input,
-            { backgroundColor: palette.surface, borderColor: palette.hairline, color: palette.ink },
-          ]}
-        />
-        <TextInput
-          value={amount}
-          onChangeText={setAmount}
-          keyboardType="decimal-pad"
-          placeholder="0,00"
-          placeholderTextColor={palette.ink3}
-          style={[
-            styles.input,
-            { backgroundColor: palette.surface, borderColor: palette.hairline, color: palette.ink },
-          ]}
-        />
-
-        <TouchableOpacity
-          onPress={() => setShowDatePicker(true)}
-          style={[
-            styles.input,
-            styles.inputButton,
-            { backgroundColor: palette.surface, borderColor: palette.hairline },
-          ]}
-        >
-          <Text style={{ color: palette.ink, ...type.body }}>
-            {formatDate(occurredAt.toISOString())}
-          </Text>
-        </TouchableOpacity>
-
-        {showDatePicker && (
-          <>
-            <DateTimePicker
-              value={occurredAt}
-              mode="date"
-              themeVariant={dark ? "dark" : "light"}
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              onChange={(_event, selected) => {
-                if (Platform.OS !== "ios") setShowDatePicker(false);
-                if (selected) setOccurredAt(selected);
-              }}
-            />
-            {Platform.OS === "ios" && (
-              <TouchableOpacity
-                onPress={() => setShowDatePicker(false)}
-                style={styles.doneButton}
-                accessibilityRole="button"
-              >
-                <Text style={[styles.doneText, { color: palette.good }]}>Fatto</Text>
-              </TouchableOpacity>
-            )}
-          </>
-        )}
-
-        <TextInput
-          value={note}
-          onChangeText={setNote}
-          placeholder="Nota facoltativa"
-          placeholderTextColor={palette.ink3}
-          style={[
-            styles.input,
-            { backgroundColor: palette.surface, borderColor: palette.hairline, color: palette.ink },
-          ]}
-        />
-
-        <TouchableOpacity
-          style={[styles.button, { backgroundColor: palette.good }]}
-          onPress={save}
-        >
-          <Text style={[styles.buttonText, { color: palette.onAccent }]}>Salva</Text>
-        </TouchableOpacity>
-
-        {editing && (
-          <TouchableOpacity style={styles.ghost} onPress={() => confirmDelete(editing)}>
-            <Text style={[styles.ghostText, { color: palette.over }]}>
-              Elimina introito
-            </Text>
-          </TouchableOpacity>
-        )}
-      </Sheet>
+      <EditIncomeSheet
+        income={editing}
+        onClose={() => setEditing(null)}
+        onSaved={load}
+      />
     </>
   );
 }
@@ -703,18 +546,4 @@ const styles = StyleSheet.create({
   entryLabel: { ...type.body },
   entryMeta: { ...type.small, marginTop: 2 },
   entryAmount: { ...type.amount, fontVariant: ["tabular-nums"] },
-  input: {
-    borderWidth: 1,
-    borderRadius: radius.field,
-    paddingHorizontal: 13,
-    paddingVertical: 12,
-    ...type.body,
-  },
-  inputButton: { justifyContent: "center" },
-  doneButton: { alignSelf: "flex-end", paddingVertical: 8, paddingHorizontal: 2 },
-  doneText: { ...type.bodyMedium, fontSize: 14.5 },
-  button: { borderRadius: radius.button, paddingVertical: 14, alignItems: "center", marginTop: space.xs },
-  buttonText: { ...type.bodyMedium, fontSize: 14.5 },
-  ghost: { paddingVertical: 8, alignItems: "center" },
-  ghostText: { ...type.body },
 });
