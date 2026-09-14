@@ -913,11 +913,14 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                           const category = categoryById(status.limit.category_id);
                           if (!category) return null;
                           return (
-                            <CategoryLimitRow
+                            <TouchableOpacity
                               key={status.limit.id}
-                              status={status}
-                              category={category}
-                            />
+                              onPress={() => openSettings("limits")}
+                              accessibilityRole="button"
+                              accessibilityLabel={`Limite ${category.name}, apri Limiti`}
+                            >
+                              <CategoryLimitRow status={status} category={category} />
+                            </TouchableOpacity>
                           );
                         })}
                       </View>
