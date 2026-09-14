@@ -26,6 +26,7 @@ import {
   monthName,
   shortDateTime,
 } from "../lib/format";
+import { useScrollRestoration } from "../lib/scrollRestoration";
 import { supabase } from "../lib/supabase";
 import { categoryColor, radius, space, tint, type } from "../lib/theme";
 import { Income, Payment } from "../lib/types";
@@ -153,6 +154,7 @@ function ExpensesList({
   const { payments, error, staleLabel, staleReason, reload } = usePayments(month);
   const [refreshing, setRefreshing] = useState(false);
   const explorer = useExplorer(reload);
+  const scrollRestoration = useScrollRestoration("movements-expenses");
 
   const [query, setQuery] = useState("");
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
@@ -311,6 +313,10 @@ function ExpensesList({
       </View>
 
       <SectionList
+        ref={scrollRestoration.ref}
+        onScroll={scrollRestoration.onScroll}
+        onContentSizeChange={scrollRestoration.onContentSizeChange}
+        scrollEventThrottle={scrollRestoration.scrollEventThrottle}
         sections={sections}
         keyExtractor={(item) => item.id}
         stickySectionHeadersEnabled={false}
@@ -366,6 +372,7 @@ function IncomeList({ month }: { month: Date }) {
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const scrollRestoration = useScrollRestoration("movements-income");
 
   const [editing, setEditing] = useState<Income | null>(null);
 
@@ -396,6 +403,10 @@ function IncomeList({ month }: { month: Date }) {
   return (
     <>
       <ScrollView
+        ref={scrollRestoration.ref}
+        onScroll={scrollRestoration.onScroll}
+        onContentSizeChange={scrollRestoration.onContentSizeChange}
+        scrollEventThrottle={scrollRestoration.scrollEventThrottle}
         contentContainerStyle={styles.list}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

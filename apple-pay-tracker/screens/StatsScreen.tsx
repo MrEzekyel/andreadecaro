@@ -22,6 +22,7 @@ import { ScreenHeader } from "../components/ScreenHeader";
 import { TrendChart, TrendPoint } from "../components/TrendChart";
 import { useData } from "../lib/DataContext";
 import { useWideLayout } from "../lib/layout";
+import { useScrollRestoration } from "../lib/scrollRestoration";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, splitAmount } from "../lib/format";
 import {
@@ -140,6 +141,7 @@ function rankByBrand(
 export default function StatsScreen() {
   const { palette, dark } = useTheme();
   const wide = useWideLayout();
+  const scrollRestoration = useScrollRestoration("stats");
   // Gli esercenti arrivano da `DataContext`: la lettura di prima non era
   // paginata, e oltre le 1000 righe PostgREST tronca **senza errore** —
   // gli esercenti oltre il millesimo sarebbero spariti dalle classifiche
@@ -1181,6 +1183,10 @@ export default function StatsScreen() {
   );
   return (
     <ScrollView
+      ref={scrollRestoration.ref}
+      onScroll={scrollRestoration.onScroll}
+      onContentSizeChange={scrollRestoration.onContentSizeChange}
+      scrollEventThrottle={scrollRestoration.scrollEventThrottle}
       style={{ backgroundColor: palette.ground }}
       contentContainerStyle={[styles.content, wide && styles.contentWide]}
       refreshControl={
