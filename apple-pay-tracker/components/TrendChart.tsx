@@ -20,11 +20,13 @@ import { type } from "../lib/theme";
  */
 const FALLBACK_WIDTH = 320;
 /** Colonna riservata alle etichette dell'asse y. */
-const GUTTER = 30;
-const TOP = 10;
-const PLOT_H = 102;
+const GUTTER = 34;
+const TOP = 16;
+// Grafico piu' alto (era 102): con piu' spazio verticale l'andamento si
+// legge meglio, senza cambiare la tavolozza ne' il linguaggio visivo.
+const PLOT_H = 150;
 const BASE = TOP + PLOT_H;
-const AXIS_H = 15;
+const AXIS_H = 18;
 const HEIGHT = BASE + AXIS_H;
 
 export type TrendPoint = {
@@ -212,10 +214,10 @@ export function TrendChart({
                 opacity={0.7}
               />
               <SvgText
-                x={GUTTER - 6}
+                x={GUTTER - 7}
                 y={y + 3}
                 textAnchor="end"
-                fontSize={8}
+                fontSize={9}
                 fill={palette.ink3}
               >
                 {compactAmount(value)}
@@ -247,9 +249,9 @@ export function TrendChart({
             />
             <SvgText
               x={width}
-              y={Math.max(limitY - 4, 8)}
+              y={Math.max(limitY - 5, 9)}
               textAnchor="end"
-              fontSize={8}
+              fontSize={9}
               fill={palette.limit}
             >
               {`${limitLabel} ${formatAmount(limit as number)}`}
@@ -276,19 +278,21 @@ export function TrendChart({
           d={line}
           fill="none"
           stroke={color}
-          strokeWidth={2}
+          strokeWidth={2.6}
           strokeLinecap="round"
           strokeLinejoin="round"
         />
 
-        <Circle cx={last.x} cy={last.y} r={5} fill={palette.surface} />
-        <Circle cx={last.x} cy={last.y} r={3.2} fill={color} />
+        {/* Punto finale evidenziato, come in ScrubChart: e' "dove sei
+            adesso", il numero che conta di piu' su un grafico cumulato. */}
+        <Circle cx={last.x} cy={last.y} r={6.5} fill={palette.surface} />
+        <Circle cx={last.x} cy={last.y} r={4} fill={color} />
 
         {labelIndexes.map((index) => (
           <SvgText
             key={`x-${index}`}
             x={xOf(index)}
-            y={BASE + 11}
+            y={BASE + 13}
             textAnchor={
               index === 0
                 ? "start"
@@ -296,7 +300,7 @@ export function TrendChart({
                   ? "end"
                   : "middle"
             }
-            fontSize={8}
+            fontSize={9}
             fill={palette.ink3}
           >
             {points[index].label}

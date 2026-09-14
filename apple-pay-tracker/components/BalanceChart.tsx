@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, {
   Circle,
@@ -14,13 +14,22 @@ import { useTheme } from "../lib/ThemeContext";
 import { compactAmount, formatAmount } from "../lib/format";
 import { type } from "../lib/theme";
 
-const WIDTH = 320;
+/**
+ * Larghezza di ripiego per il primo fotogramma, prima che `onLayout` abbia
+ * detto quanto e' larga la scheda che ospita il grafico — stesso schema di
+ * TrendChart/BarChart/MonthBars: con un viewBox fisso e `preserveAspectRatio`
+ * di default e' l'altezza a decidere la scala, quindi su una scheda larga il
+ * grafico restava a grandezza naturale invece di allargarsi.
+ */
+const FALLBACK_WIDTH = 320;
 /** Fascia a sinistra per i valori dell'asse: senza, la scala resta indovinata. */
-const PAD_L = 30;
-const TOP = 16;
-const PLOT_H = 96;
+const PAD_L = 34;
+const TOP = 20;
+// Grafico piu' alto (era 96): l'andamento del saldo si legge meglio con piu'
+// spazio verticale, senza cambiare colori ne' tipografia.
+const PLOT_H = 148;
 const BASE = TOP + PLOT_H;
-const HEIGHT = BASE + 15;
+const HEIGHT = BASE + 18;
 
 export type BalancePoint = {
   /** Giorno del mese, 1-based. */
@@ -69,6 +78,13 @@ export function BalanceChart({
 }: Props) {
   const { palette } = useTheme();
 
+  /**
+   * Il viewBox segue la larghezza vera del contenitore invece di restare
+   * fisso — stesso motivo di TrendChart/BarChart: senza, su una scheda larga
+   * (iPad, colonna destra) il grafico restava piccolo in mezzo al vuoto.
+   */
+  const [width, setWidth] = useState(FALLBACK_WIDTH);
+
   if (points.length < 2) {
     return <Text style={[styles.empty, { color: palette.ink3 }]}>{empty}</Text>;
   }
@@ -95,7 +111,7 @@ export function BalanceChart({
   const peak = trueMax;
   const span = Math.max(peak - floor, 1);
 
-  const plotW = WIDTH - PAD_L;
+  const plotW = width - PAD_L;
   const xOf = (day: number) =>
     PAD_L + ((day - 1) / Math.max(days - 1, 1)) * plotW;
   const yOf = (value: number) => BASE - ((value - floor) / span) * PLOT_H;
@@ -111,11 +127,17 @@ export function BalanceChart({
   const ticks = [floor, floor + span / 2, peak];
 
   return (
-    <View>
-      <Svg width="100%" height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`}>
+    <View
+      onLayout={(event) => {
+        const measured = Math.round(event.nativeEvent.layout.width);
+        // Il confronto evita il ciclo re-render -> layout -> re-render.
+        if (measured > 0 && measured !== width) setWidth(measured);
+      }}
+    >
+      <Svg width="100%" height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`}>
         <Defs>
           <LinearGradient id="balFill" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0%" stopColor={palette.good} stopOpacity="0.2" />
+            <Stop offset="0%" stopColor={palette.good} stopOpacity="0.22" />
             <Stop offset="100%" stopColor={palette.good} stopOpacity="0" />
           </LinearGradient>
         </Defs>
@@ -125,19 +147,19 @@ export function BalanceChart({
             <Line
               x1={PAD_L}
               y1={yOf(tick)}
-              x2={WIDTH}
+              x2={width}
               y2={yOf(tick)}
               stroke={palette.hairline}
               strokeWidth={1}
               opacity={index === 0 ? 1 : 0.55}
             />
             <SvgText
-              x={PAD_L - 4}
+              x={PAD_L - 7}
               // Il riferimento piu' basso sta sopra la sua riga e non sotto:
               // sotto finirebbe addosso ai giorni dell'asse orizzontale.
-              y={index === 0 ? yOf(tick) - 3 : yOf(tick) + 3}
+              y={index === 0 ? yOf(tick) - 4 : yOf(tick) + 3}
               textAnchor="end"
-              fontSize={8}
+              fontSize={9}
               fill={palette.ink3}
             >
               {/* `compactAmount(0)` e' vuoto apposta — sulle barre uno zero
@@ -152,7 +174,7 @@ export function BalanceChart({
           <Line
             x1={PAD_L}
             y1={zeroY}
-            x2={WIDTH}
+            x2={width}
             y2={zeroY}
             stroke={palette.over}
             strokeWidth={1}
@@ -166,7 +188,7 @@ export function BalanceChart({
           d={line}
           fill="none"
           stroke={palette.good}
-          strokeWidth={2.2}
+          strokeWidth={2.6}
           strokeLinejoin="round"
           strokeLinecap="round"
         />
@@ -175,12 +197,12 @@ export function BalanceChart({
           .filter((c) => c.income && c.income > 0)
           .map((c) => (
             <React.Fragment key={`in-${c.day}`}>
-              <Circle cx={c.x} cy={c.y} r={3.4} fill={palette.good} />
+              <Circle cx={c.x} cy={c.y} r={3.6} fill={palette.good} />
               <SvgText
-                x={Math.min(c.x + 4, WIDTH - 4)}
-                y={Math.max(c.y - 6, 9)}
-                textAnchor={c.x > WIDTH - 50 ? "end" : "start"}
-                fontSize={8}
+                x={Math.min(c.x + 5, width - 4)}
+                y={Math.max(c.y - 7, 10)}
+                textAnchor={c.x > width - 60 ? "end" : "start"}
+                fontSize={9}
                 fill={palette.good}
               >
                 {`+${compactAmount(c.income as number)}`}
@@ -192,12 +214,12 @@ export function BalanceChart({
           .filter((c) => c.invested && c.invested > 0)
           .map((c) => (
             <React.Fragment key={`inv-${c.day}`}>
-              <Circle cx={c.x} cy={c.y} r={3.4} fill={palette.invest} />
+              <Circle cx={c.x} cy={c.y} r={3.6} fill={palette.invest} />
               <SvgText
-                x={Math.min(c.x + 4, WIDTH - 4)}
-                y={Math.min(c.y + 12, BASE - 2)}
-                textAnchor={c.x > WIDTH - 50 ? "end" : "start"}
-                fontSize={8}
+                x={Math.min(c.x + 5, width - 4)}
+                y={Math.min(c.y + 14, BASE - 2)}
+                textAnchor={c.x > width - 60 ? "end" : "start"}
+                fontSize={9}
                 fill={palette.invest}
               >
                 {`−${compactAmount(c.invested as number)}`}
@@ -224,10 +246,10 @@ export function BalanceChart({
                 fill={palette.ink}
               />
               <SvgText
-                x={Math.min(c.x + 4, WIDTH - 4)}
-                y={Math.min(c.y + 18, BASE - 2)}
-                textAnchor={c.x > WIDTH - 50 ? "end" : "start"}
-                fontSize={8}
+                x={Math.min(c.x + 5, width - 4)}
+                y={Math.min(c.y + 22, BASE - 2)}
+                textAnchor={c.x > width - 60 ? "end" : "start"}
+                fontSize={9}
                 fill={palette.ink3}
               >
                 {`−${compactAmount(c.fixedCost as number)} fisso`}
@@ -235,17 +257,17 @@ export function BalanceChart({
             </React.Fragment>
           ))}
 
-        <Circle cx={last.x} cy={last.y} r={5} fill={palette.ground} />
-        <Circle cx={last.x} cy={last.y} r={3.4} fill={palette.good} />
+        <Circle cx={last.x} cy={last.y} r={6.5} fill={palette.ground} />
+        <Circle cx={last.x} cy={last.y} r={4} fill={palette.good} />
 
-        <SvgText x={PAD_L} y={BASE + 11} fontSize={8} fill={palette.ink3}>
+        <SvgText x={PAD_L} y={BASE + 13} fontSize={9} fill={palette.ink3}>
           1
         </SvgText>
         <SvgText
-          x={WIDTH}
-          y={BASE + 11}
+          x={width}
+          y={BASE + 13}
           textAnchor="end"
-          fontSize={8}
+          fontSize={9}
           fill={palette.ink3}
         >
           {String(days)}
