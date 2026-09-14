@@ -414,14 +414,20 @@ export default function StatsScreen() {
     setDonutMonthReady(true);
   }, [donutMonths.length]);
 
-  // Cambiare il mese principale in cima alla pagina sposta anche la
-  // ripartizione sullo stesso mese: due controlli che scelgono "il mese"
-  // indipendentemente sarebbero una fonte costante di disallineamento.
+  // Cambiare il periodo in cima alla pagina sposta anche la ripartizione sul
+  // mese che lo contiene: due controlli che scelgono "il mese" indipendente-
+  // mente sarebbero una fonte costante di disallineamento. Vale per tutti e
+  // tre i periodi (settimana/mese/anno), non solo per "Mese": una settimana
+  // sposta il mese quando scavalla un confine di calendario, un anno lo
+  // sposta a gennaio. `donutScope` resta una scelta indipendente (un mese
+  // alla volta o tutto lo storico e' una domanda diversa da "quale
+  // periodo"): questo effetto sposta solo quale mese la ghiera mostra
+  // quando lo scope e' "month", senza toccare la scelta dello scope stesso.
   useEffect(() => {
-    if (kind !== "month" || donutMonths.length === 0) return;
+    if (donutMonths.length === 0) return;
     const index = donutMonths.findIndex((m) => sameMonth(m, period.start));
     if (index !== -1) setDonutMonthIndex(index);
-  }, [kind, period, donutMonths]);
+  }, [period, donutMonths]);
 
   const donutPool = useMemo(() => {
     const scoped =
@@ -593,17 +599,20 @@ export default function StatsScreen() {
     buckets.find((bucket) => bucket.key === selectedKey) ??
     buckets[buckets.length - 1];
 
-  // Stessa sincronizzazione del mese principale, per il grafico a colonne:
-  // cambiare mese in cima alla pagina sposta anche la colonna selezionata,
-  // qualunque sia il grado (settimana/mese) scelto per quel grafico.
+  // Stessa sincronizzazione del periodo principale, per il grafico a
+  // colonne: cambiare periodo in cima alla pagina (frecce, swipe o il
+  // selettore Settimana/Mese/Anno) sposta anche la colonna selezionata,
+  // qualunque sia il grado (settimana/mese) scelto per quel grafico e
+  // qualunque sia il periodo scelto in cima — non solo "Mese" come prima.
+  // Il grado del grafico (`grain`) resta una scelta indipendente: e'
+  // "quanto fitto guardare il confronto", non "quale periodo e' aperto".
   useEffect(() => {
-    if (kind !== "month") return;
     const match = buckets.find((bucket) => {
       const { start, end } = bucketRange(bucket, grain);
       return period.start >= start && period.start < end;
     });
     if (match) setSelectedKey(match.key);
-  }, [kind, period, buckets, grain]);
+  }, [period, buckets, grain]);
 
   const selectedPayments = useMemo(
     () => (selected ? paymentsIn(historyPool, selected, grain) : []),
