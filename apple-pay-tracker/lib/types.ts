@@ -86,8 +86,9 @@ export type Payment = {
    * Le quote di questa spesa, quando la query le richiede esplicitamente
    * (join opzionale su `payment_splits`). `undefined` = non richieste,
    * `[]` = spesa non divisa: i chiamanti devono distinguere i due casi.
+   * `person_id` serve a `PaymentRow` per mostrare CON CHI, non solo SE.
    */
-  payment_splits?: { settled_at: string | null }[];
+  payment_splits?: { settled_at: string | null; person_id: string }[];
 };
 
 export type Person = {
