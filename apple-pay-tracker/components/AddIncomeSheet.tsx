@@ -14,6 +14,7 @@ import { useTheme } from "../lib/ThemeContext";
 import { formatDate } from "../lib/format";
 import { supabase } from "../lib/supabase";
 import { radius, space, type } from "../lib/theme";
+import { IncomeSourcePicker } from "./IncomeSourcePicker";
 import { Sheet } from "./Sheet";
 
 type Props = {
@@ -36,7 +37,7 @@ function parseAmountInput(value: string): number | null {
  * introito, di che mese) che qui non c'e' ancora.
  */
 export function AddIncomeSheet({ visible, onClose, onSaved }: Props) {
-  const { palette } = useTheme();
+  const { palette, dark } = useTheme();
 
   const [label, setLabel] = useState("");
   const [amount, setAmount] = useState("");
@@ -97,20 +98,7 @@ export function AddIncomeSheet({ visible, onClose, onSaved }: Props) {
     <Sheet visible={visible} onClose={onClose} title="Nuovo introito">
       <View>
         <Text style={[styles.fieldLabel, { color: palette.ink3 }]}>Nome</Text>
-        <TextInput
-          value={label}
-          onChangeText={setLabel}
-          placeholder="Es. Stipendio"
-          placeholderTextColor={palette.ink3}
-          style={[
-            styles.input,
-            {
-              backgroundColor: palette.surface,
-              borderColor: palette.hairline,
-              color: palette.ink,
-            },
-          ]}
-        />
+        <IncomeSourcePicker value={label} onChange={setLabel} />
       </View>
 
       <View>
@@ -149,15 +137,27 @@ export function AddIncomeSheet({ visible, onClose, onSaved }: Props) {
       </View>
 
       {showDatePicker && (
-        <DateTimePicker
-          value={occurredAt}
-          mode="date"
-          display={Platform.OS === "ios" ? "inline" : "default"}
-          onChange={(_event, selected) => {
-            if (Platform.OS !== "ios") setShowDatePicker(false);
-            if (selected) setOccurredAt(selected);
-          }}
-        />
+        <>
+          <DateTimePicker
+            value={occurredAt}
+            mode="date"
+            themeVariant={dark ? "dark" : "light"}
+            display={Platform.OS === "ios" ? "inline" : "default"}
+            onChange={(_event, selected) => {
+              if (Platform.OS !== "ios") setShowDatePicker(false);
+              if (selected) setOccurredAt(selected);
+            }}
+          />
+          {Platform.OS === "ios" && (
+            <TouchableOpacity
+              onPress={() => setShowDatePicker(false)}
+              style={styles.doneButton}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.doneText, { color: palette.good }]}>Fatto</Text>
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
       <View>
@@ -205,6 +205,8 @@ const styles = StyleSheet.create({
     ...type.body,
   },
   inputButton: { justifyContent: "center" },
+  doneButton: { alignSelf: "flex-end", paddingVertical: 8, paddingHorizontal: 2 },
+  doneText: { ...type.bodyMedium, fontSize: 14.5 },
   button: {
     borderRadius: radius.button,
     paddingVertical: 14,

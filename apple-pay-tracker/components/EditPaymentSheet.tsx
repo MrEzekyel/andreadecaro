@@ -417,15 +417,27 @@ export function EditPaymentSheet({
       </View>
 
       {showDatePicker && (
-        <DateTimePicker
-          value={occurredAt}
-          mode="date"
-          display={Platform.OS === "ios" ? "inline" : "default"}
-          onChange={(_event, selected) => {
-            if (Platform.OS !== "ios") setShowDatePicker(false);
-            if (selected) setOccurredAt(selected);
-          }}
-        />
+        <>
+          <DateTimePicker
+            value={occurredAt}
+            mode="date"
+            themeVariant={dark ? "dark" : "light"}
+            display={Platform.OS === "ios" ? "inline" : "default"}
+            onChange={(_event, selected) => {
+              if (Platform.OS !== "ios") setShowDatePicker(false);
+              if (selected) setOccurredAt(selected);
+            }}
+          />
+          {Platform.OS === "ios" && (
+            <TouchableOpacity
+              onPress={() => setShowDatePicker(false)}
+              style={styles.doneButton}
+              accessibilityRole="button"
+            >
+              <Text style={[styles.doneText, { color: palette.accent }]}>Fatto</Text>
+            </TouchableOpacity>
+          )}
+        </>
       )}
 
       <View>
@@ -571,6 +583,8 @@ const styles = StyleSheet.create({
     ...type.body,
   },
   inputButton: { justifyContent: "center" },
+  doneButton: { alignSelf: "flex-end", paddingVertical: 8, paddingHorizontal: 2 },
+  doneText: { ...type.bodyMedium, fontSize: 14.5 },
   ask: {
     borderRadius: radius.card,
     padding: 14,
