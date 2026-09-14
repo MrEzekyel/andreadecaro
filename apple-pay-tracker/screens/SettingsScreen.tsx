@@ -47,9 +47,16 @@ type Props = {
   initialPage?: SettingsPage;
   /** Cambia a ogni richiesta di apertura, anche verso la stessa pagina. */
   openNonce?: number;
+  /** Risale oltre la pagina d'ingresso: torna alla scheda da cui si e'
+   *  aperto Impostazioni (vedi `App.tsx` → `settingsOrigin`). */
+  onExit?: () => void;
 };
 
-export default function SettingsScreen({ initialPage = "root", openNonce }: Props) {
+export default function SettingsScreen({
+  initialPage = "root",
+  openNonce,
+  onExit,
+}: Props) {
   const { palette, preference, setPreference } = useTheme();
   const measure = useDetailMeasure();
   const { categories, people } = useData();
@@ -100,19 +107,41 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
           ? `${trialDaysLeft}g di prova`
           : "…";
 
-  const [page, setPage] = useState<SettingsPage>(initialPage);
+  // Pila delle sotto-pagine visitate dentro questa apertura di Impostazioni,
+  // radicata su `initialPage`. Non solo l'ultima pagina: se non si tenesse
+  // la strada fatta, "Indietro" da una pagina raggiunta navigando (es.
+  // Automazioni → Guida) non saprebbe dire se il passo precedente era
+  // un'altra sotto-pagina o la scheda da cui si e' aperto Impostazioni.
+  const [stack, setStack] = useState<SettingsPage[]>([initialPage]);
+  const page = stack[stack.length - 1];
 
   // Il nonce distingue "sono arrivato qui da un'altra scheda" da "sto
   // navigando dentro Impostazioni": senza, tornare indietro dalla pagina dei
-  // limiti la riaprirebbe subito.
+  // limiti la riaprirebbe subito. Ogni nuova apertura riparte da una pila
+  // fresca, anche se la pagina di destinazione e' la stessa di prima.
   useEffect(() => {
     if (openNonce === undefined) return;
-    setPage(initialPage);
+    setStack([initialPage]);
   }, [openNonce, initialPage]);
 
-  if (page !== "root") {
-    const back = () => setPage("root");
+  const push = (next: SettingsPage) =>
+    setStack((current) => [...current, next]);
 
+  // Un passo indietro dentro la pila (es. dalla Guida ad Automazioni). Sceso
+  // fino alla pagina d'ingresso, "Indietro" non ha piu' un gradino di
+  // Impostazioni sotto di se': se ci si e' arrivati direttamente da un'altra
+  // scheda (`initialPage !== "root"`, un ingresso laterale come "Prossimi
+  // addebiti" in Home) si esce verso quella scheda invece di cadere sulla
+  // radice di Impostazioni, che in quel percorso non e' mai stata vista.
+  const back = () => {
+    if (stack.length > 1) {
+      setStack((current) => current.slice(0, -1));
+      return;
+    }
+    if (page !== "root") onExit?.();
+  };
+
+  if (page !== "root") {
     // Ogni sottopagina passa dal boundary: se una cade, si vede il motivo e
     // si torna indietro, invece di restare davanti a una pagina vuota da cui
     // l'unica uscita e' chiudere l'app.
@@ -123,13 +152,13 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
       people: <OwedScreen onBack={back} />,
       profile: <FriendsScreen onBack={back} />,
       automations: (
-        <AutomationsScreen onBack={back} onOpenGuide={() => setPage("guide")} />
+        <AutomationsScreen onBack={back} onOpenGuide={() => push("guide")} />
       ),
       export: <ExportScreen onBack={back} />,
       subscription: <SubscriptionScreen onBack={back} />,
       referral: <ReferralScreen onBack={back} />,
       changelog: <ChangelogScreen onBack={back} />,
-      guide: <GuideScreen onBack={() => setPage("automations")} />,
+      guide: <GuideScreen onBack={back} />,
     }[page];
 
     return (
@@ -158,7 +187,7 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
           icon="circle-user-round"
           label="Profilo"
           value={profile?.display_name ?? profile?.handle ?? "…"}
-          onPress={() => setPage("profile")}
+          onPress={() => push("profile")}
         />
       </View>
 
@@ -235,7 +264,7 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
             icon="palette"
             label="Categorie"
             value={String(categories.length)}
-            onPress={() => setPage("categories")}
+            onPress={() => push("categories")}
           />
           <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
           <SettingRow
@@ -246,14 +275,14 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
                 ? "nessuno"
                 : `${statuses.length} attiv${statuses.length === 1 ? "o" : "i"}`
             }
-            onPress={() => setPage("limits")}
+            onPress={() => push("limits")}
           />
           <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
           <SettingRow
             icon="repeat"
             label="Spese ricorrenti"
             value="Gestisci"
-            onPress={() => setPage("recurring")}
+            onPress={() => push("recurring")}
           />
           <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
           <SettingRow
@@ -264,7 +293,7 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
                 ? "nessuno"
                 : `${people.length} ${people.length === 1 ? "persona" : "persone"}`
             }
-            onPress={() => setPage("people")}
+            onPress={() => push("people")}
           />
         </View>
       </View>
@@ -281,21 +310,21 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
             icon="crown"
             label="Abbonamento"
             value={subscriptionValue}
-            onPress={() => setPage("subscription")}
+            onPress={() => push("subscription")}
           />
           <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
           <SettingRow
             icon="gift"
             label="Invita un amico"
             value="Gestisci"
-            onPress={() => setPage("referral")}
+            onPress={() => push("referral")}
           />
           <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
           <SettingRow
             icon="zap"
             label="Automazioni"
             value="Gestisci"
-            onPress={() => setPage("automations")}
+            onPress={() => push("automations")}
           />
         </View>
       </View>
@@ -310,7 +339,7 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
           icon="file-down"
           label="Esporta i dati"
           value="CSV"
-          onPress={() => setPage("export")}
+          onPress={() => push("export")}
         />
         <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
         <SettingRow
@@ -318,7 +347,7 @@ export default function SettingsScreen({ initialPage = "root", openNonce }: Prop
           label="Novità"
           value={unread ? "" : "Cosa è cambiato"}
           badge={unread}
-          onPress={() => setPage("changelog")}
+          onPress={() => push("changelog")}
         />
       </View>
 

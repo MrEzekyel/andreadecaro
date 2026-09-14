@@ -31,6 +31,7 @@ import { SemiGauge } from "../components/SemiGauge";
 import { TrendChart, TrendPoint } from "../components/TrendChart";
 import { TwoColumns } from "../components/TwoColumns";
 import { useWideLayout } from "../lib/layout";
+import { useScrollRestoration } from "../lib/scrollRestoration";
 import { useChangelog } from "../lib/changelog";
 import { useData } from "../lib/DataContext";
 import { MoneyMode } from "../lib/moneyMode";
@@ -114,6 +115,7 @@ type Props = {
 export default function HomeScreen({ mode, onModeChange }: Props) {
   const { palette, dark } = useTheme();
   const wide = useWideLayout();
+  const scrollRestoration = useScrollRestoration("home");
   const { categoryById } = useData();
   const { openSettings, openAddIncome } = useNav();
   const { width: windowWidth } = useWindowDimensions();
@@ -692,6 +694,10 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
   return (
     <>
       <ScrollView
+        ref={scrollRestoration.ref}
+        onScroll={scrollRestoration.onScroll}
+        onContentSizeChange={scrollRestoration.onContentSizeChange}
+        scrollEventThrottle={scrollRestoration.scrollEventThrottle}
         style={{ backgroundColor: palette.ground }}
         contentContainerStyle={[styles.content, wide && styles.contentWide]}
         refreshControl={

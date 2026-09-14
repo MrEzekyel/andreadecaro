@@ -65,12 +65,31 @@ function Shell() {
   // Cambia a ogni richiesta di apertura, anche verso la stessa pagina: e' il
   // segnale che dice a Impostazioni "riapri", invece di restare dove sei.
   const [settingsNonce, setSettingsNonce] = useState(0);
+  // La scheda da cui si e' aperto Impostazioni (dal tasto ingranaggio o da
+  // un ingresso laterale come "Prossimi addebiti" in Home): e' dove il tasto
+  // Indietro deve tornare una volta risalita la sua sotto-pagina, invece di
+  // fermarsi alla radice di Impostazioni. Si aggiorna solo al primo ingresso
+  // (quando non si e' gia' su "settings"): una seconda `openSettings` mentre
+  // si e' gia' dentro Impostazioni non deve dimenticare da dove si era
+  // partiti davvero.
+  const [settingsOrigin, setSettingsOrigin] = useState<Tab>("home");
 
-  const openSettings = useCallback((page: SettingsPage) => {
-    setSettingsPage(page);
-    setSettingsNonce((value) => value + 1);
-    setTab("settings");
-  }, []);
+  const openSettings = useCallback(
+    (page: SettingsPage) => {
+      // Solo al primo ingresso: chiamata di nuovo mentre si e' gia' dentro
+      // Impostazioni (es. da una seconda card laterale) non deve sovrascrivere
+      // la scheda di partenza vera con "settings" stesso.
+      if (tab !== "settings") setSettingsOrigin(tab);
+      setSettingsPage(page);
+      setSettingsNonce((value) => value + 1);
+      setTab("settings");
+    },
+    [tab]
+  );
+
+  const exitSettings = useCallback(() => {
+    setTab(settingsOrigin);
+  }, [settingsOrigin]);
 
   const openAddIncome = useCallback(() => setAddingIncome(true), []);
 
@@ -173,7 +192,11 @@ function Shell() {
             {tab === "stats" && <StatsScreen />}
             {tab === "portfolio" && <PortfolioScreen addNonce={investmentNonce} />}
             {tab === "settings" && (
-              <SettingsScreen initialPage={settingsPage} openNonce={settingsNonce} />
+              <SettingsScreen
+                initialPage={settingsPage}
+                openNonce={settingsNonce}
+                onExit={exitSettings}
+              />
             )}
           </View>
 

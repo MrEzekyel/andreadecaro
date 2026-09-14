@@ -16,6 +16,7 @@ import { ScrubChart } from "../components/ScrubChart";
 import { StaleNote } from "../components/StaleNote";
 import { StatTiles } from "../components/StatTiles";
 import { useWideLayout } from "../lib/layout";
+import { useScrollRestoration } from "../lib/scrollRestoration";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, formatDate, splitAmount } from "../lib/format";
 import {
@@ -92,6 +93,7 @@ type Props = {
 export default function PortfolioScreen({ addNonce }: Props) {
   const { palette } = useTheme();
   const wide = useWideLayout();
+  const scrollRestoration = useScrollRestoration("portfolio");
   const portfolio = usePortfolio();
   const { positions, totals, series, annualReturn, rules, loading, error, staleLabel } =
     portfolio;
@@ -451,6 +453,10 @@ export default function PortfolioScreen({ addNonce }: Props) {
   return (
     <>
     <ScrollView
+      ref={scrollRestoration.ref}
+      onScroll={scrollRestoration.onScroll}
+      onContentSizeChange={scrollRestoration.onContentSizeChange}
+      scrollEventThrottle={scrollRestoration.scrollEventThrottle}
       style={{ backgroundColor: palette.ground }}
       contentContainerStyle={[styles.content, wide && styles.contentWide]}
       refreshControl={
