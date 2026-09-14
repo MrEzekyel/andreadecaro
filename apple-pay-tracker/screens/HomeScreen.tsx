@@ -28,6 +28,8 @@ import { PaymentRow } from "../components/PaymentRow";
 import { RecurringSummary, UpcomingRule } from "../components/RecurringSummary";
 import { SemiGauge } from "../components/SemiGauge";
 import { TrendChart, TrendPoint } from "../components/TrendChart";
+import { TwoColumns } from "../components/TwoColumns";
+import { useWideLayout } from "../lib/layout";
 import { useChangelog } from "../lib/changelog";
 import { useData } from "../lib/DataContext";
 import { MoneyMode } from "../lib/moneyMode";
@@ -97,6 +99,7 @@ type Props = {
 
 export default function HomeScreen({ mode, onModeChange }: Props) {
   const { palette, dark } = useTheme();
+  const wide = useWideLayout();
   const { categoryById } = useData();
   const { openSettings, openAddIncome } = useNav();
   const { width: windowWidth } = useWindowDimensions();
@@ -620,11 +623,52 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
         }
       : null;
 
+  /* Due letture dello stesso mese, non due schermate diverse: quanto e'
+     uscito e quanto e' entrato rispondono a domande opposte, e tenerle in
+     colonna una dopo l'altra faceva scorrere mezza Home per arrivare alla
+     seconda.
+
+     Su schermo largo sale nella riga del titolo: a tutta larghezza sarebbe
+     una pillola lunga mezzo schermo per scegliere fra due parole, e accanto
+     all'ingranaggio sta dove stanno gli altri comandi della schermata. */
+  const segControl = (
+    <View
+      style={[
+        styles.seg,
+        wide && styles.segWide,
+        { backgroundColor: palette.surface2 },
+      ]}
+    >
+      {(["uscite", "entrate"] as MoneyMode[]).map((value) => {
+        const on = mode === value;
+        return (
+          <TouchableOpacity
+            key={value}
+            style={[
+              styles.segItem,
+              wide && styles.segItemWide,
+              on && { backgroundColor: palette.ground },
+            ]}
+            onPress={() => onModeChange(value)}
+            accessibilityRole="button"
+            accessibilityState={{ selected: on }}
+          >
+            <Text
+              style={[styles.segText, { color: on ? palette.ink : palette.ink2 }]}
+            >
+              {value === "uscite" ? "Uscite" : "Entrate"}
+            </Text>
+          </TouchableOpacity>
+        );
+      })}
+    </View>
+  );
+
   return (
     <>
       <ScrollView
         style={{ backgroundColor: palette.ground }}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, wide && styles.contentWide]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -646,7 +690,10 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
             </Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
+          <View style={styles.headRight}>
+            {wide && segControl}
+
+            <TouchableOpacity
             onPress={() => openSettings("root")}
             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
             accessibilityRole="button"
@@ -661,36 +708,11 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
             {unreadNews && (
               <View style={[styles.newsDot, { borderColor: palette.ground, backgroundColor: palette.accent }]} />
             )}
-          </TouchableOpacity>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Due letture dello stesso mese, non due schermate diverse: quanto
-            e' uscito e quanto e' entrato rispondono a domande opposte, e
-            tenerle in colonna una dopo l'altra faceva scorrere mezza Home
-            per arrivare alla seconda. */}
-        <View style={[styles.seg, { backgroundColor: palette.surface2 }]}>
-          {(["uscite", "entrate"] as MoneyMode[]).map((value) => {
-            const on = mode === value;
-            return (
-              <TouchableOpacity
-                key={value}
-                style={[styles.segItem, on && { backgroundColor: palette.ground }]}
-                onPress={() => onModeChange(value)}
-                accessibilityRole="button"
-                accessibilityState={{ selected: on }}
-              >
-                <Text
-                  style={[
-                    styles.segText,
-                    { color: on ? palette.ink : palette.ink2 },
-                  ]}
-                >
-                  {value === "uscite" ? "Uscite" : "Entrate"}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
+        {!wide && segControl}
 
         {/* Due casi. Senza niente in memoria il totale direbbe "0,00 €" e
             sarebbe un'affermazione falsa: l'errore prende tutto il posto. Con
@@ -709,7 +731,9 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
             {staleLabel && <StaleNote label={staleLabel} reason={staleReason} onRetry={onRefresh} />}
 
             {mode === "uscite" ? (
-              <>
+              <TwoColumns
+                left={
+                  <>
                 {gauge !== null ? (
                   // Il semicerchio riempie la larghezza del contenuto invece
                   // di stare stretto in una riga: dice le stesse tre cose di
@@ -1165,7 +1189,10 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                     />
                   </View>
                 )}
-
+                  </>
+                }
+                right={
+                  <>
                 {trend.length > 1 && (
                   <View>
                     <Text style={[styles.label, { color: palette.ink3 }]}>
@@ -1257,7 +1284,9 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                     </TouchableOpacity>
                   </View>
                 )}
-              </>
+                  </>
+                }
+              />
             ) : (
               /* ---------------------------- ENTRATE ---------------------- */
               <>
@@ -1512,6 +1541,8 @@ function Stat({
 const styles = StyleSheet.create({
   chartNote: { ...type.small, fontSize: 10.5, lineHeight: 15, marginTop: space.sm },
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.xl },
+  // Col rail accanto, il margine di 16 stringeva troppo il contenuto.
+  contentWide: { padding: 24, paddingBottom: space.xxl },
   head: {
     flexDirection: "row",
     alignItems: "center",
@@ -1519,6 +1550,7 @@ const styles = StyleSheet.create({
     paddingVertical: space.sm,
   },
   headPair: { flexDirection: "row", alignItems: "baseline", gap: space.sm },
+  headRight: { flexDirection: "row", alignItems: "center", gap: space.xl },
   title: { ...type.title, fontSize: 27, letterSpacing: -0.3 },
   year: { ...type.body, fontWeight: "500" },
   label: { ...type.label, marginBottom: space.sm },
@@ -1529,12 +1561,14 @@ const styles = StyleSheet.create({
     padding: 3,
     marginTop: -space.sm,
   },
+  segWide: { marginTop: 0 },
   segItem: {
     flex: 1,
     alignItems: "center",
     paddingVertical: 7,
     borderRadius: radius.pill,
   },
+  segItemWide: { flex: 0, paddingHorizontal: 22 },
   segText: { ...type.bodyMedium, fontSize: 13 },
 
   gaugeBlock: { gap: space.xl },

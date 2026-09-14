@@ -16,6 +16,7 @@ import { Icon } from "./components/Icon";
 import { LockCover, LockScreen } from "./components/LockScreen";
 import { AppLockProvider, useAppLock } from "./lib/AppLockContext";
 import { DataProvider, useData } from "./lib/DataContext";
+import { useWideLayout } from "./lib/layout";
 import { NavProvider, SettingsPage } from "./lib/NavContext";
 import { ThemeProvider, useTheme } from "./lib/ThemeContext";
 import { supabase } from "./lib/supabase";
@@ -43,6 +44,7 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 
 function Shell() {
   const { palette, dark } = useTheme();
+  const wide = useWideLayout();
   const { reload } = useData();
 
   const [tab, setTab] = useState<Tab>("home");
@@ -83,73 +85,108 @@ function Shell() {
     (tab === "home" || tab === "movements") && moneyMode === "entrate";
   const addingInvestmentTarget = tab === "portfolio";
 
+  // Il tasto di aggiunta e' lo stesso nella tabbar e nel rail: cambia solo il
+  // margine, che in verticale lo fa sporgere sopra la barra e in orizzontale
+  // non serve.
+  const addButton = (
+    <TouchableOpacity
+      style={[
+        styles.fab,
+        wide ? styles.fabRail : styles.fabBar,
+        {
+          backgroundColor: addingInvestmentTarget
+            ? palette.invest
+            : addingIncomeTarget
+              ? palette.good
+              : palette.accent,
+        },
+      ]}
+      onPress={() => {
+        if (addingInvestmentTarget) setInvestmentNonce((v) => v + 1);
+        else if (addingIncomeTarget) setAddingIncome(true);
+        else setAdding(true);
+      }}
+      accessibilityLabel={
+        addingInvestmentTarget
+          ? "Aggiungi investimento"
+          : addingIncomeTarget
+            ? "Aggiungi introito"
+            : "Aggiungi spesa"
+      }
+    >
+      <Icon name="plus" size={21} color={palette.onAccent} strokeWidth={1.9} />
+    </TouchableOpacity>
+  );
+
+  const navItems = (
+    <>
+      {TABS.slice(0, 2).map((item) => (
+        <TabButton
+          key={item.key}
+          item={item}
+          active={tab === item.key}
+          wide={wide}
+          onPress={() => setTab(item.key)}
+        />
+      ))}
+
+      {addButton}
+
+      {TABS.slice(2).map((item) => (
+        <TabButton
+          key={item.key}
+          item={item}
+          active={tab === item.key}
+          wide={wide}
+          onPress={() => setTab(item.key)}
+        />
+      ))}
+    </>
+  );
+
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: palette.ground }]}>
       <NavProvider value={{ openSettings, openAddIncome }}>
-        <View style={styles.content} key={reloadKey}>
-          {tab === "home" && (
-            <HomeScreen mode={moneyMode} onModeChange={setMoneyMode} />
+        {/* In orizzontale la barra ruota e diventa un rail a sinistra: su uno
+            schermo largo e basso l'altezza e' la risorsa scarsa, e una barra in
+            fondo la consuma proprio dove serve al contenuto. L'ordine delle
+            voci resta lo stesso, cosi' la mano sa gia' dove andare. */}
+        <View style={[styles.shell, wide && styles.shellWide]}>
+          {wide && (
+            <View
+              style={[
+                styles.rail,
+                { backgroundColor: palette.surface, borderRightColor: palette.hairline },
+              ]}
+            >
+              {navItems}
+            </View>
           )}
-          {tab === "movements" && (
-            <MovementsScreen mode={moneyMode} onModeChange={setMoneyMode} />
+
+          <View style={styles.content} key={reloadKey}>
+            {tab === "home" && (
+              <HomeScreen mode={moneyMode} onModeChange={setMoneyMode} />
+            )}
+            {tab === "movements" && (
+              <MovementsScreen mode={moneyMode} onModeChange={setMoneyMode} />
+            )}
+            {tab === "stats" && <StatsScreen />}
+            {tab === "portfolio" && <PortfolioScreen addNonce={investmentNonce} />}
+            {tab === "settings" && (
+              <SettingsScreen initialPage={settingsPage} openNonce={settingsNonce} />
+            )}
+          </View>
+
+          {!wide && (
+            <View
+              style={[
+                styles.tabbar,
+                { backgroundColor: palette.surface, borderTopColor: palette.hairline },
+              ]}
+            >
+              {navItems}
+            </View>
           )}
-          {tab === "stats" && <StatsScreen />}
-          {tab === "portfolio" && <PortfolioScreen addNonce={investmentNonce} />}
-          {tab === "settings" && (
-            <SettingsScreen initialPage={settingsPage} openNonce={settingsNonce} />
-          )}
-        </View>
-
-        <View
-          style={[
-            styles.tabbar,
-            { backgroundColor: palette.surface, borderTopColor: palette.hairline },
-          ]}
-        >
-          {TABS.slice(0, 2).map((item) => (
-            <TabButton
-              key={item.key}
-              item={item}
-              active={tab === item.key}
-              onPress={() => setTab(item.key)}
-            />
-          ))}
-
-          <TouchableOpacity
-            style={[
-              styles.fab,
-              {
-                backgroundColor: addingInvestmentTarget
-                  ? palette.invest
-                  : addingIncomeTarget
-                    ? palette.good
-                    : palette.accent,
-              },
-            ]}
-            onPress={() => {
-              if (addingInvestmentTarget) setInvestmentNonce((v) => v + 1);
-              else if (addingIncomeTarget) setAddingIncome(true);
-              else setAdding(true);
-            }}
-            accessibilityLabel={
-              addingInvestmentTarget
-                ? "Aggiungi investimento"
-                : addingIncomeTarget
-                  ? "Aggiungi introito"
-                  : "Aggiungi spesa"
-            }
-          >
-            <Icon name="plus" size={21} color={palette.onAccent} strokeWidth={1.9} />
-          </TouchableOpacity>
-
-          {TABS.slice(2).map((item) => (
-            <TabButton
-              key={item.key}
-              item={item}
-              active={tab === item.key}
-              onPress={() => setTab(item.key)}
-            />
-          ))}
         </View>
       </NavProvider>
 
@@ -179,16 +216,22 @@ function Shell() {
 function TabButton({
   item,
   active,
+  wide,
   onPress,
 }: {
   item: { key: Tab; label: string; icon: string };
   active: boolean;
+  wide: boolean;
   onPress: () => void;
 }) {
   const { palette } = useTheme();
   return (
     <TouchableOpacity
-      style={styles.tab}
+      style={[
+        styles.tab,
+        wide && styles.tabRail,
+        wide && active && { backgroundColor: palette.accentSoft },
+      ]}
       onPress={onPress}
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
@@ -363,7 +406,16 @@ export default function App() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  content: { flex: 1 },
+  shell: { flex: 1 },
+  shellWide: { flexDirection: "row" },
+  content: { flex: 1, minWidth: 0 },
+  rail: {
+    width: 80,
+    alignItems: "center",
+    paddingVertical: 26,
+    gap: 4,
+    borderRightWidth: StyleSheet.hairlineWidth,
+  },
   tabbar: {
     flexDirection: "row",
     alignItems: "center",
@@ -374,6 +426,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.md,
   },
   tab: { flex: 1, alignItems: "center", gap: 3 },
+  tabRail: {
+    flex: 0,
+    width: 64,
+    paddingVertical: 9,
+    borderRadius: radius.button,
+  },
   tabLabel: { fontSize: 9.5, fontWeight: "500" },
   fab: {
     width: 42,
@@ -381,7 +439,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignItems: "center",
     justifyContent: "center",
-    marginTop: -14,
-    marginHorizontal: space.sm,
   },
+  fabBar: { marginTop: -14, marginHorizontal: space.sm },
+  fabRail: { marginVertical: space.sm },
 });
