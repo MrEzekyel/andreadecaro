@@ -116,7 +116,10 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
         note: note.trim() || null,
         card_name: card.trim() || null,
         source: "manual",
-        my_share: split.enabled ? splitResult.myShare : null,
+        // "Divisa" vuole almeno una persona: attivare l'interruttore senza
+        // sceglierne una non deve marcare la spesa come divisa con nessuno.
+        my_share:
+          split.enabled && split.personIds.length > 0 ? splitResult.myShare : null,
       })
       .select("id")
       .single();

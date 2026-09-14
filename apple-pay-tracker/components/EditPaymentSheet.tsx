@@ -226,7 +226,16 @@ export function EditPaymentSheet({
         note: note.trim() || null,
         card_name: card.trim() || null,
         occurred_at: occurredAt.toISOString(),
-        ...(riscriviQuote ? { my_share: split.enabled ? splitResult.myShare : null } : {}),
+        ...(riscriviQuote
+          ? {
+              // "Divisa" vuole almeno una persona: attivare l'interruttore
+              // senza sceglierne una non deve marcare la spesa come divisa.
+              my_share:
+                split.enabled && split.personIds.length > 0
+                  ? splitResult.myShare
+                  : null,
+            }
+          : {}),
       })
       .eq("id", payment.id);
 
