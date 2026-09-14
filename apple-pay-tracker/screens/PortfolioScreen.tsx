@@ -11,9 +11,11 @@ import { AddInvestmentSheet } from "../components/AddInvestmentSheet";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
 import { ScreenHeader } from "../components/ScreenHeader";
+import { TwoColumns } from "../components/TwoColumns";
 import { ScrubChart } from "../components/ScrubChart";
 import { StaleNote } from "../components/StaleNote";
 import { StatTiles } from "../components/StatTiles";
+import { useWideLayout } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, formatDate, splitAmount } from "../lib/format";
 import {
@@ -89,6 +91,7 @@ type Props = {
 
 export default function PortfolioScreen({ addNonce }: Props) {
   const { palette } = useTheme();
+  const wide = useWideLayout();
   const portfolio = usePortfolio();
   const { positions, totals, series, annualReturn, rules, loading, error, staleLabel } =
     portfolio;
@@ -249,7 +252,7 @@ export default function PortfolioScreen({ addNonce }: Props) {
       <>
         <ScrollView
           style={{ backgroundColor: palette.ground }}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, wide && styles.contentWide]}
         >
           <ScreenHeader title="Investimenti" />
           <LoadError message={error} onRetry={portfolio.reload} />
@@ -259,11 +262,197 @@ export default function PortfolioScreen({ addNonce }: Props) {
     );
   }
 
+  const heroBlock = (
+    <React.Fragment key="hero">
+        <View>
+          <Text style={[styles.hero, { color: palette.ink }]}>
+            {amount.whole}
+            <Text style={[styles.heroCents, { color: palette.ink2 }]}>
+              {amount.cents}
+            </Text>
+          </Text>
+
+          <View style={styles.gainRow}>
+            <Text style={[styles.gain, { color: gainColor }]}>
+              {heroGain >= 0 ? "+" : "−"}
+              {formatAmount(Math.abs(heroGain))}
+            </Text>
+            {heroPct !== null && (
+              <Text style={[styles.gain, { color: gainColor }]}>
+                {heroGain >= 0 ? "+" : "−"}
+                {Math.abs(heroPct * 100).toFixed(1)}%
+              </Text>
+            )}
+            <Text style={[styles.heroMeta, { color: palette.ink3 }]}>
+              {at ? formatDate(at.on_date) : `su ${formatAmount(heroBasis)} versati`}
+            </Text>
+          </View>
+        </View>
+    </React.Fragment>
+  );
+
+  const chartSection = (
+    <React.Fragment key="chart">
+        <View style={styles.chartBlock}>
+          <ScrubChart points={points} color={palette.invest} onScrub={setScrub} />
+          <RangePicker
+            range={range}
+            onChange={(r) => {
+              setRange(r);
+              setScrub(null);
+            }}
+          />
+        </View>
+    </React.Fragment>
+  );
+
+  const shortcuts = (
+    <React.Fragment key="shortcuts">
+        <View>
+          <LinkRow
+            icon="chart-pie"
+            label="Analisi"
+            hint="ripartizione del portafoglio"
+            onPress={() => setPage("analysis")}
+          />
+          <LinkRow
+            icon="repeat"
+            label="Piani di accumulo"
+            hint={
+              monthlyPac > 0
+                ? `${formatAmount(monthlyPac)} al mese`
+                : "nessun piano attivo"
+            }
+            onPress={() => setPage("pac")}
+          />
+        </View>
+    </React.Fragment>
+  );
+
+  const tilesSection = (
+    <React.Fragment key="tiles">
+        <StatTiles
+          goodColor={palette.investUp}
+          tiles={[
+            ...(annualReturn !== null ? [returnTile(annualReturn)] : []),
+            {
+              label: "Capitale versato",
+              value: formatAmount(totals.investedBasis),
+              hint: monthlyPac > 0 ? `${formatAmount(monthlyPac)} al mese` : undefined,
+            },
+            ...(totals.dividends > 0
+              ? [{
+                  label: "Dividendi incassati",
+                  value: formatAmount(totals.dividends),
+                  hint: "fuori dal prezzo, gia' sul conto",
+                  tone: "good" as const,
+                }]
+              : []),
+            {
+              label: "Titoli",
+              value: String(open.length),
+              hint: `in ${groups.length} sezion${groups.length === 1 ? "e" : "i"}`,
+            },
+          ]}
+        />
+    </React.Fragment>
+  );
+
+  const pendingNote = (
+    <React.Fragment key="pending">
+        {totals.pending > 0 && (
+          <View style={styles.pendingRow}>
+            <Icon name="clock" size={16} color={palette.ink3} />
+            <Text style={[styles.pendingText, { color: palette.ink2 }]}>
+              {formatAmount(totals.pending)} versati su un fondo di cui non si
+              conosce ancora nessun valore: valgono il loro costo finche' non
+              arriva il primo aggiornamento.
+            </Text>
+          </View>
+        )}
+    </React.Fragment>
+  );
+
+  const staleNote = (
+    <React.Fragment key="stale">
+        {staleManual.length > 0 && (
+          <TouchableOpacity
+            style={styles.pendingRow}
+            onPress={() => setOpenAsset(staleManual[0])}
+          >
+            <Icon name="circle-alert" size={16} color={palette.over} />
+            <Text style={[styles.pendingText, { color: palette.ink2 }]}>
+              {staleManual.length === 1
+                ? `Il valore di ${staleManual[0].asset.name} e' fermo da un po': aggiornalo da Trade Republic quando puoi.`
+                : `${staleManual.map((p) => p.asset.name).join(" e ")} hanno un valore fermo da un po': aggiornali da Trade Republic quando puoi.`}
+            </Text>
+          </TouchableOpacity>
+        )}
+    </React.Fragment>
+  );
+
+  const groupSections = (
+    <React.Fragment key="groups">
+        {groups.map((group) => (
+          <GroupSection
+            key={group.group}
+            group={group}
+            onOpenAsset={setOpenAsset}
+            onOpenGroup={() => setOpenGroup(group.group)}
+          />
+        ))}
+    </React.Fragment>
+  );
+
+  const emptyNote = (
+    <React.Fragment key="empty">
+        {!loading && open.length === 0 && (
+          <Text style={[styles.note, { color: palette.ink3 }]}>
+            Nessuna posizione aperta.
+          </Text>
+        )}
+    </React.Fragment>
+  );
+
+  const returnNote = (
+    <React.Fragment key="return">
+        {/* Due percentuali diverse sulla stessa schermata sembrano un errore di
+            conto finche' non si dice che misurano cose diverse: nei riquadri
+            c'e' il rendimento vero, negli elenchi quello che mostra il broker. */}
+        {annualReturn !== null && open.length > 0 && (
+          <Text style={[styles.note, { color: palette.ink3 }]}>
+            Le percentuali accanto ai titoli sono il solo movimento del prezzo,
+            le stesse che vedi dal broker. Il rendimento qui sopra comprende
+            anche dividendi e commissioni, e pesa ogni versamento per il tempo
+            in cui e' rimasto investito.
+          </Text>
+        )}
+    </React.Fragment>
+  );
+
+  const closedSection = (
+    <React.Fragment key="closed">
+        {positions.some((p) => p.closed) && (
+          <View>
+            <Text style={[styles.label, { color: palette.ink3 }]}>Chiuse</Text>
+            {positions
+              .filter((p) => p.closed)
+              .map((position) => (
+                <AssetRow
+                  key={position.asset.id}
+                  position={position}
+                  onPress={() => setOpenAsset(position)}
+                />
+              ))}
+          </View>
+        )}
+    </React.Fragment>
+  );
   return (
     <>
     <ScrollView
       style={{ backgroundColor: palette.ground }}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, wide && styles.contentWide]}
       refreshControl={
         <RefreshControl
           refreshing={refreshing}
@@ -294,152 +483,43 @@ export default function PortfolioScreen({ addNonce }: Props) {
         />
       )}
 
-      <View>
-        <Text style={[styles.hero, { color: palette.ink }]}>
-          {amount.whole}
-          <Text style={[styles.heroCents, { color: palette.ink2 }]}>
-            {amount.cents}
-          </Text>
-        </Text>
-
-        <View style={styles.gainRow}>
-          <Text style={[styles.gain, { color: gainColor }]}>
-            {heroGain >= 0 ? "+" : "−"}
-            {formatAmount(Math.abs(heroGain))}
-          </Text>
-          {heroPct !== null && (
-            <Text style={[styles.gain, { color: gainColor }]}>
-              {heroGain >= 0 ? "+" : "−"}
-              {Math.abs(heroPct * 100).toFixed(1)}%
-            </Text>
-          )}
-          <Text style={[styles.heroMeta, { color: palette.ink3 }]}>
-            {at ? formatDate(at.on_date) : `su ${formatAmount(heroBasis)} versati`}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.chartBlock}>
-        <ScrubChart points={points} color={palette.invest} onScrub={setScrub} />
-        <RangePicker
-          range={range}
-          onChange={(r) => {
-            setRange(r);
-            setScrub(null);
-          }}
-        />
-      </View>
-
-      <View>
-        <LinkRow
-          icon="chart-pie"
-          label="Analisi"
-          hint="ripartizione del portafoglio"
-          onPress={() => setPage("analysis")}
-        />
-        <LinkRow
-          icon="repeat"
-          label="Piani di accumulo"
-          hint={
-            monthlyPac > 0
-              ? `${formatAmount(monthlyPac)} al mese`
-              : "nessun piano attivo"
-          }
-          onPress={() => setPage("pac")}
-        />
-      </View>
-
-      <StatTiles
-        goodColor={palette.investUp}
-        tiles={[
-          ...(annualReturn !== null ? [returnTile(annualReturn)] : []),
-          {
-            label: "Capitale versato",
-            value: formatAmount(totals.investedBasis),
-            hint: monthlyPac > 0 ? `${formatAmount(monthlyPac)} al mese` : undefined,
-          },
-          ...(totals.dividends > 0
-            ? [{
-                label: "Dividendi incassati",
-                value: formatAmount(totals.dividends),
-                hint: "fuori dal prezzo, gia' sul conto",
-                tone: "good" as const,
-              }]
-            : []),
-          {
-            label: "Titoli",
-            value: String(open.length),
-            hint: `in ${groups.length} sezion${groups.length === 1 ? "e" : "i"}`,
-          },
-        ]}
+      {/* A sinistra lo stato del portafoglio, a destra l'andamento e i
+          titoli: le stesse due domande della Home. In verticale l'ordine
+          resta quello di sempre, grafico subito sotto l'importo. */}
+      <TwoColumns
+        order={
+          <>
+            {heroBlock}
+            {chartSection}
+            {shortcuts}
+            {tilesSection}
+            {pendingNote}
+            {staleNote}
+            {groupSections}
+            {emptyNote}
+            {returnNote}
+            {closedSection}
+          </>
+        }
+        left={
+          <>
+            {heroBlock}
+            {tilesSection}
+            {shortcuts}
+            {returnNote}
+            {pendingNote}
+            {staleNote}
+          </>
+        }
+        right={
+          <>
+            {chartSection}
+            {groupSections}
+            {emptyNote}
+            {closedSection}
+          </>
+        }
       />
-
-      {totals.pending > 0 && (
-        <View style={styles.pendingRow}>
-          <Icon name="clock" size={16} color={palette.ink3} />
-          <Text style={[styles.pendingText, { color: palette.ink2 }]}>
-            {formatAmount(totals.pending)} versati su un fondo di cui non si
-            conosce ancora nessun valore: valgono il loro costo finche' non
-            arriva il primo aggiornamento.
-          </Text>
-        </View>
-      )}
-
-      {staleManual.length > 0 && (
-        <TouchableOpacity
-          style={styles.pendingRow}
-          onPress={() => setOpenAsset(staleManual[0])}
-        >
-          <Icon name="circle-alert" size={16} color={palette.over} />
-          <Text style={[styles.pendingText, { color: palette.ink2 }]}>
-            {staleManual.length === 1
-              ? `Il valore di ${staleManual[0].asset.name} e' fermo da un po': aggiornalo da Trade Republic quando puoi.`
-              : `${staleManual.map((p) => p.asset.name).join(" e ")} hanno un valore fermo da un po': aggiornali da Trade Republic quando puoi.`}
-          </Text>
-        </TouchableOpacity>
-      )}
-
-      {groups.map((group) => (
-        <GroupSection
-          key={group.group}
-          group={group}
-          onOpenAsset={setOpenAsset}
-          onOpenGroup={() => setOpenGroup(group.group)}
-        />
-      ))}
-
-      {!loading && open.length === 0 && (
-        <Text style={[styles.note, { color: palette.ink3 }]}>
-          Nessuna posizione aperta.
-        </Text>
-      )}
-
-      {/* Due percentuali diverse sulla stessa schermata sembrano un errore di
-          conto finche' non si dice che misurano cose diverse: nei riquadri
-          c'e' il rendimento vero, negli elenchi quello che mostra il broker. */}
-      {annualReturn !== null && open.length > 0 && (
-        <Text style={[styles.note, { color: palette.ink3 }]}>
-          Le percentuali accanto ai titoli sono il solo movimento del prezzo,
-          le stesse che vedi dal broker. Il rendimento qui sopra comprende
-          anche dividendi e commissioni, e pesa ogni versamento per il tempo
-          in cui e' rimasto investito.
-        </Text>
-      )}
-
-      {positions.some((p) => p.closed) && (
-        <View>
-          <Text style={[styles.label, { color: palette.ink3 }]}>Chiuse</Text>
-          {positions
-            .filter((p) => p.closed)
-            .map((position) => (
-              <AssetRow
-                key={position.asset.id}
-                position={position}
-                onPress={() => setOpenAsset(position)}
-              />
-            ))}
-        </View>
-      )}
     </ScrollView>
     {addSheet}
     </>
@@ -620,6 +700,8 @@ function AssetRow({
 
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.xl },
+  // Col rail accanto, il margine di 16 stringeva troppo il contenuto.
+  contentWide: { padding: 24, paddingBottom: space.xxl },
   title: { ...type.title },
   hero: { ...type.hero },
   heroCents: { ...type.heroCents },

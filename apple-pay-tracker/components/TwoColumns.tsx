@@ -8,6 +8,18 @@ type Props = {
   left: React.ReactNode;
   /** La lettura: grafici ed elenchi, cio' che si guarda per capire. */
   right: React.ReactNode;
+  /**
+   * Ordine da tenere in verticale, quando non e' semplicemente sinistra
+   * seguita da destra.
+   *
+   * Serve dove la divisione in colonne non cade in mezzo all'elenco delle
+   * sezioni ma le alterna: in Investimenti il grafico sta a destra, ma sul
+   * telefono deve restare subito sotto l'importo, dov'e' sempre stato.
+   * Senza questo, affiancare le colonne avrebbe riordinato anche la versione
+   * verticale — cioe' cambiato una schermata che nessuno ha chiesto di
+   * cambiare.
+   */
+  order?: React.ReactNode;
 };
 
 /**
@@ -19,14 +31,18 @@ type Props = {
  * cui aggiungere le due colonne non ha richiesto di toccare il layout
  * verticale: in verticale questo componente non c'e'.
  */
-export function TwoColumns({ left, right }: Props) {
+export function TwoColumns({ left, right, order }: Props) {
   const wide = useWideLayout();
 
   if (!wide) {
     return (
       <>
-        {left}
-        {right}
+        {order ?? (
+          <>
+            {left}
+            {right}
+          </>
+        )}
       </>
     );
   }

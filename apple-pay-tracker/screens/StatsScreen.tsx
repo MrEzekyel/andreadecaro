@@ -12,6 +12,7 @@ import {
 import { BarChart } from "../components/BarChart";
 import { CategoryDonut, DonutSlice } from "../components/CategoryDonut";
 import { ChartCarousel, ChartPage } from "../components/ChartCarousel";
+import { TwoColumns } from "../components/TwoColumns";
 import { useExplorer } from "../components/Explorer";
 import { Icon } from "../components/Icon";
 import { LoadError } from "../components/LoadError";
@@ -20,6 +21,7 @@ import { MonthWheel } from "../components/MonthWheel";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { TrendChart, TrendPoint } from "../components/TrendChart";
 import { useData } from "../lib/DataContext";
+import { useWideLayout } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount, splitAmount } from "../lib/format";
 import {
@@ -136,6 +138,7 @@ function rankByBrand(
 
 export default function StatsScreen() {
   const { palette, dark } = useTheme();
+  const wide = useWideLayout();
   // Gli esercenti arrivano da `DataContext`: la lettura di prima non era
   // paginata, e oltre le 1000 righe PostgREST tronca **senza errore** —
   // gli esercenti oltre il millesimo sarebbero spariti dalle classifiche
@@ -845,7 +848,7 @@ export default function StatsScreen() {
     return (
       <ScrollView
         style={{ backgroundColor: palette.ground }}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, wide && styles.contentWide]}
       >
         <ScreenHeader title="Statistiche" />
         <LoadError message={error} onRetry={load} />
@@ -853,10 +856,317 @@ export default function StatsScreen() {
     );
   }
 
+  const totalSection = (
+    <React.Fragment key="tot">
+        <View>
+          <Text style={[styles.label, { color: palette.ink3 }]}>Totale</Text>
+          <Text style={[styles.hero, { color: palette.ink }]}>
+            {amount.whole}
+            <Text style={[styles.heroCents, { color: palette.ink3 }]}>
+              {amount.cents}
+            </Text>
+          </Text>
+          <Text style={[styles.heroMeta, { color: palette.ink2 }]}>
+            {payments.length} {payments.length === 1 ? "spesa" : "spese"}
+          </Text>
+          {!excludeMarked && fixedCostsTotal > 0 && (
+            <Text style={[styles.heroMeta, { color: palette.ink3 }]}>
+              di cui costi fissi {formatAmount(fixedCostsTotal)}
+            </Text>
+          )}
+        </View>
+    </React.Fragment>
+  );
+
+  const trendSection = (
+    <React.Fragment key="trend">
+        <View>
+          <Text style={[styles.label, { color: palette.ink3 }]}>
+            Andamento cumulato
+          </Text>
+          <TrendChart
+            points={trend}
+            limit={effectiveLimit}
+            baseline={excludeMarked ? 0 : fixedCostsTotal}
+            color={palette.accent}
+            empty="Servono almeno due giorni di spese per disegnare l'andamento."
+          />
+          {excludeMarked && fixedCostsTotal > 0 && effectiveLimit !== null && (
+            <Text style={[styles.chartNote, { color: palette.ink3 }]}>
+              Il limite qui sopra è già al netto di {formatAmount(fixedCostsTotal)}{" "}
+              di costi fissi.
+            </Text>
+          )}
+        </View>
+    </React.Fragment>
+  );
+
+  const rankSection = (
+    <React.Fragment key="rank">
+        <View>
+          <View style={styles.filterHead}>
+            <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
+              Classifiche
+            </Text>
+            <TouchableOpacity
+              style={styles.excludeToggle}
+              onPress={() => setExcludeMarked((v) => !v)}
+              accessibilityRole="switch"
+              accessibilityState={{ checked: excludeMarked }}
+            >
+              <Text style={[styles.filterNote, { color: palette.ink3 }]}>
+                escludi costi fissi
+              </Text>
+              <Switch
+                value={excludeMarked}
+                onValueChange={setExcludeMarked}
+                trackColor={{ true: palette.accent, false: palette.hairline }}
+              />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterRow}
+          >
+            <TouchableOpacity
+              onPress={() => setFilterCategory(null)}
+              style={[
+                styles.filterChip,
+                {
+                  backgroundColor:
+                    filterCategory === null ? palette.accent : palette.surface,
+                  borderColor:
+                    filterCategory === null ? palette.accent : palette.hairline,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  {
+                    color:
+                      filterCategory === null ? palette.onAccent : palette.ink2,
+                  },
+                ]}
+              >
+                Tutte
+              </Text>
+            </TouchableOpacity>
+
+            {topCategories.map(({ id }) => {
+              const category = categoryById(id);
+              if (!category) return null;
+              const selectedChip = filterCategory === id;
+              const color = categoryColor(category.color, dark);
+
+              return (
+                <TouchableOpacity
+                  key={id ?? "none"}
+                  onPress={() => setFilterCategory(selectedChip ? null : id)}
+                  style={[
+                    styles.filterChip,
+                    {
+                      backgroundColor: selectedChip
+                        ? tint(color, dark)
+                        : palette.surface,
+                      borderColor: selectedChip ? color : palette.hairline,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.filterChipText,
+                      { color: selectedChip ? color : palette.ink2 },
+                    ]}
+                  >
+                    {category.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+        </View>
+    </React.Fragment>
+  );
+
+  const carouselSection = (
+    <React.Fragment key="caro">
+        {(historyPool.length > 0 || rankedPool.length > 0) && (
+          <ChartCarousel pages={pages} />
+        )}
+    </React.Fragment>
+  );
+
+  const categorySection = (
+    <React.Fragment key="cat">
+        <View>
+          <View style={styles.donutHead}>
+            <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
+              Per categoria
+            </Text>
+            <LetterToggle
+              options={DONUT_SCOPE_OPTIONS}
+              value={donutScope}
+              onChange={setDonutScope}
+            />
+          </View>
+
+          <CategoryDonut
+            slices={slices}
+            centerLabel={
+              donutScope === "all"
+                ? "tutto lo storico"
+                : donutMonths[donutMonthIndex]?.toLocaleDateString("it-IT", {
+                    month: "long",
+                  }) ?? ""
+            }
+            onSelect={(slice) =>
+              explorer.openDetail({
+                kind: "category",
+                id: slice.id,
+                title: slice.label,
+                month:
+                  donutScope === "month" ? donutMonths[donutMonthIndex] : undefined,
+              })
+            }
+          />
+
+          {donutScope === "month" && donutMonthReady && (
+            <MonthWheel
+              months={donutMonths}
+              value={donutMonthIndex}
+              onChange={setDonutMonthIndex}
+            />
+          )}
+        </View>
+    </React.Fragment>
+  );
+
+  const savingsSection = (
+    <React.Fragment key="savings">
+        {savingsMonths > 0 && (
+          <View>
+            <View style={styles.filterHead}>
+              <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
+                Risparmi mensili
+              </Text>
+              <Text style={[styles.filterNote, { color: palette.ink3 }]}>
+                introiti − spese − investimenti
+              </Text>
+            </View>
+            <BarChart
+              buckets={savingsBuckets}
+              metric="amount"
+              color={palette.good}
+              negativeColor={palette.over}
+            />
+            <Text style={[styles.chartNote, { color: palette.ink3 }]}>
+              Contano solo i mesi in cui hai registrato sia introiti sia
+              investimenti.
+            </Text>
+          </View>
+        )}
+    </React.Fragment>
+  );
+
+  const cardSection = (
+    <React.Fragment key="card">
+        {cardSlices.length > 0 && (
+          <View>
+            <Text style={[styles.label, { color: palette.ink3 }]}>
+              Metodo di pagamento
+            </Text>
+            <CategoryDonut
+              slices={cardSlices}
+              centerLabel={period.label.toLowerCase()}
+            />
+          </View>
+        )}
+    </React.Fragment>
+  );
+
+  const sourceSection = (
+    <React.Fragment key="source">
+        {sourceSlices.length > 0 && (
+          <View>
+            <View style={styles.filterHead}>
+              <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
+                Provenienza
+              </Text>
+              <Text style={[styles.filterNote, { color: palette.ink3 }]}>
+                numero di spese
+              </Text>
+            </View>
+            <CategoryDonut
+              slices={sourceSlices}
+              centerLabel="spese"
+              formatValue={(value) => String(Math.round(value))}
+            />
+          </View>
+        )}
+    </React.Fragment>
+  );
+
+  const merchantSection = (
+    <React.Fragment key="merchant">
+        {byMerchant.length > 0 && (
+          <View>
+            <Text style={[styles.label, { color: palette.ink3 }]}>
+              Dove spendi di più
+            </Text>
+
+            {byMerchant.map((merchant) => (
+              <TouchableOpacity
+                key={merchant.id}
+                style={styles.merchantRow}
+                onPress={() =>
+                  explorer.openDetail({
+                    kind: "merchant",
+                    id: merchant.id,
+                    title: merchant.name,
+                    month: kind === "month" ? period.start : undefined,
+                  })
+                }
+              >
+                <View
+                  style={[
+                    styles.merchantIcon,
+                    { backgroundColor: tint(palette.accent, dark) },
+                  ]}
+                >
+                  <Text style={[styles.merchantInitial, { color: palette.accent }]}>
+                    {merchant.name.charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text
+                    style={[styles.merchantName, { color: palette.ink }]}
+                    numberOfLines={1}
+                  >
+                    {merchant.name}
+                  </Text>
+                  <Text style={[styles.merchantMeta, { color: palette.ink3 }]}>
+                    {merchant.count} {merchant.count === 1 ? "spesa" : "spese"}
+                  </Text>
+                </View>
+
+                <Text style={[styles.catValue, { color: palette.ink }]}>
+                  {formatAmount(merchant.amount)}
+                </Text>
+                <Icon name="chevron-right" size={14} color={palette.ink3} />
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+    </React.Fragment>
+  );
   return (
     <ScrollView
       style={{ backgroundColor: palette.ground }}
-      contentContainerStyle={styles.content}
+      contentContainerStyle={[styles.content, wide && styles.contentWide]}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
@@ -915,283 +1225,48 @@ export default function StatsScreen() {
         </TouchableOpacity>
       </View>
 
-      <View>
-        <Text style={[styles.label, { color: palette.ink3 }]}>Totale</Text>
-        <Text style={[styles.hero, { color: palette.ink }]}>
-          {amount.whole}
-          <Text style={[styles.heroCents, { color: palette.ink3 }]}>
-            {amount.cents}
-          </Text>
-        </Text>
-        <Text style={[styles.heroMeta, { color: palette.ink2 }]}>
-          {payments.length} {payments.length === 1 ? "spesa" : "spese"}
-        </Text>
-        {!excludeMarked && fixedCostsTotal > 0 && (
-          <Text style={[styles.heroMeta, { color: palette.ink3 }]}>
-            di cui costi fissi {formatAmount(fixedCostsTotal)}
-          </Text>
-        )}
-      </View>
-
-      <View>
-        <Text style={[styles.label, { color: palette.ink3 }]}>
-          Andamento cumulato
-        </Text>
-        <TrendChart
-          points={trend}
-          limit={effectiveLimit}
-          baseline={excludeMarked ? 0 : fixedCostsTotal}
-          color={palette.accent}
-          empty="Servono almeno due giorni di spese per disegnare l'andamento."
-        />
-        {excludeMarked && fixedCostsTotal > 0 && effectiveLimit !== null && (
-          <Text style={[styles.chartNote, { color: palette.ink3 }]}>
-            Il limite qui sopra è già al netto di {formatAmount(fixedCostsTotal)}{" "}
-            di costi fissi.
-          </Text>
-        )}
-      </View>
-
-      <View>
-        <View style={styles.filterHead}>
-          <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
-            Classifiche
-          </Text>
-          <TouchableOpacity
-            style={styles.excludeToggle}
-            onPress={() => setExcludeMarked((v) => !v)}
-            accessibilityRole="switch"
-            accessibilityState={{ checked: excludeMarked }}
-          >
-            <Text style={[styles.filterNote, { color: palette.ink3 }]}>
-              escludi costi fissi
-            </Text>
-            <Switch
-              value={excludeMarked}
-              onValueChange={setExcludeMarked}
-              trackColor={{ true: palette.accent, false: palette.hairline }}
-            />
-          </TouchableOpacity>
-        </View>
-
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterRow}
-        >
-          <TouchableOpacity
-            onPress={() => setFilterCategory(null)}
-            style={[
-              styles.filterChip,
-              {
-                backgroundColor:
-                  filterCategory === null ? palette.accent : palette.surface,
-                borderColor:
-                  filterCategory === null ? palette.accent : palette.hairline,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.filterChipText,
-                {
-                  color:
-                    filterCategory === null ? palette.onAccent : palette.ink2,
-                },
-              ]}
-            >
-              Tutte
-            </Text>
-          </TouchableOpacity>
-
-          {topCategories.map(({ id }) => {
-            const category = categoryById(id);
-            if (!category) return null;
-            const selectedChip = filterCategory === id;
-            const color = categoryColor(category.color, dark);
-
-            return (
-              <TouchableOpacity
-                key={id ?? "none"}
-                onPress={() => setFilterCategory(selectedChip ? null : id)}
-                style={[
-                  styles.filterChip,
-                  {
-                    backgroundColor: selectedChip
-                      ? tint(color, dark)
-                      : palette.surface,
-                    borderColor: selectedChip ? color : palette.hairline,
-                  },
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.filterChipText,
-                    { color: selectedChip ? color : palette.ink2 },
-                  ]}
-                >
-                  {category.name}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
-      </View>
-
-      {(historyPool.length > 0 || rankedPool.length > 0) && (
-        <ChartCarousel pages={pages} />
-      )}
-
-      <View>
-        <View style={styles.donutHead}>
-          <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
-            Per categoria
-          </Text>
-          <LetterToggle
-            options={DONUT_SCOPE_OPTIONS}
-            value={donutScope}
-            onChange={setDonutScope}
-          />
-        </View>
-
-        <CategoryDonut
-          slices={slices}
-          centerLabel={
-            donutScope === "all"
-              ? "tutto lo storico"
-              : donutMonths[donutMonthIndex]?.toLocaleDateString("it-IT", {
-                  month: "long",
-                }) ?? ""
-          }
-          onSelect={(slice) =>
-            explorer.openDetail({
-              kind: "category",
-              id: slice.id,
-              title: slice.label,
-              month:
-                donutScope === "month" ? donutMonths[donutMonthIndex] : undefined,
-            })
-          }
-        />
-
-        {donutScope === "month" && donutMonthReady && (
-          <MonthWheel
-            months={donutMonths}
-            value={donutMonthIndex}
-            onChange={setDonutMonthIndex}
-          />
-        )}
-      </View>
-
-      {savingsMonths > 0 && (
-        <View>
-          <View style={styles.filterHead}>
-            <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
-              Risparmi mensili
-            </Text>
-            <Text style={[styles.filterNote, { color: palette.ink3 }]}>
-              introiti − spese − investimenti
-            </Text>
-          </View>
-          <BarChart
-            buckets={savingsBuckets}
-            metric="amount"
-            color={palette.good}
-            negativeColor={palette.over}
-          />
-          <Text style={[styles.chartNote, { color: palette.ink3 }]}>
-            Contano solo i mesi in cui hai registrato sia introiti sia
-            investimenti.
-          </Text>
-        </View>
-      )}
-
-      {cardSlices.length > 0 && (
-        <View>
-          <Text style={[styles.label, { color: palette.ink3 }]}>
-            Metodo di pagamento
-          </Text>
-          <CategoryDonut
-            slices={cardSlices}
-            centerLabel={period.label.toLowerCase()}
-          />
-        </View>
-      )}
-
-      {sourceSlices.length > 0 && (
-        <View>
-          <View style={styles.filterHead}>
-            <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
-              Provenienza
-            </Text>
-            <Text style={[styles.filterNote, { color: palette.ink3 }]}>
-              numero di spese
-            </Text>
-          </View>
-          <CategoryDonut
-            slices={sourceSlices}
-            centerLabel="spese"
-            formatValue={(value) => String(Math.round(value))}
-          />
-        </View>
-      )}
-
-      {byMerchant.length > 0 && (
-        <View>
-          <Text style={[styles.label, { color: palette.ink3 }]}>
-            Dove spendi di più
-          </Text>
-
-          {byMerchant.map((merchant) => (
-            <TouchableOpacity
-              key={merchant.id}
-              style={styles.merchantRow}
-              onPress={() =>
-                explorer.openDetail({
-                  kind: "merchant",
-                  id: merchant.id,
-                  title: merchant.name,
-                  month: kind === "month" ? period.start : undefined,
-                })
-              }
-            >
-              <View
-                style={[
-                  styles.merchantIcon,
-                  { backgroundColor: tint(palette.accent, dark) },
-                ]}
-              >
-                <Text style={[styles.merchantInitial, { color: palette.accent }]}>
-                  {merchant.name.charAt(0).toUpperCase()}
-                </Text>
-              </View>
-
-              <View style={{ flex: 1 }}>
-                <Text
-                  style={[styles.merchantName, { color: palette.ink }]}
-                  numberOfLines={1}
-                >
-                  {merchant.name}
-                </Text>
-                <Text style={[styles.merchantMeta, { color: palette.ink3 }]}>
-                  {merchant.count} {merchant.count === 1 ? "spesa" : "spese"}
-                </Text>
-              </View>
-
-              <Text style={[styles.catValue, { color: palette.ink }]}>
-                {formatAmount(merchant.amount)}
-              </Text>
-              <Icon name="chevron-right" size={14} color={palette.ink3} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+      {/* A sinistra i totali e le ripartizioni, a destra gli andamenti e le
+          classifiche. In verticale l'ordine resta quello di sempre. */}
+      <TwoColumns
+        order={
+          <>
+            {totalSection}
+            {trendSection}
+            {rankSection}
+            {carouselSection}
+            {categorySection}
+            {savingsSection}
+            {cardSection}
+            {sourceSection}
+            {merchantSection}
+          </>
+        }
+        left={
+          <>
+            {totalSection}
+            {categorySection}
+            {cardSection}
+            {sourceSection}
+          </>
+        }
+        right={
+          <>
+            {trendSection}
+            {rankSection}
+            {carouselSection}
+            {savingsSection}
+            {merchantSection}
+          </>
+        }
+      />
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   content: { padding: space.lg, paddingBottom: space.xxl, gap: space.lg },
+  // Col rail accanto, il margine di 16 stringeva troppo il contenuto.
+  contentWide: { padding: 24, paddingBottom: space.xxl },
   title: { ...type.title },
   segment: { flexDirection: "row", gap: 4, borderRadius: 11, padding: 4 },
   segmentOption: {
