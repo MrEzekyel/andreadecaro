@@ -23,6 +23,13 @@ type Props = {
   onDelete: (category: Category) => void;
   /** Chiamato a trascinamento concluso, col nuovo ordine gia' scritto sul database. */
   onReordered: () => void;
+  /**
+   * Chiamato con `true` non appena una maniglia viene afferrata e con
+   * `false` al rilascio (o alla fine forzata del gesto). Chi include questo
+   * elenco dentro uno `ScrollView` deve spegnerne `scrollEnabled` mentre
+   * vale `true` — vedi la nota sotto su `onPanResponderTerminationRequest`.
+   */
+  onDragStateChange?: (dragging: boolean) => void;
 };
 
 /**
@@ -35,12 +42,23 @@ type Props = {
  * stessi gestori di gesto, che altrimenti vedrebbero closure ferme al
  * momento in cui sono stati creati); l'`sort_order` sul database si scrive
  * tutto insieme al rilascio, non ad ogni scambio.
+ *
+ * **`onPanResponderTerminationRequest: () => false` non e' opzionale qui.**
+ * Questo elenco vive dentro lo `ScrollView` di `CategoriesScreen`: senza
+ * quella riga, appena il dito si sposta in verticale lo `ScrollView` padre
+ * chiede di diventare lui il responder del gesto e, non essendoci nulla che
+ * rifiuti la richiesta, la ottiene — il trascinamento si "blocca" a meta'
+ * gesto (nessun altro `onPanResponderMove` arriva alla riga) mentre la
+ * lista sotto comincia a scorrere al suo posto. Stesso schema gia' usato in
+ * `AmountSlider`. Come seconda barriera (non solo la prima) si spegne anche
+ * lo scroll del genitore mentre si trascina, tramite `onDragStateChange`.
  */
 export function DraggableCategoryList({
   categories,
   onEdit,
   onDelete,
   onReordered,
+  onDragStateChange,
 }: Props) {
   const { palette, dark } = useTheme();
   const [order, setOrder] = useState(categories);
@@ -72,12 +90,22 @@ export function DraggableCategoryList({
       map.set(
         category.id,
         PanResponder.create({
+          // Cattura il gesto gia' al tocco, non solo al primo spostamento:
+          // e' la maniglia dedicata (l'icona "grip"), quindi appena viene
+          // toccata e' inequivocabile che si vuole trascinare, non scorrere.
           onStartShouldSetPanResponder: () => true,
+          onStartShouldSetPanResponderCapture: () => true,
+          // Una volta responder, non cederlo mai indietro: e' questa riga
+          // che manca finche' non viene aggiunta a far si' che lo
+          // `ScrollView` padre riesca a rubare il gesto non appena rileva
+          // uno spostamento verticale, fermando il trascinamento a meta'.
+          onPanResponderTerminationRequest: () => false,
           onPanResponderGrant: () => {
             const index = orderRef.current.findIndex((c) => c.id === category.id);
             startIndexRef.current = index === -1 ? 0 : index;
             dragY.setValue(0);
             setDraggingId(category.id);
+            onDragStateChange?.(true);
           },
           onPanResponderMove: (
             _evt: GestureResponderEvent,
@@ -102,6 +130,7 @@ export function DraggableCategoryList({
           onPanResponderRelease: async () => {
             setDraggingId(null);
             dragY.setValue(0);
+            onDragStateChange?.(false);
 
             const finalOrder = orderRef.current;
             await Promise.all(
@@ -113,6 +142,15 @@ export function DraggableCategoryList({
               )
             );
             onReordered();
+          },
+          // Se il gesto viene comunque interrotto da fuori (es. una chiamata
+          // in arrivo), la riga non deve restare "in trascinamento" per
+          // sempre: senza questo, draggingId resterebbe bloccato e lo
+          // `ScrollView` padre disattivato a vita.
+          onPanResponderTerminate: () => {
+            setDraggingId(null);
+            dragY.setValue(0);
+            onDragStateChange?.(false);
           },
         })
       );

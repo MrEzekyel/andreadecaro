@@ -16,6 +16,10 @@ export default function CategoriesScreen({ onBack }: { onBack: () => void }) {
 
   const [editing, setEditing] = useState<Category | null>(null);
   const [creating, setCreating] = useState(false);
+  // Spento mentre una categoria viene trascinata: senza, lo scroll verticale
+  // di questo ScrollView e il PanResponder della riga si contendono lo stesso
+  // gesto e il trascinamento si blocca a meta' (vedi DraggableCategoryList).
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   function confirmDelete(category: Category) {
     Alert.alert(
@@ -68,7 +72,7 @@ export default function CategoriesScreen({ onBack }: { onBack: () => void }) {
         </TouchableOpacity>
       </View>
 
-      <ScrollView contentContainerStyle={styles.list}>
+      <ScrollView contentContainerStyle={styles.list} scrollEnabled={scrollEnabled}>
         <DraggableCategoryList
           categories={categories}
           onEdit={(category) => {
@@ -77,6 +81,7 @@ export default function CategoriesScreen({ onBack }: { onBack: () => void }) {
           }}
           onDelete={confirmDelete}
           onReordered={reload}
+          onDragStateChange={(dragging) => setScrollEnabled(!dragging)}
         />
 
         <Text style={[styles.note, { color: palette.ink3 }]}>
