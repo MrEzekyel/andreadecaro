@@ -112,6 +112,27 @@ export default function TransactionDetailScreen({
     load();
   }, [load]);
 
+  /**
+   * Segna una quota come saldata — la stessa identica azione del tasto verde
+   * in `OwedScreen` ("Ti devono"): un `update` diretto su `payment_splits`,
+   * non una RPC, perche' la spesa di cui questa quota fa parte e' nostra e la
+   * policy di riga gia' lo permette. Solo chi ha pagato la conferma, e chi
+   * vede questa schermata l'ha pagata per definizione: ogni `payment_splits`
+   * qui appartiene a una spesa dell'utente che la sta guardando.
+   */
+  async function settleSplit(split: PaymentSplit) {
+    const { error } = await supabase
+      .from("payment_splits")
+      .update({ settled_at: new Date().toISOString() })
+      .eq("id", split.id);
+    if (error) {
+      Alert.alert("Errore", error.message);
+      return;
+    }
+    await load();
+    onChanged();
+  }
+
   async function toggleExcluded(value: boolean) {
     // Ottimistico: il tocco su uno switch deve rispondere subito, e in caso
     // di errore lo si riporta indietro.
@@ -312,17 +333,33 @@ export default function TransactionDetailScreen({
                       <Text style={[styles.rowLabel, { color: palette.ink2 }]}>
                         {personById(split.person_id)?.name ?? "—"}
                       </Text>
-                      <Text
-                        style={[
-                          styles.rowValue,
-                          {
-                            color: split.settled_at ? palette.good : palette.ink,
-                          },
-                        ]}
-                      >
-                        {formatAmount(Number(split.amount_owed))}
-                        {split.settled_at ? " · saldato" : ""}
-                      </Text>
+                      <View style={styles.splitValueWrap}>
+                        <Text
+                          style={[
+                            styles.rowValue,
+                            {
+                              color: split.settled_at ? palette.good : palette.ink,
+                            },
+                          ]}
+                        >
+                          {formatAmount(Number(split.amount_owed))}
+                          {split.settled_at ? " · saldato" : ""}
+                        </Text>
+                        {/* Stessa azione, stesso aspetto del tasto verde in
+                            "Ti devono" (OwedScreen): non serve uscire dalla
+                            spesa per confermare un saldo che si e' visto qui. */}
+                        {!split.settled_at && (
+                          <TouchableOpacity
+                            onPress={() => settleSplit(split)}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            accessibilityLabel={`Segna come saldato: ${
+                              personById(split.person_id)?.name ?? "quota"
+                            }`}
+                          >
+                            <Icon name="check" size={18} color={palette.good} />
+                          </TouchableOpacity>
+                        )}
+                      </View>
                     </View>
                   </View>
                 ))}
@@ -471,6 +508,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     textAlign: "right",
   },
+  splitValueWrap: { flexDirection: "row", alignItems: "center", gap: 9 },
   label: { ...type.label, marginBottom: space.sm },
   statsRow: { flexDirection: "row", gap: space.xxl },
   stat: { gap: 3 },
