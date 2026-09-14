@@ -23,6 +23,15 @@ import { computeSplit, SplitMode, SplitState } from "./SplitEditor";
  *  allunga esattamente come l'elenco che deve evitare di far scorrere. */
 const MAX_FAVORITES = 4;
 
+/** Minuscole e senza accenti: "Nicolò" si deve trovare scrivendo "nicolo". */
+function fold(value: string) {
+  return value
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "");
+}
+
 const MODE_LABEL: Record<SplitMode, string> = {
   equal: "In parti uguali",
   percent: "Percentuale",
@@ -42,6 +51,17 @@ type Props = {
   split: SplitState;
   onChange: (next: SplitState) => void;
   existingPersonIds: string[];
+  /**
+   * Vero quando la lettura delle quote già salvate per questa spesa è
+   * fallita: `existingPersonIds` in quel caso è vuoto non perché non ci sia
+   * nessuno, ma perché non si è potuto controllare. Una persona già in
+   * divisione sembrerebbe allora "nuova", e l'interruttore "già saldata"
+   * potrebbe chiudere in silenzio un credito aperto per davvero — la stessa
+   * classe di errore per cui `EditPaymentSheet` blocca già la riscrittura
+   * delle quote quando non le ha potute leggere (vedi CLAUDE.md, "una
+   * lettura fallita non deve poter diventare la base di un update/delete").
+   */
+  splitUnknown?: boolean;
 };
 
 /**
@@ -61,6 +81,7 @@ export function SplitPeopleSheet({
   split,
   onChange,
   existingPersonIds,
+  splitUnknown,
 }: Props) {
   const { palette, dark } = useTheme();
   const { people, reload } = useData();
@@ -72,9 +93,9 @@ export function SplitPeopleSheet({
   const favorites = useMemo(() => people.filter((p) => p.is_favorite), [people]);
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = fold(query);
     if (!q) return people;
-    return people.filter((p) => p.name.toLowerCase().includes(q));
+    return people.filter((p) => fold(p.name).includes(q));
   }, [people, query]);
 
   function togglePerson(id: string) {
@@ -243,8 +264,12 @@ export function SplitPeopleSheet({
               const isNew = !existingPersonIds.includes(person.id);
               // Ha senso dichiarare "gia' saldata" solo per un contatto senza
               // account Clinck (la quota di chi lo ha deve prima essere vista
-              // e accettata) e solo per una quota che non esiste ancora.
-              const canPreSettle = selected && !person.linked_user_id && isNew;
+              // e accettata) e solo per una quota che non esiste ancora — e
+              // solo se si sa davvero chi c'e' gia': con `splitUnknown` la
+              // lettura delle quote e' fallita, quindi "nuovo" potrebbe voler
+              // dire solo "non abbiamo potuto controllare".
+              const canPreSettle =
+                selected && !person.linked_user_id && isNew && !splitUnknown;
 
               return (
                 <View key={person.id} style={styles.personBlock}>

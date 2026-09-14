@@ -531,6 +531,7 @@ export function EditPaymentSheet({
           split={split}
           onChange={setSplit}
           existingPersonIds={existingPersonIds}
+          splitUnknown={splitUnknown}
           focusPicker={focusSplit}
         />
       </View>

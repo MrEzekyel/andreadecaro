@@ -118,6 +118,8 @@ type Props = {
    * ancora (`AddPaymentSheet`): li' ogni persona scelta e' per forza nuova.
    */
   existingPersonIds?: string[];
+  /** Passato a `SplitPeopleSheet`: vedi lì per il motivo. */
+  splitUnknown?: boolean;
   /**
    * Apre subito il foglio di scelta persone. Chi arriva dal tasto "Dividi
    * con altri" nel dettaglio di una spesa vuole scegliere subito con chi,
@@ -139,6 +141,7 @@ export function SplitEditor({
   split,
   onChange,
   existingPersonIds = [],
+  splitUnknown,
   focusPicker,
 }: Props) {
   const { palette, dark } = useTheme();
@@ -250,6 +253,7 @@ export function SplitEditor({
         split={split}
         onChange={onChange}
         existingPersonIds={existingPersonIds}
+        splitUnknown={splitUnknown}
       />
     </View>
   );

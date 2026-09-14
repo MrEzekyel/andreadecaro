@@ -209,17 +209,6 @@ export function useLimits() {
     [statuses]
   );
 
-  /** Il limite complessivo della settimana: prima non veniva letto da
-   *  nessuna schermata, restava impostato ma invisibile in Home. */
-  const weeklyOverall = useMemo(
-    () =>
-      statuses.find(
-        (status) =>
-          status.limit.period === "weekly" && status.limit.category_id === null
-      ),
-    [statuses]
-  );
-
   /** Limiti su una singola categoria, qualunque sia il periodo: sono quelli
    *  che Home mostra come righe sotto il semicerchio, non come avviso. */
   const categoryLimits = useMemo(
@@ -284,7 +273,6 @@ export function useLimits() {
     limits,
     statuses,
     monthlyOverall,
-    weeklyOverall,
     categoryLimits,
     alerts,
     goal,

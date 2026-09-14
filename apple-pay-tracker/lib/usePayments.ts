@@ -91,7 +91,12 @@ export function usePayments(month: Date) {
         .select("*, payment_splits!payment_splits_payment_id_fkey(settled_at, person_id)")
         .gte("occurred_at", start.toISOString())
         .lt("occurred_at", end.toISOString())
-        .order("occurred_at", { ascending: false }),
+        .order("occurred_at", { ascending: false })
+        // PostgREST non garantisce un ordine sulle risorse annidate: senza
+        // questo, `PaymentRow` (che mostra solo la prima persona di una
+        // divisione) potrebbe cambiare nome a ogni lettura pur non essendo
+        // cambiato nulla nella divisione.
+        .order("person_id", { referencedTable: "payment_splits" }),
       supabase
         .from("payments")
         .select("*")

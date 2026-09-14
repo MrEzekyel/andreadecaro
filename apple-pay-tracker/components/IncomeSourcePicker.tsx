@@ -19,7 +19,7 @@ function fold(value: string) {
     .trim()
     .toLowerCase()
     .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "");
+    .replace(/[\u0300-\u036f]/g, "");
 }
 
 /**
@@ -47,6 +47,12 @@ export function IncomeSourcePicker({ value, onChange, placeholder }: Props) {
     supabase
       .from("incomes")
       .select("label")
+      // Serve solo un campione di nomi distinti per suggerirli, non ogni
+      // entrata mai registrata: senza un limite, PostgREST tronca comunque
+      // a 1000 righe (silenziosamente) dopo anni d'uso — meglio chiederne
+      // esplicitamente un numero ragionevole, dalle più recenti.
+      .order("occurred_at", { ascending: false })
+      .limit(200)
       .then(({ data }) => {
         if (!data) return;
         const names = new Set<string>();

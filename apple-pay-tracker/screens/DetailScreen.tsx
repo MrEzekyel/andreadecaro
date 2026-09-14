@@ -118,7 +118,10 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
       // Vedi il commento in `usePayments.load`: serve il join disambiguato
       // per via del secondo riferimento a `payments` da `mirror_payment_id`.
       .select("*, payment_splits!payment_splits_payment_id_fkey(settled_at, person_id)")
-      .order("occurred_at", { ascending: false });
+      .order("occurred_at", { ascending: false })
+      // Vedi il commento in `usePayments.load`: senza, `PaymentRow` potrebbe
+      // mostrare un nome diverso ad ogni lettura per la stessa divisione.
+      .order("person_id", { referencedTable: "payment_splits" });
 
     if (target.kind === "merchant") {
       query = query.in("merchant_id", merchantFamily);

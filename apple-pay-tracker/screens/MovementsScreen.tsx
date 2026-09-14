@@ -368,7 +368,7 @@ function ExpensesList({
  * l'aggiunta spese sulla stessa tabbar.
  */
 function IncomeList({ month }: { month: Date }) {
-  const { palette, dark } = useTheme();
+  const { palette } = useTheme();
   const [incomes, setIncomes] = useState<Income[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);

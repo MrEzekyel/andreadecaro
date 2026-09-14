@@ -116,10 +116,13 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
         note: note.trim() || null,
         card_name: card.trim() || null,
         source: "manual",
-        // "Divisa" vuole almeno una persona: attivare l'interruttore senza
-        // sceglierne una non deve marcare la spesa come divisa con nessuno.
-        my_share:
-          split.enabled && split.personIds.length > 0 ? splitResult.myShare : null,
+        // `my_share` nasce sempre nullo: la spesa non e' "divisa" finche' le
+        // sue quote non esistono davvero. Se l'insert sotto fallisse dopo
+        // averlo gia' scritto qui, la spesa resterebbe con una quota
+        // dichiarata (effective_amount tagliato) senza nessuna riga di
+        // payment_splits a giustificarla — gli altri euro non sarebbero ne'
+        // spesi ne' un credito da nessuna parte, persi in silenzio.
+        my_share: null,
       })
       .select("id")
       .single();
@@ -132,7 +135,9 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
 
     // Le quote nascono insieme alla spesa, non in un secondo passaggio: ogni
     // riga e' per forza nuova, quindi qui e' un semplice insert — nessuna
-    // quota preesistente da preservare come in `EditPaymentSheet`.
+    // quota preesistente da preservare come in `EditPaymentSheet`. Solo a
+    // insert riuscito si scrive `my_share`: e' cosi' che la spesa diventa
+    // "divisa" — mai prima.
     if (split.enabled && split.personIds.length > 0) {
       const settleNow = settledOnInsertIds(split, people);
       const { error: splitError } = await supabase.from("payment_splits").insert(
@@ -149,6 +154,24 @@ export function AddPaymentSheet({ visible, onClose, onSaved }: Props) {
         Alert.alert(
           "Spesa salvata, ma non la divisione",
           `Le quote non sono state registrate: ${splitError.message}`
+        );
+        reloadData();
+        reset();
+        onSaved();
+        onClose();
+        return;
+      }
+
+      const { error: shareError } = await supabase
+        .from("payments")
+        .update({ my_share: splitResult.myShare })
+        .eq("id", inserted.id);
+
+      if (shareError) {
+        setSaving(false);
+        Alert.alert(
+          "Spesa salvata, ma non la divisione",
+          `Le quote sono state registrate, ma la spesa non risulta ancora divisa: ${shareError.message}`
         );
         reloadData();
         reset();
