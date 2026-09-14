@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, {
   Circle,
@@ -13,7 +13,12 @@ import { useTheme } from "../lib/ThemeContext";
 import { compactAmount, formatAmount } from "../lib/format";
 import { type } from "../lib/theme";
 
-const WIDTH = 320;
+/**
+ * Larghezza di ripiego, usata solo per il primo fotogramma: dal secondo in poi
+ * vale quella misurata. Serve perche' i punti si calcolano prima che
+ * `onLayout` abbia detto quanto e' larga la scheda che ospita il grafico.
+ */
+const FALLBACK_WIDTH = 320;
 /** Colonna riservata alle etichette dell'asse y. */
 const GUTTER = 30;
 const TOP = 10;
@@ -124,6 +129,19 @@ export function TrendChart({
 }: Props) {
   const { palette } = useTheme();
 
+  /**
+   * Il viewBox segue la larghezza vera del contenitore invece di restare
+   * fisso a 320.
+   *
+   * Con un viewBox fisso e `preserveAspectRatio` di default, su una scheda
+   * larga il grafico non si allargava: restava a grandezza naturale in mezzo
+   * al vuoto, perche' l'altezza era il vincolo che decideva la scala. Ora il
+   * viewBox coincide con la larghezza misurata, quindi il disegno e' sempre
+   * in scala 1:1 — le etichette restano nitide alla loro dimensione vera e i
+   * punti si distribuiscono su tutto lo spazio disponibile.
+   */
+  const [width, setWidth] = useState(FALLBACK_WIDTH);
+
   // Indice originale conservato: e' quello che posiziona il punto sull'asse
   // del mese intero, non la sua posizione fra i soli giorni gia' trascorsi.
   const noti = points
@@ -143,7 +161,7 @@ export function TrendChart({
     yTicks.push(value);
   }
 
-  const plotWidth = WIDTH - GUTTER;
+  const plotWidth = width - GUTTER;
   const xOf = (index: number) =>
     GUTTER + (index / Math.max(points.length - 1, 1)) * plotWidth;
   const yOf = (value: number) => BASE - (value / chartMax) * PLOT_H;
@@ -178,8 +196,14 @@ export function TrendChart({
       : null;
 
   return (
-    <View>
-      <Svg width="100%" height={HEIGHT} viewBox={`0 0 ${WIDTH} ${HEIGHT}`}>
+    <View
+      onLayout={(event) => {
+        const measured = Math.round(event.nativeEvent.layout.width);
+        // Il confronto evita il ciclo re-render -> layout -> re-render.
+        if (measured > 0 && measured !== width) setWidth(measured);
+      }}
+    >
+      <Svg width="100%" height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`}>
         <Defs>
           <LinearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0%" stopColor={color} stopOpacity="0.24" />
@@ -194,7 +218,7 @@ export function TrendChart({
               <Line
                 x1={GUTTER}
                 y1={y}
-                x2={WIDTH}
+                x2={width}
                 y2={y}
                 stroke={palette.hairline}
                 strokeWidth={1}
@@ -216,7 +240,7 @@ export function TrendChart({
         <Line
           x1={GUTTER}
           y1={BASE}
-          x2={WIDTH}
+          x2={width}
           y2={BASE}
           stroke={palette.hairline}
           strokeWidth={1}
@@ -227,7 +251,7 @@ export function TrendChart({
             <Line
               x1={GUTTER}
               y1={limitY}
-              x2={WIDTH}
+              x2={width}
               y2={limitY}
               stroke={palette.limit}
               strokeWidth={1.5}
@@ -235,7 +259,7 @@ export function TrendChart({
               opacity={0.65}
             />
             <SvgText
-              x={WIDTH}
+              x={width}
               y={Math.max(limitY - 4, 8)}
               textAnchor="end"
               fontSize={8}

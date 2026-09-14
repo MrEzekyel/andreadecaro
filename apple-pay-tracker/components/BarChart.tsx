@@ -1,11 +1,15 @@
-import React, { useRef } from "react";
-import { ScrollView, View } from "react-native";
+import React, { useRef, useState } from "react";
+import { LayoutChangeEvent, ScrollView, View } from "react-native";
 import Svg, { Line, Rect, Text as SvgText } from "react-native-svg";
 import { useTheme } from "../lib/ThemeContext";
 import { Bucket } from "../lib/aggregate";
 import { compactAmount } from "../lib/format";
 
-const WIDTH = 320;
+/**
+ * Larghezza di ripiego per il primo fotogramma, prima che `onLayout` abbia
+ * detto quanto e' larga la scheda che ospita il grafico.
+ */
+const FALLBACK_WIDTH = 320;
 /** Colonna riservata alle etichette dell'asse y. */
 const GUTTER = 26;
 /** Aria sopra le colonne, per i valori scritti sulle cime. */
@@ -59,6 +63,17 @@ export function BarChart({
   minColumnWidth,
 }: Props) {
   const { palette } = useTheme();
+
+  /**
+   * Larghezza vera del contenitore, non un valore fisso.
+   *
+   * Con il viewBox fermo a 320 il grafico non si allargava su una scheda piu'
+   * larga: restava a grandezza naturale al centro, perche' con
+   * `preserveAspectRatio` di default era l'altezza a decidere la scala.
+   * Misurandola, il disegno resta in scala 1:1 e le colonne occupano tutto lo
+   * spazio che hanno.
+   */
+  const [boxWidth, setBoxWidth] = useState(FALLBACK_WIDTH);
   const scroller = useRef<ScrollView>(null);
 
   const values = buckets.map((b) => (metric === "amount" ? b.total : b.count));
@@ -87,9 +102,10 @@ export function BarChart({
   // Scorrendo, l'asse dei valori esce dal disegno e viene ridisegnato fermo
   // accanto: se scorresse via anche lui le colonne resterebbero senza scala.
   const scorre =
-    minColumnWidth != null && GUTTER + buckets.length * minColumnWidth > WIDTH;
+    minColumnWidth != null &&
+    GUTTER + buckets.length * minColumnWidth > boxWidth;
   const gutter = scorre ? 0 : GUTTER;
-  const width = scorre ? buckets.length * minColumnWidth! : WIDTH;
+  const width = scorre ? buckets.length * minColumnWidth! : boxWidth;
 
   const plotWidth = width - gutter;
   const barWidth = Math.max(
@@ -250,10 +266,19 @@ export function BarChart({
     </Svg>
   );
 
-  if (!scorre) return <View>{disegno}</View>;
+  const misura = (event: LayoutChangeEvent) => {
+    const measured = Math.round(event.nativeEvent.layout.width);
+    // Il confronto evita il ciclo re-render -> layout -> re-render.
+    if (measured > 0 && measured !== boxWidth) setBoxWidth(measured);
+  };
+
+  if (!scorre) return <View onLayout={misura}>{disegno}</View>;
 
   return (
-    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+    <View
+      onLayout={misura}
+      style={{ flexDirection: "row", alignItems: "flex-start" }}
+    >
       {/* L'asse dei valori sta fuori dallo scorrimento: e' il riferimento
           rispetto a cui si leggono le colonne, e seguirle scivolando via lo
           renderebbe inutile proprio mentre serve. */}

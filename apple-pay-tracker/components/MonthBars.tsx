@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { StyleSheet, Text, View } from "react-native";
 import Svg, { Line, Rect, Text as SvgText } from "react-native-svg";
 import { useTheme } from "../lib/ThemeContext";
@@ -24,7 +24,11 @@ type Props = {
    * sbagliata.
    */
   selectedKey?: string;
-  /** Larghezza del viewBox: la carta a meta' schermo ne usa una piu' stretta. */
+  /**
+   * Larghezza del viewBox. Se non si passa, si misura il contenitore: il
+   * valore fisso di prima teneva il grafico piccolo al centro di una scheda
+   * larga invece di farlo crescere con lei.
+   */
   width?: number;
   height?: number;
   /** Etichette dei mesi sotto le barre: si spengono quando lo spazio manca. */
@@ -52,26 +56,35 @@ export function MonthBars({
   bars,
   color,
   selectedKey,
-  width = 128,
+  width,
   height = 76,
   showLabels = true,
 }: Props) {
   const { palette } = useTheme();
+  const [measured, setMeasured] = useState(128);
 
   if (bars.length === 0) return null;
 
+  const larghezza = width ?? measured;
   const axisH = showLabels ? 12 : 2;
   const plotH = height - axisH;
   const peak = Math.max(...bars.map((b) => b.value), 1);
-  const slot = width / bars.length;
+  const slot = larghezza / bars.length;
   const barW = Math.min(slot * 0.62, 26);
   // Il valore sopra ogni barra vuole la sua fascia: senza, la barra piu' alta
   // si prendeva tutta l'altezza e il numero finiva fuori dal viewBox.
-  const valueFont = width > 200 ? 8 : 6.4;
+  const valueFont = larghezza > 200 ? 8 : 6.4;
   const headroom = valueFont + 5;
 
   return (
-    <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
+    <View
+      onLayout={(event) => {
+        const value = Math.round(event.nativeEvent.layout.width);
+        // Il confronto evita il ciclo re-render -> layout -> re-render.
+        if (value > 0 && value !== measured) setMeasured(value);
+      }}
+    >
+    <Svg width="100%" height={height} viewBox={`0 0 ${larghezza} ${height}`}>
       {/* Niente riga della media qui sopra: era un riferimento che nessun mese
           toccava e rubava lo spazio ai numeri veri, che sono quelli che
           rispondono a "quanto". La media sta scritta accanto al titolo. */}
@@ -120,7 +133,7 @@ export function MonthBars({
       <Line
         x1={0}
         y1={plotH}
-        x2={width}
+        x2={larghezza}
         y2={plotH}
         stroke={palette.hairline}
         strokeWidth={1}
@@ -144,6 +157,7 @@ export function MonthBars({
           );
         })}
     </Svg>
+    </View>
   );
 }
 
