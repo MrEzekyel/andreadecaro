@@ -6,6 +6,7 @@ import Svg, {
   Line,
   LinearGradient,
   Path,
+  Rect,
   Stop,
   Text as SvgText,
 } from "react-native-svg";
@@ -29,6 +30,15 @@ export type BalancePoint = {
   income?: number;
   /** Investito quel giorno: scende come una spesa, ma non e' speso. */
   invested?: number;
+  /**
+   * Quanto di quel giorno era un costo fisso (mutuo, rate), se c'e'.
+   *
+   * La linea scende comunque di tutto l'importo speso quel giorno — i costi
+   * fissi sono spesa vera, non vanno tolti dal saldo — ma senza un segno
+   * proprio una rata sembra una discesa qualunque fra le altre, e non si
+   * capisce quanto del calo del mese fosse gia' impegnato dall'inizio.
+   */
+  fixedCost?: number;
 };
 
 type Props = {
@@ -64,11 +74,25 @@ export function BalanceChart({
   }
 
   const values = points.map((p) => p.value);
-  const peak = Math.max(...values, 0);
-  // Il fondo scende sotto zero solo se il saldo ci e' andato davvero: un asse
-  // che parte sempre da zero schiaccerebbe la linea nella meta' alta quando i
-  // valori stanno tutti in alto, e non si vedrebbe piu' nessuna variazione.
-  const floor = Math.min(...values, 0);
+  const trueMax = Math.max(...values, 0);
+  const trueMin = Math.min(...values);
+  /**
+   * Il fondo scende sotto zero SOLO se il saldo ci e' andato davvero (nota di
+   * design invariata): quando resta sempre positivo il fondo segue il minimo
+   * vero, non piu' sempre zero.
+   *
+   * Forzare lo zero come fondo scala anche quando il saldo non ci si avvicina
+   * mai schiaccia le variazioni vere in una fascia minuscola: un introito
+   * grande il giorno 1 (es. lo stipendio) porta subito il saldo in alto, e da
+   * li' in poi tutta la spesa del mese — la parte che si vuole davvero
+   * leggere — si muoveva in una fascia stretta vicino alla cima di una scala
+   * alta il triplo di quanto serve. Il margine sotto al minimo vero (15%
+   * dello scarto osservato) lascia respiro alla linea senza inventare un
+   * fondo scala che i dati non giustificano.
+   */
+  const cushion = Math.max(trueMax - trueMin, 1) * 0.15;
+  const floor = trueMin < 0 ? trueMin : Math.max(0, trueMin - cushion);
+  const peak = trueMax;
   const span = Math.max(peak - floor, 1);
 
   const plotW = WIDTH - PAD_L;
@@ -181,6 +205,36 @@ export function BalanceChart({
             </React.Fragment>
           ))}
 
+        {/* I costi fissi scendono come qualunque altra spesa (mutuo e rate
+            sono spesa vera, non vanno tolti dalla linea) ma prendono un
+            segno diverso — un quadretto invece di un pallino, nello stesso
+            ink neutro con cui SemiGauge segna i costi fissi qui in Home —
+            cosi' fra tutte le altre discese si vede quale non e' una spesa
+            nuova ma un impegno gia' preso dall'inizio del mese. */}
+        {coords
+          .filter((c) => c.fixedCost && c.fixedCost > 0)
+          .map((c) => (
+            <React.Fragment key={`fix-${c.day}`}>
+              <Rect
+                x={c.x - 3.2}
+                y={c.y - 3.2}
+                width={6.4}
+                height={6.4}
+                rx={1.5}
+                fill={palette.ink}
+              />
+              <SvgText
+                x={Math.min(c.x + 4, WIDTH - 4)}
+                y={Math.min(c.y + 18, BASE - 2)}
+                textAnchor={c.x > WIDTH - 50 ? "end" : "start"}
+                fontSize={8}
+                fill={palette.ink3}
+              >
+                {`−${compactAmount(c.fixedCost as number)} fisso`}
+              </SvgText>
+            </React.Fragment>
+          ))}
+
         <Circle cx={last.x} cy={last.y} r={5} fill={palette.ground} />
         <Circle cx={last.x} cy={last.y} r={3.4} fill={palette.good} />
 
@@ -198,18 +252,45 @@ export function BalanceChart({
         </SvgText>
       </Svg>
 
-      <Text style={[styles.foot, { color: palette.ink2 }]}>
-        Oggi ti restano{" "}
-        <Text style={{ color: palette.good, fontWeight: "600" }}>
-          {formatAmount(last.value)}
+      <View style={styles.footRow}>
+        <Text style={[styles.foot, { color: palette.ink2 }]}>
+          Oggi ti restano{" "}
+          <Text style={{ color: palette.good, fontWeight: "600" }}>
+            {formatAmount(last.value)}
+          </Text>
+          , al netto di spese e investimenti
         </Text>
-        , al netto di spese e investimenti
-      </Text>
+
+        {/* Legenda solo per il segno che da solo non si spiega — il pallino
+            verde/azzurro dell'introito/investimento e' gia' accanto al suo
+            importo, il quadretto dei costi fissi lo stesso, ma il colore
+            (ink) e' condiviso con altro testo del grafico: un campione qui
+            toglie ogni dubbio, come gia' fa la legenda dei costi fissi sotto
+            il semicerchio Uscite. */}
+        {coords.some((c) => c.fixedCost && c.fixedCost > 0) && (
+          <View style={styles.legendItem}>
+            <View style={[styles.legendSwatch, { backgroundColor: palette.ink }]} />
+            <Text style={[styles.legendText, { color: palette.ink3 }]}>
+              costi fissi
+            </Text>
+          </View>
+        )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   empty: { ...type.caption, lineHeight: 19 },
-  foot: { ...type.caption, marginTop: 4, fontVariant: ["tabular-nums"] },
+  footRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 4,
+  },
+  foot: { ...type.caption, flexShrink: 1, fontVariant: ["tabular-nums"] },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  legendSwatch: { width: 7, height: 7, borderRadius: 1.5 },
+  legendText: { ...type.small, fontSize: 10 },
 });
