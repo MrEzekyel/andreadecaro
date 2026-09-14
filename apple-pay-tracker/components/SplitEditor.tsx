@@ -1,12 +1,12 @@
-import React, { useState } from "react";
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from "react-native";
+import React, { useEffect, useState } from "react";
+import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount } from "../lib/format";
-import { radius, space, type } from "../lib/theme";
+import { radius, space, tint, type } from "../lib/theme";
 import { Person } from "../lib/types";
-import { AddPersonSheet } from "./AddPersonSheet";
 import { Icon } from "./Icon";
+import { SplitPeopleSheet } from "./SplitPeopleSheet";
 
 export type SplitMode = "equal" | "percent" | "exact";
 
@@ -17,6 +17,21 @@ export type SplitState = {
   personIds: string[];
   /** Per 'percent' la percentuale altrui, per 'exact' l'importo altrui. */
   values: Record<string, string>;
+  /**
+   * Persone locali segnate "gia' saldata" nel momento in cui si sceglie la
+   * divisione: fa scrivere `settled_at` sulla riga `payment_splits` quando
+   * quella riga **nasce**, invece di lasciarlo null come sempre.
+   *
+   * Ha senso solo per chi non ha un account Clinck collegato — vedi
+   * `settledOnInsertIds` piu' sotto, che e' anche il posto dove il filtro si
+   * riapplica in scrittura, non solo qui nell'interfaccia — e solo per una
+   * quota che non esisteva gia': ri-saldare una quota gia' salvata si fa dal
+   * tasto verde di conferma (`OwedScreen`, `PersonDetailScreen`, il dettaglio
+   * della spesa), mai riaprendo l'editor della divisione, altrimenti
+   * salvare una nota su una spesa gia' divisa potrebbe chiudere in silenzio
+   * un credito che l'altra persona non ha ancora saldato davvero.
+   */
+  settledOnCreate: Record<string, boolean>;
 };
 
 export const emptySplit: SplitState = {
@@ -24,6 +39,7 @@ export const emptySplit: SplitState = {
   mode: "equal",
   personIds: [],
   values: {},
+  settledOnCreate: {},
 };
 
 function toNumber(value: string) {
@@ -72,75 +88,86 @@ function round(value: number) {
   return Math.round(value * 100) / 100;
 }
 
+/**
+ * Chi, fra le persone scelte, deve nascere gia' segnata come saldata.
+ *
+ * Il filtro su `linked_user_id` sta anche qui e non solo nell'interfaccia
+ * (che gia' non mostra l'interruttore a una persona collegata): la quota di
+ * chi ha Clinck deve prima essere vista e accettata dall'altra parte, quindi
+ * non esiste ancora niente da dichiarare saldato — se lo stato arrivasse
+ * incoerente, la scrittura non deve fidarsi di quello che ha disegnato lo
+ * schermo.
+ */
+export function settledOnInsertIds(split: SplitState, people: Person[]): Set<string> {
+  const linked = new Set(people.filter((p) => p.linked_user_id).map((p) => p.id));
+  const ids = new Set<string>();
+  for (const id of split.personIds) {
+    if (split.settledOnCreate[id] && !linked.has(id)) ids.add(id);
+  }
+  return ids;
+}
+
 type Props = {
   total: number;
   split: SplitState;
   onChange: (next: SplitState) => void;
+  /**
+   * Person id gia' salvati per questa spesa quando il foglio si e' aperto:
+   * solo chi non c'e' qui dentro e' una quota davvero nuova, l'unico caso in
+   * cui "gia' saldato" ha senso offrire. Vuoto per una spesa che non esiste
+   * ancora (`AddPaymentSheet`): li' ogni persona scelta e' per forza nuova.
+   */
+  existingPersonIds?: string[];
+  /**
+   * Apre subito il foglio di scelta persone. Chi arriva dal tasto "Dividi
+   * con altri" nel dettaglio di una spesa vuole scegliere subito con chi,
+   * non vedere un riassunto vuoto con un altro tasto da toccare prima.
+   */
+  focusPicker?: boolean;
 };
 
-const MODE_LABEL: Record<SplitMode, string> = {
-  equal: "In parti uguali",
-  percent: "Percentuale",
-  exact: "Importo esatto",
-};
-
-export function SplitEditor({ total, split, onChange }: Props) {
+/**
+ * La divisione, riassunta in poche righe dentro il foglio di aggiunta o
+ * modifica spesa: l'elenco di chi c'e' dentro, quanto resta a te, e un tasto
+ * che apre `SplitPeopleSheet` — il foglio dedicato a scegliere le persone e
+ * gli importi. Prima l'intero elenco della rubrica (checkbox una per una)
+ * viveva qui: con venti contatti diventava piu' lungo di tutto il resto del
+ * foglio "Nuova spesa" messo insieme.
+ */
+export function SplitEditor({
+  total,
+  split,
+  onChange,
+  existingPersonIds = [],
+  focusPicker,
+}: Props) {
   const { palette, dark } = useTheme();
-  const { people, reload } = useData();
-  const [addingPerson, setAddingPerson] = useState(false);
+  const { people } = useData();
+  const [pickerOpen, setPickerOpen] = useState(false);
+
+  useEffect(() => {
+    if (focusPicker) setPickerOpen(true);
+  }, [focusPicker]);
 
   const result = computeSplit(total, split);
+  const selected = split.personIds
+    .map((id) => people.find((p) => p.id === id))
+    .filter((p): p is Person => !!p);
 
-  function togglePerson(id: string) {
-    const has = split.personIds.includes(id);
-    onChange({
-      ...split,
-      personIds: has
-        ? split.personIds.filter((p) => p !== id)
-        : [...split.personIds, id],
-    });
-  }
-
-  async function onPersonCreated(person: Person) {
-    await reload();
-    setAddingPerson(false);
-    onChange({
-      ...split,
-      enabled: true,
-      personIds: [...split.personIds, person.id],
-    });
-  }
-
-  const addPersonRow = (
-    <TouchableOpacity style={styles.addPerson} onPress={() => setAddingPerson(true)}>
-      <Icon name="user-plus" size={15} color={palette.accent} />
-      <Text style={[styles.addPersonLabel, { color: palette.accent }]}>
-        Aggiungi persona
-      </Text>
-    </TouchableOpacity>
-  );
-
-  if (people.length === 0) {
-    return (
-      <View style={styles.wrap}>
-        <Text style={[styles.hint, { color: palette.ink3 }]}>
-          Per dividere una spesa aggiungi prima qualcuno con cui condividerla.
-        </Text>
-        {addPersonRow}
-        <AddPersonSheet
-          visible={addingPerson}
-          onClose={() => setAddingPerson(false)}
-          onCreated={onPersonCreated}
-        />
-      </View>
-    );
+  function toggleEnabled() {
+    const next = !split.enabled;
+    onChange({ ...split, enabled: next });
+    // Attivare la divisione vuole dire subito scegliere con chi: mostrare un
+    // riassunto vuoto con un altro tasto da toccare sarebbe un passo in piu'
+    // senza motivo.
+    if (next) setPickerOpen(true);
   }
 
   return (
     <View style={styles.wrap}>
       <TouchableOpacity
         style={styles.toggle}
-        onPress={() => onChange({ ...split, enabled: !split.enabled })}
+        onPress={toggleEnabled}
         accessibilityRole="switch"
         accessibilityState={{ checked: split.enabled }}
       >
@@ -163,145 +190,66 @@ export function SplitEditor({ total, split, onChange }: Props) {
       </TouchableOpacity>
 
       {split.enabled && (
-        <>
-          <View style={[styles.segment, { backgroundColor: palette.surface2 }]}>
-            {(Object.keys(MODE_LABEL) as SplitMode[]).map((mode) => (
-              <TouchableOpacity
-                key={mode}
-                onPress={() => onChange({ ...split, mode })}
-                style={[
-                  styles.segmentOption,
-                  split.mode === mode && { backgroundColor: palette.surface },
-                ]}
-              >
-                <Text
+        <TouchableOpacity
+          style={[styles.summary, { backgroundColor: palette.surface2 }]}
+          onPress={() => setPickerOpen(true)}
+          accessibilityRole="button"
+        >
+          {selected.length > 0 && (
+            <View style={styles.avatarRow}>
+              {selected.slice(0, 4).map((person, index) => (
+                <View
+                  key={person.id}
                   style={[
-                    styles.segmentLabel,
-                    { color: split.mode === mode ? palette.ink : palette.ink3 },
+                    styles.avatar,
+                    {
+                      backgroundColor: tint(palette.accent, dark),
+                      borderColor: palette.surface2,
+                      marginLeft: index === 0 ? 0 : -11,
+                    },
                   ]}
-                  numberOfLines={1}
                 >
-                  {MODE_LABEL[mode]}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-
-          {people.map((person) => {
-            const selected = split.personIds.includes(person.id);
-            return (
-              <View key={person.id} style={styles.personRow}>
-                <TouchableOpacity
-                  style={styles.personMain}
-                  onPress={() => togglePerson(person.id)}
-                >
-                  <View
-                    style={[
-                      styles.box,
-                      {
-                        borderColor: selected ? palette.accent : palette.ink3,
-                        backgroundColor: selected ? palette.accent : "transparent",
-                      },
-                    ]}
-                  >
-                    {selected && (
-                      <Icon
-                        name="check"
-                        size={11}
-                        color={palette.onAccent}
-                        strokeWidth={3}
-                      />
-                    )}
-                  </View>
-                  <Text style={[styles.personName, { color: palette.ink }]}>
-                    {person.name}
+                  <Text style={[styles.avatarText, { color: palette.accent }]}>
+                    {person.name.charAt(0).toUpperCase()}
                   </Text>
-                  {/* Chi ha Clinck riceve la quota sull'app e deve
-                      accettarla: e' una differenza di conseguenze, non un
-                      dettaglio del profilo, e va vista **prima** di
-                      spuntare la casella. */}
-                  {person.linked_user_id && (
-                    <Icon name="at-sign" size={12} color={palette.good} />
-                  )}
-                </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+          )}
 
-                {selected && split.mode !== "equal" && (
-                  <TextInput
-                    value={split.values[person.id] ?? ""}
-                    onChangeText={(text) =>
-                      onChange({
-                        ...split,
-                        values: { ...split.values, [person.id]: text },
-                      })
-                    }
-                    keyboardType="decimal-pad"
-                    placeholder={split.mode === "percent" ? "%" : "€"}
-                    placeholderTextColor={palette.ink3}
-                    style={[
-                      styles.valueInput,
-                      {
-                        backgroundColor: palette.surface,
-                        borderColor: palette.hairline,
-                        color: palette.ink,
-                      },
-                    ]}
-                  />
-                )}
-
-                {selected && (
-                  <Text style={[styles.owed, { color: palette.ink2 }]}>
-                    {formatAmount(result.owed[person.id] ?? 0)}
-                  </Text>
-                )}
-              </View>
-            );
-          })}
-
-          {addPersonRow}
-
-          <View
-            style={[
-              styles.summary,
-              {
-                backgroundColor: result.valid
-                  ? palette.surface2
-                  : `${palette.over}1f`,
-              },
-            ]}
-          >
-            <Text style={[styles.summaryLabel, { color: palette.ink2 }]}>
-              {result.valid
-                ? "Resta a te"
-                : "Le quote superano il totale pagato"}
+          <View style={styles.summaryText}>
+            <Text style={[styles.summaryTitle, { color: palette.ink }]} numberOfLines={1}>
+              {selected.length === 0
+                ? "Scegli con chi dividerla"
+                : selected.length === 1
+                  ? selected[0].name
+                  : `${selected[0].name} e altri ${selected.length - 1}`}
             </Text>
             <Text
               style={[
-                styles.summaryValue,
-                { color: result.valid ? palette.ink : palette.over },
+                styles.summaryHint,
+                { color: result.valid ? palette.ink3 : palette.over },
               ]}
             >
-              {formatAmount(result.myShare)}
+              {selected.length === 0
+                ? "Tocca per cercare in rubrica"
+                : result.valid
+                  ? `Resta a te ${formatAmount(result.myShare)}`
+                  : "Le quote superano il totale pagato"}
             </Text>
           </View>
 
-          {/* Detto una volta sola sotto, non su ogni riga: salvando parte
-              qualcosa verso un'altra persona, e chi divide deve saperlo
-              prima di premere Salva, non scoprirlo dopo. */}
-          {split.personIds.some(
-            (id) => people.find((p) => p.id === id)?.linked_user_id
-          ) && (
-            <Text style={[styles.hint, { color: palette.ink3 }]}>
-              La quota di chi ha Clinck gli arriva sull'app: dovrà accettarla,
-              e da quel momento la spesa comparirà anche nei suoi conti.
-            </Text>
-          )}
-        </>
+          <Icon name="chevron-right" size={17} color={palette.ink3} />
+        </TouchableOpacity>
       )}
 
-      <AddPersonSheet
-        visible={addingPerson}
-        onClose={() => setAddingPerson(false)}
-        onCreated={onPersonCreated}
+      <SplitPeopleSheet
+        visible={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        total={total}
+        split={split}
+        onChange={onChange}
+        existingPersonIds={existingPersonIds}
       />
     </View>
   );
@@ -309,7 +257,6 @@ export function SplitEditor({ total, split, onChange }: Props) {
 
 const styles = StyleSheet.create({
   wrap: { gap: space.md },
-  hint: { ...type.small, lineHeight: 17 },
   toggle: { flexDirection: "row", alignItems: "center", gap: 9 },
   toggleLabel: { ...type.body },
   box: {
@@ -320,43 +267,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  segment: { flexDirection: "row", gap: 4, borderRadius: 11, padding: 4 },
-  segmentOption: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 8,
-    paddingHorizontal: 4,
-    borderRadius: 8,
-  },
-  segmentLabel: { ...type.small, fontSize: 11, fontWeight: "500" },
-  personRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  personMain: { flexDirection: "row", alignItems: "center", gap: 9, flex: 1 },
-  personName: { ...type.body },
-  valueInput: {
-    borderWidth: 1,
-    borderRadius: radius.field,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
-    width: 74,
-    textAlign: "right",
-    ...type.caption,
-  },
-  owed: {
-    ...type.caption,
-    fontVariant: ["tabular-nums"],
-    width: 72,
-    textAlign: "right",
-  },
   summary: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
-    borderRadius: radius.field,
+    gap: space.sm,
+    borderRadius: radius.card,
     paddingHorizontal: 13,
-    paddingVertical: 11,
+    paddingVertical: 12,
   },
-  summaryLabel: { ...type.caption, flex: 1 },
-  summaryValue: { ...type.bodyMedium, fontVariant: ["tabular-nums"] },
-  addPerson: { flexDirection: "row", alignItems: "center", gap: 7, paddingVertical: 4 },
-  addPersonLabel: { ...type.caption, fontWeight: "500" },
+  avatarRow: { flexDirection: "row" },
+  avatar: {
+    width: 30,
+    height: 30,
+    borderRadius: radius.pill,
+    borderWidth: 2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  avatarText: { ...type.caption, fontWeight: "600" },
+  summaryText: { flex: 1, gap: 2 },
+  summaryTitle: { ...type.bodyMedium },
+  summaryHint: { ...type.small },
 });

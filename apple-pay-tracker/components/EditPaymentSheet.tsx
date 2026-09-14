@@ -25,6 +25,7 @@ import { Sheet } from "./Sheet";
 import {
   computeSplit,
   emptySplit,
+  settledOnInsertIds,
   SplitEditor,
   SplitState,
 } from "./SplitEditor";
@@ -53,7 +54,7 @@ export function EditPaymentSheet({
   focusSplit,
 }: Props) {
   const { palette, dark } = useTheme();
-  const { categoryById, merchants, merchantById, reload: reloadData } = useData();
+  const { categoryById, people, merchants, merchantById, reload: reloadData } = useData();
 
   /**
    * L'insegna e tutti i suoi punti vendita.
@@ -94,6 +95,12 @@ export function EditPaymentSheet({
    * silenzio.
    */
   const [splitUnknown, setSplitUnknown] = useState(false);
+  /**
+   * Person id che avevano gia' una quota salvata quando il foglio si e'
+   * aperto: distingue chi e' "nuovo" in questa sessione di modifica, il solo
+   * caso in cui "gia' saldato" ha senso offrire — vedi `SplitEditor.tsx`.
+   */
+  const [existingPersonIds, setExistingPersonIds] = useState<string[]>([]);
   const [siblingCount, setSiblingCount] = useState(0);
   const [applyToAll, setApplyToAll] = useState(true);
   const [remember, setRemember] = useState(true);
@@ -114,6 +121,7 @@ export function EditPaymentSheet({
     setSiblingCount(0);
     setSplit(focusSplit ? { ...emptySplit, enabled: true } : emptySplit);
     setSplitUnknown(false);
+    setExistingPersonIds([]);
 
     // Le quote gia' salvate vanno ricaricate come importi esatti: e' l'unica
     // modalita' che rappresenta fedelmente qualunque divisione precedente,
@@ -125,6 +133,7 @@ export function EditPaymentSheet({
       .then(({ data, error }) => {
         setSplitUnknown(Boolean(error));
         if (error || !data || data.length === 0) return;
+        setExistingPersonIds(data.map((row) => row.person_id));
         setSplit({
           enabled: true,
           mode: "exact",
@@ -135,6 +144,7 @@ export function EditPaymentSheet({
               String(row.amount_owed).replace(".", ","),
             ])
           ),
+          settledOnCreate: {},
         });
       });
   }, [payment, focusSplit]);
@@ -265,27 +275,51 @@ export function EditPaymentSheet({
     }
 
     if (wanted.length > 0) {
-      const rows = wanted.map((personId) => ({
+      // Chi nasce gia' segnato "gia' saldato": solo persone davvero nuove in
+      // questa sessione (non c'erano in `existingPersonIds`) e senza account
+      // collegato — vedi `settledOnInsertIds`. Per loro sola la riga porta
+      // `settled_at` gia' valorizzato; per tutte le altre quella colonna non
+      // fa parte della scrittura, quindi su un conflitto (la quota c'era
+      // gia') resta esattamente com'era — stato, accettazione e l'eventuale
+      // "saldato" impostato altrove non vengono toccati da questo salvataggio.
+      const settleNow = new Set(
+        [...settledOnInsertIds(split, people)].filter(
+          (id) => !existingPersonIds.includes(id)
+        )
+      );
+      const rest = wanted.filter((id) => !settleNow.has(id));
+
+      // `onConflict` sul vincolo che esiste gia' da sempre: la quota di chi
+      // c'era prima viene aggiornata sul posto, quindi stato, accettazione e
+      // spesa speculare dell'amico restano al loro posto.
+      const restRows = rest.map((personId) => ({
         payment_id: payment.id,
         person_id: personId,
         amount_owed: splitResult.owed[personId] ?? 0,
       }));
-      // `onConflict` sul vincolo che esiste gia' da sempre: la quota di chi
-      // c'era prima viene aggiornata sul posto, quindi stato, accettazione e
-      // spesa speculare dell'amico restano al loro posto.
-      const { error: splitError } = await supabase
-        .from("payment_splits")
-        .upsert(rows, { onConflict: "payment_id,person_id" });
+      const settleRows = [...settleNow].map((personId) => ({
+        payment_id: payment.id,
+        person_id: personId,
+        amount_owed: splitResult.owed[personId] ?? 0,
+        settled_at: new Date().toISOString(),
+      }));
 
-      if (splitError) {
-        setSaving(false);
-        Alert.alert(
-          "Spesa salvata, ma non le quote",
-          `La divisione non e' stata registrata: ${splitError.message}`
-        );
-        onSaved();
-        onClose();
-        return;
+      for (const rows of [restRows, settleRows]) {
+        if (rows.length === 0) continue;
+        const { error: splitError } = await supabase
+          .from("payment_splits")
+          .upsert(rows, { onConflict: "payment_id,person_id" });
+
+        if (splitError) {
+          setSaving(false);
+          Alert.alert(
+            "Spesa salvata, ma non le quote",
+            `La divisione non e' stata registrata: ${splitError.message}`
+          );
+          onSaved();
+          onClose();
+          return;
+        }
       }
     }
 
@@ -487,6 +521,8 @@ export function EditPaymentSheet({
           total={parseAmountInput(amount) ?? 0}
           split={split}
           onChange={setSplit}
+          existingPersonIds={existingPersonIds}
+          focusPicker={focusSplit}
         />
       </View>
 
