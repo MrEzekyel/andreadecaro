@@ -43,5 +43,15 @@ export function Icon({ name, size = 20, color, strokeWidth = 1.75, fill }: IconP
 
   if (!Component) return null;
 
-  return <Component size={size} color={color} strokeWidth={strokeWidth} fill={fill} />;
+  // `fill` si passa **solo** se c'e' davvero: Lucide ha `fill="none"` come
+  // valore predefinito della prop, e passare `fill={undefined}`
+  // esplicitamente lo sovrascrive — il default SVG e' il nero pieno, quindi
+  // ogni icona dell'app si riempiva di nero lasciando visibili solo i bordi.
+  // E' successo: la prop era stata aggiunta per la stella dei preferiti nel
+  // selettore di divisione e ha annerito l'intera app.
+  return fill === undefined ? (
+    <Component size={size} color={color} strokeWidth={strokeWidth} />
+  ) : (
+    <Component size={size} color={color} strokeWidth={strokeWidth} fill={fill} />
+  );
 }
