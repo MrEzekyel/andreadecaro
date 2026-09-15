@@ -65,6 +65,50 @@ const GRAIN_OPTIONS = [
   { value: "month" as Grain, letter: "M", label: "Per mese" },
 ];
 
+/**
+ * Il grado dei grafici a colonne dedotto dal periodo scelto in cima.
+ *
+ * `Grain` ammette solo "week" e "month": un grado "anno" non esiste, e non
+ * avrebbe senso inventarlo — una colonna sola per tutto l'anno non si
+ * confronta con niente, che e' l'unica cosa che quei due grafici sanno fare.
+ * Su "Anno" si resta quindi ai mesi, ma su una finestra lunga un anno intero
+ * (vedi `barWindow`): cambia comunque cosa si guarda rispetto a "Mese", non
+ * solo quale colonna e' evidenziata.
+ */
+const GRAIN_BY_KIND: Record<PeriodKind, Grain> = {
+  week: "week",
+  month: "month",
+  year: "month",
+};
+
+/**
+ * Quante colonne mostrare nei due grafici a colonne.
+ *
+ * Il numero fa parte di "cosa mostrano": su "Anno" i mesi visibili diventano
+ * dodici invece di otto, cioe' l'anno intero che il periodo dichiara.
+ * Su schermo largo c'e' piu' spazio orizzontale, quindi le settimane si
+ * mostrano piu' numerose invece di farle scorrere quasi subito; il grado
+ * "mese" non cambia con la larghezza (otto e' gia' comodo ovunque).
+ */
+function barWindow(kind: PeriodKind, grain: Grain, wide: boolean) {
+  if (grain === "week") return wide ? 18 : 10;
+  return kind === "year" ? 12 : 8;
+}
+
+/**
+ * Mesi di storico da leggere per i grafici a colonne e per i risparmi.
+ *
+ * Tredici, non otto: la finestra piu' lunga che un grafico a colonne puo'
+ * chiedere e' l'anno (dodici mesi, `barWindow` su "Anno") e i risparmi
+ * mensili ne mostrano nove. Allargare un grafico senza allargare la lettura
+ * riempirebbe la differenza di colonne a zero — cioe' farebbe dire "quel mese
+ * non hai speso niente" a dei mesi che non abbiamo mai chiesto.
+ */
+const HISTORY_MONTHS = 13;
+
+/** Mesi mostrati dal grafico dei risparmi. */
+const SAVINGS_MONTHS = 9;
+
 /** Riga ridotta all'osso: importo e quando, quanto basta per i risparmi. */
 type Dated = { amount: number; occurred_at: string };
 
@@ -161,7 +205,19 @@ export default function StatsScreen() {
   const [investments, setInvestments] = useState<Dated[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [grain, setGrain] = useState<Grain>("month");
+  /**
+   * Scavalcamento momentaneo del grado dedotto dal periodo (il toggle W/M).
+   *
+   * Il grado dei due grafici a colonne lo comanda il periodo scelto in cima
+   * (`GRAIN_BY_KIND`); il toggle serve ancora a guardare le settimane mentre
+   * si sta su "Mese", ma e' una deroga, non un secondo controllo alla pari —
+   * appena si ritocca Settimana/Mese/Anno il comando torna al periodo.
+   * Finche' i due controlli sceglievano la stessa cosa senza una precedenza
+   * dichiarata, il selettore in cima sembrava non cambiare niente: il grado
+   * restava quello scelto (o il default "mese") e gli unici grafici a
+   * muoversi erano quelli sotto.
+   */
+  const [grainOverride, setGrainOverride] = useState<Grain | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   /** null = tutte le categorie. */
   const [filterCategory, setFilterCategory] = useState<string | null>(null);
@@ -179,6 +235,16 @@ export default function StatsScreen() {
   const [donutMonthReady, setDonutMonthReady] = useState(false);
 
   const period = useMemo(() => buildPeriod(kind, offset), [kind, offset]);
+
+  const grain = grainOverride ?? GRAIN_BY_KIND[kind];
+
+  // Scegliere un periodo riprende il comando sul grado: il toggle W/M resta
+  // disponibile, ma vale per il periodo su cui e' stato premuto e non
+  // sopravvive al passaggio successivo. Senza questo, "Settimana" premuto
+  // dopo aver toccato "M" continuerebbe a mostrare i mesi.
+  useEffect(() => {
+    setGrainOverride(null);
+  }, [kind]);
 
   // Le frecce restano il modo esplicito di cambiare periodo; lo swipe sulla
   // stessa riga e' un modo piu' rapido di fare la stessa cosa, non lo
@@ -201,9 +267,13 @@ export default function StatsScreen() {
     // indietro oltre il periodo selezionato: con i soli dati del periodo
     // resterebbe una colonna piena e tutte le altre vuote, e toccarle per
     // cambiare mese non porterebbe da nessuna parte.
+    // Prima il giorno 1, poi indietro dei mesi: sottrarre un mese partendo da
+    // un giorno 29-31 trabocca nel mese successivo (il "31 giugno" che
+    // JavaScript normalizza a 1 luglio) e la finestra letta sarebbe un mese
+    // piu' corta del dichiarato proprio in fondo, dove serve.
     const historyStart = new Date();
-    historyStart.setMonth(historyStart.getMonth() - 9);
     historyStart.setDate(1);
+    historyStart.setMonth(historyStart.getMonth() - (HISTORY_MONTHS - 1));
     historyStart.setHours(0, 0, 0, 0);
 
     // I totali restano sempre su tutte le spese, perche' mutuo e rate sono
@@ -526,7 +596,11 @@ export default function StatsScreen() {
    * scala di tutti gli altri.
    */
   const savingsBuckets = useMemo(() => {
-    const months = bucketize([], "month", 8);
+    // Nove mesi e non otto: il grafico occupa ora piu' spazio orizzontale e
+    // una colonna in piu' ci sta senza stringere le altre. La lettura a monte
+    // (`HISTORY_MONTHS`) li copre tutti — un nono mese sempre vuoto perche'
+    // non letto sarebbe peggio che non averlo.
+    const months = bucketize([], "month", SAVINGS_MONTHS);
 
     const sumIn = (rows: Dated[], start: Date, end: Date) =>
       rows
@@ -593,26 +667,30 @@ export default function StatsScreen() {
       }));
   }, [payments]);
 
-  // Su schermo largo c'e' piu' spazio orizzontale: si mostrano piu'
-  // settimane in una volta invece di farle scorrere quasi subito. Il grado
-  // "mese" non cambia (8 e' gia' comodo su ogni larghezza).
-  const weekBucketLimit = wide ? 18 : 10;
+  // Grado e numero di colonne vengono entrambi dal periodo scelto in cima:
+  // e' questo che fa cambiare *cosa* mostrano i due grafici quando si preme
+  // Settimana / Mese / Anno, invece di limitarsi a spostare l'evidenziazione.
+  const barLimit = barWindow(kind, grain, wide);
   const buckets = useMemo(
-    () => bucketize(historyPool, grain, grain === "week" ? weekBucketLimit : 8),
-    [historyPool, grain, weekBucketLimit]
+    () => bucketize(historyPool, grain, barLimit),
+    [historyPool, grain, barLimit]
   );
+
+  /** Detto in chiaro sotto il titolo: su quale arco si sta confrontando. */
+  const windowLabel =
+    grain === "week"
+      ? `ultime ${barLimit} settimane`
+      : `ultimi ${barLimit} mesi`;
 
   const selected: Bucket | undefined =
     buckets.find((bucket) => bucket.key === selectedKey) ??
     buckets[buckets.length - 1];
 
-  // Stessa sincronizzazione del periodo principale, per il grafico a
-  // colonne: cambiare periodo in cima alla pagina (frecce, swipe o il
-  // selettore Settimana/Mese/Anno) sposta anche la colonna selezionata,
-  // qualunque sia il grado (settimana/mese) scelto per quel grafico e
-  // qualunque sia il periodo scelto in cima — non solo "Mese" come prima.
-  // Il grado del grafico (`grain`) resta una scelta indipendente: e'
-  // "quanto fitto guardare il confronto", non "quale periodo e' aperto".
+  // Le frecce e lo swipe spostano la colonna evidenziata dentro la finestra
+  // che il periodo ha gia' scelto. E' un complemento al cambio di grado, non
+  // un sostituto: da solo — com'era prima — sposta l'evidenziazione senza
+  // che i dati disegnati cambino, ed e' esattamente l'impressione di "non
+  // succede niente" che il selettore Settimana/Mese/Anno dava.
   useEffect(() => {
     const match = buckets.find((bucket) => {
       const { start, end } = bucketRange(bucket, grain);
@@ -652,7 +730,11 @@ export default function StatsScreen() {
   const amount = splitAmount(heroTotal);
 
   const grainAside = (
-    <LetterToggle options={GRAIN_OPTIONS} value={grain} onChange={setGrain} />
+    <LetterToggle
+      options={GRAIN_OPTIONS}
+      value={grain}
+      onChange={setGrainOverride}
+    />
   );
 
   function statPair(
@@ -679,10 +761,20 @@ export default function StatsScreen() {
     {
       key: "spend",
       title: "Quanto spendi",
-      subtitle:
+      // La finestra e' scritta accanto alla categoria: senza, passare da
+      // "Mese" ad "Anno" cambia il grafico ma non dice su cosa, e otto
+      // colonne contro dodici si distinguono solo contandole. Una categoria
+      // filtrata ma non piu' in elenco non diventa "tutte le categorie": si
+      // omette il pezzo, invece di dichiarare un filtro diverso da quello
+      // applicato davvero.
+      subtitle: [
         filterCategory === null
           ? "tutte le categorie"
           : categoryById(filterCategory)?.name,
+        windowLabel,
+      ]
+        .filter(Boolean)
+        .join(" · "),
       aside: (
         <View style={styles.asideStack}>
           {grainAside}
@@ -718,7 +810,7 @@ export default function StatsScreen() {
     {
       key: "count",
       title: "Quante volte",
-      subtitle: "numero di transazioni",
+      subtitle: `numero di transazioni · ${windowLabel}`,
       aside: (
         <View style={styles.asideStack}>
           {grainAside}
@@ -1127,6 +1219,15 @@ export default function StatsScreen() {
     </React.Fragment>
   );
 
+  // Fuori dalle due colonne, a tutta larghezza: su iPad questa sezione
+  // stava nella colonna destra e le sue barre si fermavano a meta' pagina
+  // mentre a sinistra, sotto le ripartizioni, restava vuoto. Non compare in
+  // `order` ne' nelle colonne proprio perche' non appartiene a nessuna delle
+  // due: resta l'ultima sezione della pagina in entrambe le viste, ed e'
+  // reso come fratello di `TwoColumns` — sul telefono `TwoColumns` non
+  // disegna nessun contenitore, quindi questa sezione e' un figlio diretto
+  // dello ScrollView come tutte le altre e prende lo stesso `gap`: la resa
+  // verticale non cambia di un pixel.
   const merchantSection = (
     <React.Fragment key="merchant">
         {byMerchant.length > 0 && (
@@ -1248,7 +1349,8 @@ export default function StatsScreen() {
       </View>
 
       {/* A sinistra i totali e le ripartizioni, a destra gli andamenti e le
-          classifiche. In verticale l'ordine resta quello di sempre. */}
+          classifiche; "Dove spendi di piu'" viene dopo, a tutta larghezza.
+          In verticale l'ordine resta quello di sempre. */}
       <TwoColumns
         order={
           <>
@@ -1260,7 +1362,6 @@ export default function StatsScreen() {
             {savingsSection}
             {cardSection}
             {sourceSection}
-            {merchantSection}
           </>
         }
         left={
@@ -1277,10 +1378,11 @@ export default function StatsScreen() {
             {rankSection}
             {carouselSection}
             {savingsSection}
-            {merchantSection}
           </>
         }
       />
+
+      {merchantSection}
     </ScrollView>
   );
 }
