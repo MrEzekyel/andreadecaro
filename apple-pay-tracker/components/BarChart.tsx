@@ -34,11 +34,20 @@ type Props = {
   /** Colore delle colonne sotto lo zero; serve solo ai grafici con negativi. */
   negativeColor?: string;
   /**
-   * Larghezza minima per colonna. Impostandola il grafico smette di
-   * comprimersi nello spazio disponibile e scorre in orizzontale: oltre una
-   * decina di periodi le etichette sotto le colonne si sovrappongono fino a
-   * diventare illeggibili, e stringere le barre non risolve, sposta solo il
-   * problema.
+   * Larghezza voluta per colonna, quando il grafico ne ha una propria.
+   *
+   * Fa due cose, e servono entrambe. Se i periodi non ci stanno, il grafico
+   * smette di comprimersi e scorre in orizzontale: oltre una decina di periodi
+   * le etichette sotto le colonne si sovrappongono fino a diventare
+   * illeggibili, e stringere le barre non risolve, sposta solo il problema.
+   * Se invece ci stanno tutti, resta il **tetto** della colonna: lo spazio
+   * avanzato diventa aria fra una colonna e l'altra, non barre piu' grasse.
+   *
+   * Il tetto e' arrivato dopo: senza, le settimane su iPad si spalmavano
+   * comunque su tutta la scheda ed erano larghe il doppio delle mensili —
+   * «le colonne dovevano rimanere strette» (Andrea). Chi non passa niente
+   * (i mesi) continua a dividersi la larghezza per intero, com'e' sempre
+   * stato.
    */
   minColumnWidth?: number;
 };
@@ -108,10 +117,18 @@ export function BarChart({
   const width = scorre ? buckets.length * minColumnWidth! : boxWidth;
 
   const plotWidth = width - gutter;
+  // Ogni periodo ha la sua fetta di larghezza (`slot`) e la colonna ci sta
+  // dentro centrata, lasciando il `GAP` come aria. Ragionare per fetta invece
+  // che per "larghezza totale diviso il numero di barre" e' cio' che permette a
+  // una colonna di essere piu' STRETTA della fetta che le tocca: quando c'e' un
+  // `minColumnWidth` quella e' anche la larghezza massima, quindi lo spazio in
+  // piu' allarga la distanza fra le colonne e non le colonne.
+  const slot = plotWidth / Math.max(buckets.length, 1);
   const barWidth = Math.max(
-    (plotWidth - GAP * (buckets.length - 1)) / Math.max(buckets.length, 1),
+    Math.min(slot - GAP, (minColumnWidth ?? Infinity) - GAP),
     2
   );
+  const xOf = (index: number) => gutter + index * slot + (slot - barWidth) / 2;
 
   const yOf = (value: number) => BASE - ((value - chartMin) / range) * PLOT_H;
   /** Quota dello zero: coincide con la base finche' non ci sono negativi. */
@@ -173,7 +190,7 @@ export function BarChart({
 
         {buckets.map((bucket, index) => {
           const value = values[index];
-          const x = gutter + index * (barWidth + GAP);
+          const x = xOf(index);
           const valueY = yOf(value);
 
           // Un periodo a zero resta visibile come traccia: distinguere
@@ -235,13 +252,16 @@ export function BarChart({
                 {bucket.label}
               </SvgText>
 
-              {/* Bersaglio a tutta altezza: la colonna da sola sarebbe
-                  impossibile da centrare quando il valore e' basso. */}
+              {/* Bersaglio a tutta altezza e a tutta fetta, non largo quanto la
+                  barra: la colonna da sola sarebbe impossibile da centrare
+                  quando il valore e' basso, e da quando le settimane sono
+                  strette 30 px una barra sarebbe anche troppo sottile per il
+                  dito. L'aria fra due colonne appartiene a quella piu' vicina. */}
               {onSelect && (
                 <Rect
-                  x={x}
+                  x={gutter + index * slot}
                   y={0}
-                  width={barWidth}
+                  width={slot}
                   height={BASE + AXIS_H}
                   fill="transparent"
                   onPress={() => onSelect(bucket)}

@@ -19,8 +19,30 @@ import { type } from "../lib/theme";
  * `onLayout` abbia detto quanto e' larga la scheda che ospita il grafico.
  */
 const FALLBACK_WIDTH = 320;
-/** Colonna riservata alle etichette dell'asse y. */
-const GUTTER = 34;
+/**
+ * Rientro uguale a destra e a sinistra, non una colonna riservata all'asse y.
+ *
+ * Prima qui c'era `GUTTER = 34`: le etichette dei valori stavano in una colonna
+ * loro, alla sinistra del disegno. Il grafico occupava tutta la larghezza della
+ * scheda ma la linea cominciava 34 px piu' in dentro, quindi rispetto alla
+ * scheda che lo contiene sembrava spostato a destra — la segnalazione di
+ * Andrea, «avere i numeri dell'asse y sul lato lo rende decentrato».
+ *
+ * Fra le vie possibili — asse a destra, oppure un margine destro uguale al
+ * gutter — si e' scelto di **sovrapporre le etichette al grafico**, appoggiate
+ * sopra la propria linea di griglia a partire dal bordo sinistro. Le altre due
+ * ricentrano il disegno pagandolo con 34 o 68 px di larghezza in meno, cioe'
+ * togliendo spazio proprio alla parte che si guarda; questa non ne toglie
+ * nemmeno uno, e i valori di riferimento sugli assi restano tutti (il design
+ * system li richiede esplicitamente). E' anche il trattamento che l'etichetta
+ * del limite ha gia' in questo stesso file, appoggiata sopra la sua retta in
+ * alto a destra: ora le due si leggono allo stesso modo.
+ *
+ * Il rientro che resta e' minimo e simmetrico, e non serve all'asse: e' il
+ * raggio del pallino di "dove sei adesso" (6,5 px), che sul bordo esatto
+ * verrebbe tagliato a meta' dal viewBox.
+ */
+const EDGE = 7;
 const TOP = 16;
 // Grafico piu' alto (era 102): con piu' spazio verticale l'andamento si
 // legge meglio, senza cambiare la tavolozza ne' il linguaggio visivo.
@@ -150,15 +172,15 @@ export function TrendChart({
     yTicks.push(value);
   }
 
-  const plotWidth = width - GUTTER;
+  const plotWidth = Math.max(width - EDGE * 2, 1);
   const xOf = (index: number) =>
-    GUTTER + (index / Math.max(points.length - 1, 1)) * plotWidth;
+    EDGE + (index / Math.max(points.length - 1, 1)) * plotWidth;
   const yOf = (value: number) => BASE - (value / chartMax) * PLOT_H;
 
   const coords = noti.map((p) => ({ x: xOf(p.index), y: yOf(p.value) }));
 
   const line = smoothPath(coords);
-  const area = `${line} L ${coords[coords.length - 1].x},${BASE} L ${GUTTER},${BASE} Z`;
+  const area = `${line} L ${coords[coords.length - 1].x},${BASE} L ${xOf(0)},${BASE} Z`;
   const last = coords[coords.length - 1];
 
   // Etichette x equidistanti, estremi inclusi: con una al giorno si
@@ -204,8 +226,11 @@ export function TrendChart({
           const y = yOf(value);
           return (
             <React.Fragment key={`y-${value}`}>
+              {/* La griglia va da bordo a bordo: e' lei a dare al grafico la
+                  larghezza piena della scheda, ora che non c'e' piu' una
+                  colonna a sinistra a interromperla. */}
               <Line
-                x1={GUTTER}
+                x1={0}
                 y1={y}
                 x2={width}
                 y2={y}
@@ -213,10 +238,14 @@ export function TrendChart({
                 strokeWidth={1}
                 opacity={0.7}
               />
+              {/* Il valore sta SOPRA la sua linea di griglia, non accanto:
+                  appoggiato li' resta attaccato alla riga che quota senza
+                  coprirla, e nessuna quota puo' finire sotto il bordo del
+                  disegno come succederebbe centrandola sulla linea. */}
               <SvgText
-                x={GUTTER - 7}
-                y={y + 3}
-                textAnchor="end"
+                x={0}
+                y={y - 3}
+                textAnchor="start"
                 fontSize={9}
                 fill={palette.ink3}
               >
@@ -227,7 +256,7 @@ export function TrendChart({
         })}
 
         <Line
-          x1={GUTTER}
+          x1={0}
           y1={BASE}
           x2={width}
           y2={BASE}
@@ -238,7 +267,7 @@ export function TrendChart({
         {limitY !== null && (
           <>
             <Line
-              x1={GUTTER}
+              x1={0}
               y1={limitY}
               x2={width}
               y2={limitY}
