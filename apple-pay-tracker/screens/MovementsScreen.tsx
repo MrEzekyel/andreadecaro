@@ -17,6 +17,7 @@ import { LoadError } from "../components/LoadError";
 import { ScreenHeader } from "../components/ScreenHeader";
 import { StaleNote } from "../components/StaleNote";
 import { PaymentRow } from "../components/PaymentRow";
+import { TwoColumns } from "../components/TwoColumns";
 import { useData } from "../lib/DataContext";
 import { useTheme } from "../lib/ThemeContext";
 import {
@@ -400,6 +401,62 @@ function IncomeList({ month }: { month: Date }) {
 
   const total = incomes.reduce((sum, i) => sum + Number(i.amount), 0);
 
+  // Lo stato: quanto e' entrato nel mese. Su schermo largo va a sinistra, dove
+  // sta l'importo grande in ogni altra schermata dell'app.
+  const hero = !error ? (
+    <View style={styles.incomeHero}>
+      <Text style={[styles.label, { color: palette.ink3 }]}>
+        Entrato nel mese
+      </Text>
+      <Text style={[styles.hero, { color: palette.good }]}>
+        {formatAmount(total)}
+      </Text>
+    </View>
+  ) : null;
+
+  // La lettura: l'elenco degli introiti, a destra.
+  const list =
+    incomes.length > 0 ? (
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: palette.surface, borderColor: palette.hairline },
+        ]}
+      >
+        {incomes.map((entry, index) => (
+          <View key={entry.id}>
+            {index > 0 && (
+              <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+            )}
+            <TouchableOpacity
+              style={styles.entryRow}
+              onPress={() => setEditing(entry)}
+              accessibilityRole="button"
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.entryLabel, { color: palette.ink }]}>
+                  {entry.label}
+                </Text>
+                <Text style={[styles.entryMeta, { color: palette.ink3 }]}>
+                  {shortDateTime(entry.occurred_at)}
+                </Text>
+              </View>
+              <Text style={[styles.entryAmount, { color: palette.good }]}>
+                +{formatAmount(entry.amount)}
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ))}
+      </View>
+    ) : error ? (
+      <LoadError message={error} onRetry={load} />
+    ) : (
+      <Text style={[styles.empty, { color: palette.ink3 }]}>
+        Nessun introito in {monthName(month)}. Tocca + per aggiungere lo
+        stipendio o un ricavo.
+      </Text>
+    );
+
   return (
     <>
       <ScrollView
@@ -412,58 +469,20 @@ function IncomeList({ month }: { month: Date }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {!error && (
-          <View style={styles.incomeHero}>
-            <Text style={[styles.label, { color: palette.ink3 }]}>
-              Entrato nel mese
-            </Text>
-            <Text style={[styles.hero, { color: palette.good }]}>
-              {formatAmount(total)}
-            </Text>
-          </View>
-        )}
-
-        {incomes.length > 0 ? (
-          <View
-            style={[
-              styles.card,
-              { backgroundColor: palette.surface, borderColor: palette.hairline },
-            ]}
-          >
-            {incomes.map((entry, index) => (
-              <View key={entry.id}>
-                {index > 0 && (
-                  <View
-                    style={[styles.divider, { backgroundColor: palette.hairline }]}
-                  />
-                )}
-                <TouchableOpacity
-                  style={styles.entryRow}
-                  onPress={() => setEditing(entry)}
-                  accessibilityRole="button"
-                >
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.entryLabel, { color: palette.ink }]}>
-                      {entry.label}
-                    </Text>
-                    <Text style={[styles.entryMeta, { color: palette.ink3 }]}>
-                      {shortDateTime(entry.occurred_at)}
-                    </Text>
-                  </View>
-                  <Text style={[styles.entryAmount, { color: palette.good }]}>
-                    +{formatAmount(entry.amount)}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        ) : error ? (
-          <LoadError message={error} onRetry={load} />
+        {/* Stesso taglio della meta' Uscite: stato a sinistra, lettura a
+            destra. Si affianca solo quando ci sono davvero due cose da
+            affiancare — con un errore o un mese vuoto la colonna sinistra
+            resterebbe vuota e il messaggio finirebbe spinto di lato, mentre
+            deve prendersi la pagina. Qui sinistra e destra sono gia'
+            nell'ordine verticale di sempre, quindi `order` non serve: se un
+            giorno una sezione cambiasse colonna, andrebbe aggiunto. */}
+        {hero && incomes.length > 0 ? (
+          <TwoColumns left={hero} right={list} />
         ) : (
-          <Text style={[styles.empty, { color: palette.ink3 }]}>
-            Nessun introito in {monthName(month)}. Tocca + per aggiungere lo
-            stipendio o un ricavo.
-          </Text>
+          <>
+            {hero}
+            {list}
+          </>
         )}
       </ScrollView>
 
