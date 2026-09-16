@@ -1,11 +1,11 @@
 import React, { useState } from "react";
 import {
+  LayoutChangeEvent,
   NativeScrollEvent,
   NativeSyntheticEvent,
   ScrollView,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useTheme } from "../lib/ThemeContext";
@@ -24,72 +24,93 @@ export type ChartPage = {
 
 type Props = {
   pages: ChartPage[];
-  /** Margine orizzontale della schermata, per calcolare la larghezza pagina. */
+  /**
+   * @deprecated Non serve piu' e viene ignorato: la larghezza della pagina non
+   * si deduce piu' dalla finestra meno i margini, si misura. Resta accettato
+   * solo per non rompere un chiamante che lo passi ancora.
+   */
   horizontalPadding?: number;
 };
 
 /**
  * Carosello a scorrimento laterale con una pagina per grafico.
  *
- * La larghezza pagina si calcola dalla finestra invece di essere fissa,
- * altrimenti l'aggancio (`snapToInterval`) sbaglia di qualche pixel a ogni
- * pagina e il carosello si disallinea scorrendo.
+ * La pagina e' larga quanto il **contenitore**, misurato con `onLayout`, non
+ * quanto la finestra meno i margini della schermata. Era la seconda cosa: su
+ * iPad in orizzontale, con il rail a sinistra e la Home a due colonne, il
+ * carosello vive dentro una colonna molto piu' stretta dello schermo — ogni
+ * pagina veniva disegnata larga quanto lo schermo intero, sbordava a destra e
+ * `snapToInterval` agganciava su un passo che non era quello vero: per vedere
+ * un grafico per intero bisognava scorrerlo, mentre lo scorrimento qui deve
+ * servire solo a cambiare pagina.
+ *
+ * E' lo stesso schema di `TrendChart`, `BarChart` e `MonthBars`, guardrail
+ * compreso: il confronto prima di `setState` evita il ciclo re-render →
+ * layout → re-render. Finche' la misura non c'e' non si disegna nessuna
+ * pagina, perche' una pagina di larghezza sbagliata al primo fotogramma
+ * lascerebbe il carosello agganciato male finche' non lo si tocca.
  */
-export function ChartCarousel({ pages, horizontalPadding = 16 }: Props) {
+export function ChartCarousel({ pages }: Props) {
   const { palette } = useTheme();
-  const { width } = useWindowDimensions();
+  const [pageWidth, setPageWidth] = useState(0);
   const [index, setIndex] = useState(0);
 
-  const pageWidth = width - horizontalPadding * 2;
+  function misura(event: LayoutChangeEvent) {
+    const measured = Math.round(event.nativeEvent.layout.width);
+    if (measured > 0 && measured !== pageWidth) setPageWidth(measured);
+  }
 
   function onScroll(event: NativeSyntheticEvent<NativeScrollEvent>) {
+    if (pageWidth <= 0) return;
     const next = Math.round(event.nativeEvent.contentOffset.x / pageWidth);
     if (next !== index) setIndex(next);
   }
 
   return (
-    <View style={styles.wrap}>
-      <ScrollView
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        snapToInterval={pageWidth}
-        decelerationRate="fast"
-        onScroll={onScroll}
-        scrollEventThrottle={32}
-      >
-        {pages.map((page) => (
-          <View key={page.key} style={{ width: pageWidth }}>
-            <View
-              style={[
-                styles.card,
-                {
-                  backgroundColor: palette.surface,
-                  borderColor: palette.hairline,
-                },
-              ]}
-            >
-              <View style={styles.head}>
-                <View style={styles.heading}>
-                  <Text style={[styles.title, { color: palette.ink }]}>
-                    {page.title}
-                  </Text>
-                  {page.subtitle && (
-                    <Text style={[styles.subtitle, { color: palette.ink3 }]}>
-                      {page.subtitle}
+    <View style={styles.wrap} onLayout={misura}>
+      {pageWidth > 0 && (
+        <ScrollView
+          horizontal
+          pagingEnabled
+          showsHorizontalScrollIndicator={false}
+          snapToInterval={pageWidth}
+          decelerationRate="fast"
+          onScroll={onScroll}
+          scrollEventThrottle={32}
+        >
+          {pages.map((page) => (
+            <View key={page.key} style={{ width: pageWidth }}>
+              <View
+                style={[
+                  styles.card,
+                  {
+                    backgroundColor: palette.surface,
+                    borderColor: palette.hairline,
+                  },
+                ]}
+              >
+                <View style={styles.head}>
+                  <View style={styles.heading}>
+                    <Text style={[styles.title, { color: palette.ink }]}>
+                      {page.title}
                     </Text>
-                  )}
+                    {page.subtitle && (
+                      <Text style={[styles.subtitle, { color: palette.ink3 }]}>
+                        {page.subtitle}
+                      </Text>
+                    )}
+                  </View>
+                  {page.aside}
                 </View>
-                {page.aside}
+
+                {page.content}
               </View>
 
-              {page.content}
+              {page.footer}
             </View>
-
-            {page.footer}
-          </View>
-        ))}
-      </ScrollView>
+          ))}
+        </ScrollView>
+      )}
 
       <View style={styles.dots}>
         {pages.map((page, i) => (

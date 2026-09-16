@@ -16,6 +16,7 @@ import Svg, {
 } from "react-native-svg";
 import { useTheme } from "../lib/ThemeContext";
 import { compactAmount } from "../lib/format";
+import { useWideLayout } from "../lib/layout";
 import { space, type } from "../lib/theme";
 
 export type ScrubPoint = {
@@ -30,6 +31,11 @@ type Props = {
   color: string;
   /** Indice sotto il dito, o null quando non si sta trascinando. */
   onScrub?: (index: number | null) => void;
+  /**
+   * Altezza imposta dal chiamante. Lasciandola vuota il grafico sceglie da se'
+   * fra `PHONE_HEIGHT` e `WIDE_HEIGHT` secondo lo schermo — e' il caso di tutti
+   * i chiamanti di oggi.
+   */
   height?: number;
   /** Nome della seconda linea in legenda. */
   baselineName?: string;
@@ -38,6 +44,20 @@ type Props = {
 
 const TOP = 10;
 const BOTTOM = 4;
+
+/**
+ * Altezza del grafico sul telefono, e su schermo largo.
+ *
+ * Sul telefono l'altezza e' la risorsa scarsa — sotto al grafico c'e' ancora
+ * tutto l'elenco dei titoli — quindi resta il valore di sempre. Su iPad in
+ * orizzontale il grafico sta nella colonna destra e in verticale avanza spazio:
+ * allargandosi senza crescere in altezza la linea si appiattisce, e un
+ * andamento schiacciato dice meno di quello che sa. L'aumento e' misurato
+ * (+22%, richiesta di Andrea: «aumenta LEGGERMENTE lo spazio verticale»), non
+ * un raddoppio: tanto quanto basta a restituire pendenza alla linea.
+ */
+const PHONE_HEIGHT = 180;
+const WIDE_HEIGHT = 220;
 
 function buildPath(xs: number[], ys: number[]) {
   let d = `M ${xs[0]},${ys[0]}`;
@@ -59,11 +79,13 @@ export function ScrubChart({
   points,
   color,
   onScrub,
-  height = 180,
+  height: fixedHeight,
   baselineName = "capitale versato",
   empty = "Ancora troppo pochi dati per disegnare l'andamento.",
 }: Props) {
   const { palette } = useTheme();
+  const wide = useWideLayout();
+  const height = fixedHeight ?? (wide ? WIDE_HEIGHT : PHONE_HEIGHT);
   const [width, setWidth] = useState(0);
   const [active, setActive] = useState<number | null>(null);
 

@@ -3,14 +3,23 @@ import { Payment } from "./types";
 export type Grain = "week" | "month";
 
 /**
- * Colonna minima per una settimana nei grafici a barre.
+ * Larghezza di una colonna settimanale nei grafici a barre.
  *
- * Sotto questa larghezza l'etichetta col range di date ("29/07 - 04/08") non
- * ci sta piu'. Impostarla come `minColumnWidth` fa scorrere il grafico
- * invece di comprimere le colonne: su schermo stretto ne restano visibili
- * circa cinque alla volta, il resto si raggiunge scorrendo.
+ * Era 68, cioe' quanto serviva all'etichetta col range di date
+ * ("29/07 - 04/08"): colonne larghe il doppio di quelle mensili, bocciate da
+ * Andrea («le colonne dovevano rimanere strette, tagliale del 50%»). Dimezzarla
+ * ha richiesto di accorciare prima l'etichetta (vedi `weekStartLabel`), non il
+ * contrario: e' l'etichetta a decidere quanto stretta puo' essere la colonna.
+ *
+ * `BarChart` la legge come `minColumnWidth` e la usa in due modi, che vanno
+ * pensati insieme: quando i bucket non ci stanno il grafico scorre con colonne
+ * larghe esattamente cosi', e quando ci stanno tutti resta questo il **tetto**
+ * della colonna — lo spazio in piu' diventa aria fra una colonna e l'altra
+ * invece di barre piu' grasse. Senza il tetto, su iPad dieci settimane in una
+ * scheda larga si spalmavano comunque su tutta la larghezza, che e' proprio
+ * cio' che Andrea guardava quando ha chiesto di stringerle.
  */
-export const WEEK_BAR_MIN_COLUMN_WIDTH = 68;
+export const WEEK_BAR_MIN_COLUMN_WIDTH = 34;
 
 export type Bucket = {
   key: string;
@@ -59,23 +68,28 @@ export function keyOf(date: Date, grain: Grain) {
 const pad2 = (n: number) => String(n).padStart(2, "0");
 
 /**
- * "29/07 - 04/08": l'intervallo vero della settimana, non il nome del mese.
+ * "29/07": il lunedi' della settimana, con giorno E mese.
  *
- * Il mese da solo non basta a una settimana — puo' cominciare in un mese e
- * finire nel successivo — e "29 lug" (solo il lunedi') lasciava indovinare
- * dove finisse. Col range esplicito, e la colonna piu' larga fatta apposta
- * per ospitarlo (`WEEK_BAR_MIN_COLUMN_WIDTH`), la colonna dice da sola quali
- * sette giorni rappresenta.
+ * Prima era il range intero ("29/07 - 04/08") perche' il solo nome del mese non
+ * basta a una settimana — puo' cominciare in un mese e finire nel successivo —
+ * e il vecchio "29 lug" lasciava indovinare dove finisse. Quel range pero'
+ * costava 68 px di colonna, il doppio di una mensile: Andrea ha chiesto colonne
+ * strette, e fra le due cose l'etichetta e' quella che si puo' accorciare senza
+ * perdere l'informazione portante.
+ *
+ * Una data di lunedi' **identifica la settimana da sola**: quel che si perde e'
+ * il giorno di chiusura, che sono sempre i sei giorni seguenti. Resta giorno e
+ * mese (non "29 lug" abbreviato) proprio perche' due settimane a cavallo di due
+ * mesi non si confondano. Il riepilogo sotto il grafico continua a dire la
+ * settimana per esteso ("Settimana del 29/07", `DetailScreen`), che con questa
+ * etichetta si legge anche meglio di prima.
  */
-function weekRangeLabel(monday: Date) {
-  const sunday = new Date(monday);
-  sunday.setDate(sunday.getDate() + 6);
-  const fmt = (d: Date) => `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}`;
-  return `${fmt(monday)} - ${fmt(sunday)}`;
+function weekStartLabel(monday: Date) {
+  return `${pad2(monday.getDate())}/${pad2(monday.getMonth() + 1)}`;
 }
 
 function labelOf(date: Date, grain: Grain) {
-  if (grain === "week") return weekRangeLabel(startOfWeek(date));
+  if (grain === "week") return weekStartLabel(startOfWeek(date));
   return MONTHS_SHORT[date.getMonth()];
 }
 
