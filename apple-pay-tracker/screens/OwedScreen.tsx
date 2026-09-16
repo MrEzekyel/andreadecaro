@@ -19,8 +19,10 @@ import { SemiGauge } from "../components/SemiGauge";
 import { Sheet } from "../components/Sheet";
 import { StatTiles } from "../components/StatTiles";
 import { SwipeBack, backHitSlop } from "../components/SwipeBack";
+import { TwoColumns } from "../components/TwoColumns";
 import { useData } from "../lib/DataContext";
 import { formatAmount } from "../lib/format";
+import { useWideLayout } from "../lib/layout";
 import {
   buildSplitEvents,
   groupEventsByMonth,
@@ -62,7 +64,18 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
   const { palette, dark } = useTheme();
   const { people, reload: reloadPeople } = useData();
   const { width: windowWidth } = useWindowDimensions();
+  const wide = useWideLayout();
   const gaugeWidth = Math.min(windowWidth - space.lg * 2, 340);
+  /**
+   * Larghezza vera della colonna che ospita il carosello.
+   *
+   * `ChartCarousel` ricava la larghezza di una pagina dalla finestra
+   * (`width - horizontalPadding * 2`): dentro una colonna otterrebbe pagine
+   * larghe quanto tutto l'iPad, che escono dalla colonna e sballano
+   * l'aggancio. Misurandola si puo' passare il margine equivalente e
+   * riportare la pagina alla larghezza che ha davvero.
+   */
+  const [chartColumn, setChartColumn] = useState(0);
 
   const [credits, setCredits] = useState<OpenCredit[]>([]);
   const [debts, setDebts] = useState<IncomingSplit[]>([]);
@@ -382,6 +395,568 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
     );
   }
 
+  // ── Le sezioni, una per costante ───────────────────────────────────────
+  // Estratte dal corpo del render perche' su schermo largo vanno distribuite
+  // su due colonne e in verticale devono restare nell'ordine di sempre. La
+  // divisione qui sotto e' gia' "prima tutte quelle di sinistra, poi quelle di
+  // destra", quindi `order` non serve: se una sezione cambiasse colonna
+  // andrebbe aggiunto, altrimenti telefono e iPad divergerebbero in silenzio.
+
+  const gaugeSection = !error && (
+    /* Un solo semicerchio, non due affiancati: l'anello esterno e'
+       quanto hai ricevuto questo mese, quello interno (specchiato,
+       cresce dalla punta destra) e' quanto hai inviato — stessa scala
+       per entrambi, il mese piu' pieno degli ultimi sei. Dentro ogni
+       anello la parte gia' saldata usa il colore pieno, quella ancora
+       aperta lo stesso colore piu' scuro e piu' trasparente: e' lo
+       stesso meccanismo con cui Home impila piu' fonti di introito in
+       un solo arco, non due anelli diversi. */
+    <View style={styles.gaugeBlock}>
+      <View style={styles.gaugeCenter}>
+        <SemiGauge
+          width={gaugeWidth}
+          stroke={16}
+          outer={{
+            segments: [
+              { value: creditSettledMonth, color: palette.good },
+              { value: creditOpenMonth, color: shade(palette.good) },
+            ],
+            max: gaugeMax,
+          }}
+          inner={{
+            segments: [
+              { value: debtSettledMonth, color: palette.over },
+              { value: debtOpenMonth, color: shade(palette.over) },
+            ],
+            max: gaugeMax,
+          }}
+          mirrorInner
+          endLabel={formatAmount(gaugeMax)}
+        >
+          <View style={styles.gaugeCenterRow}>
+            <View style={styles.gaugeCenterItem}>
+              <Text
+                style={[styles.gaugeAmount, { color: palette.good }]}
+                numberOfLines={1}
+              >
+                {formatAmount(totalOpen)}
+              </Text>
+              <Text style={[styles.gaugeSubLabel, { color: palette.good }]}>
+                da recuperare
+              </Text>
+            </View>
+            <View style={styles.gaugeCenterItem}>
+              <Text
+                style={[styles.gaugeAmount, { color: palette.over }]}
+                numberOfLines={1}
+              >
+                {formatAmount(totalDebts)}
+              </Text>
+              <Text style={[styles.gaugeSubLabel, { color: palette.over }]}>
+                da inviare
+              </Text>
+            </View>
+          </View>
+        </SemiGauge>
+      </View>
+
+      <View style={styles.legendRow}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: palette.good }]} />
+          <Text style={[styles.legendText, { color: palette.ink2 }]}>
+            Ricevuto
+          </Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: palette.over }]} />
+          <Text style={[styles.legendText, { color: palette.ink2 }]}>
+            Inviato
+          </Text>
+        </View>
+      </View>
+
+      <Text style={[styles.gaugeScaleNote, { color: palette.ink3 }]}>
+        scala: {formatAmount(gaugeMax)}, il mese più pieno degli ultimi 6
+      </Text>
+
+      <StatTiles
+        tiles={[
+          { label: "Totale diviso", value: formatAmount(totalDivided) },
+          {
+            label: "Tot Inviato/Ricevuto",
+            value: `${formatAmount(totalSentAllTime)} / ${formatAmount(totalReceivedAllTime)}`,
+          },
+          { label: "Transazioni", value: String(events.length) },
+          { label: "Persone", value: String(distinctPeopleCount) },
+        ]}
+      />
+    </View>
+  );
+
+  /* ── Quello che devo io ─────────────────────────────────────────
+     Accettare non e' una formalita': crea la spesa nei propri conti,
+     ed e' il motivo per cui la divisione fra account vale la pena.
+     Per questo la riga dice l'importo intero della spesa accanto alla
+     quota — si accetta sapendo su cosa. Niente piu' tab a nascondere
+     l'una o l'altra: le due liste stanno sempre entrambe qui sotto. */
+  const debtsSection = !error && openDebts.length > 0 && (
+    <View>
+      <Text style={[styles.label, { color: palette.ink3 }]}>
+        Da accettare
+        {pendingDebts > 0 ? ` (${pendingDebts})` : ""}
+      </Text>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: palette.surface, borderColor: palette.hairline },
+        ]}
+      >
+        {openDebts.map((debt, index) => (
+          <View key={debt.split_id}>
+            {index > 0 && (
+              <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
+            )}
+            <View style={styles.debtRow}>
+              <View style={styles.debtHead}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.person, { color: palette.ink }]}>
+                    {debt.merchant}
+                  </Text>
+                  <Text style={[styles.context, { color: palette.ink3 }]}>
+                    {debt.payer_name} · {shortDate(debt.occurred_at)} · su{" "}
+                    {formatAmount(Number(debt.total_amount))}
+                  </Text>
+                </View>
+                <Text style={[styles.owed, { color: palette.ink }]}>
+                  {formatAmount(Number(debt.amount_owed))}
+                </Text>
+              </View>
+
+              {debt.status === "pending" ? (
+                <View style={styles.debtActions}>
+                  <TouchableOpacity
+                    style={[styles.action, { backgroundColor: palette.accent }]}
+                    onPress={() => respondDebt(debt, true)}
+                  >
+                    <Text style={[styles.actionText, { color: palette.onAccent }]}>
+                      Accetta
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.action,
+                      { borderWidth: 1, borderColor: palette.hairline },
+                    ]}
+                    onPress={() => respondDebt(debt, false)}
+                  >
+                    <Text style={[styles.actionText, { color: palette.ink2 }]}>
+                      Rifiuta
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              ) : debt.settle_requested_at ? (
+                <Text style={[styles.context, { color: palette.ink3 }]}>
+                  Hai detto di aver pagato: aspetta la conferma di{" "}
+                  {debt.payer_name}.
+                </Text>
+              ) : (
+                <View style={styles.debtActions}>
+                  <TouchableOpacity
+                    style={[
+                      styles.action,
+                      { borderWidth: 1, borderColor: palette.hairline },
+                    ]}
+                    onPress={() => declarePaid(debt)}
+                  >
+                    <Text style={[styles.actionText, { color: palette.ink2 }]}>
+                      Ho pagato
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
+        ))}
+      </View>
+    </View>
+  );
+
+  const creditsSection = !error && open.length > 0 && (
+    <View>
+      <Text style={[styles.label, { color: palette.ink3 }]}>Ti devono</Text>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: palette.surface, borderColor: palette.hairline },
+        ]}
+      >
+        {open.map((credit, index) => {
+          const late = daysSince(credit.created_at) >= OVERDUE_DAYS;
+          const days = daysSince(credit.created_at);
+
+          return (
+            <View key={credit.id}>
+              {index > 0 && (
+                <View
+                  style={[
+                    styles.divider,
+                    { backgroundColor: palette.hairline },
+                  ]}
+                />
+              )}
+              <View style={styles.creditRow}>
+                <View
+                  style={[
+                    styles.avatar,
+                    { backgroundColor: tint(palette.accent, dark) },
+                  ]}
+                >
+                  <Text style={[styles.initial, { color: palette.accent }]}>
+                    {(credit.person?.name ?? "?").charAt(0).toUpperCase()}
+                  </Text>
+                </View>
+
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.person, { color: palette.ink }]}>
+                    {credit.person?.name ?? "—"}
+                  </Text>
+                  <Text style={[styles.context, { color: palette.ink3 }]}>
+                    {credit.payment?.merchant_name ?? "spesa eliminata"}
+                    {" · "}
+                    {new Date(
+                      credit.payment?.occurred_at ?? credit.created_at
+                    ).toLocaleDateString("it-IT", {
+                      day: "numeric",
+                      month: "short",
+                    })}
+                  </Text>
+                  {/* Lo stato solo quando c'e' un account dall'altra
+                      parte: su una persona senza Clinck non c'e' niente
+                      da aspettare, e scrivere "in attesa" farebbe
+                      credere che manchi un passaggio. */}
+                  {credit.status !== "local" && (
+                    <Text
+                      style={[
+                        styles.state,
+                        {
+                          color:
+                            credit.status === "declined"
+                              ? palette.over
+                              : palette.ink3,
+                        },
+                      ]}
+                    >
+                      {credit.status === "pending"
+                        ? "In attesa che accetti"
+                        : credit.status === "declined"
+                          ? "Ha rifiutato la quota"
+                          : credit.settle_requested_at
+                            ? "Dice di aver pagato"
+                            : "Accettata"}
+                    </Text>
+                  )}
+                </View>
+
+                <View style={styles.creditRight}>
+                  <Text style={[styles.owed, { color: palette.ink }]}>
+                    {formatAmount(Number(credit.amount_owed))}
+                  </Text>
+                  {late && (
+                    <View
+                      style={[
+                        styles.pill,
+                        { backgroundColor: `${palette.over}22` },
+                      ]}
+                    >
+                      <Text style={[styles.pillText, { color: palette.over }]}>
+                        da {days} giorni
+                      </Text>
+                    </View>
+                  )}
+                </View>
+
+                <TouchableOpacity
+                  onPress={() => settle(credit)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                  accessibilityLabel="Segna come saldato"
+                >
+                  <Icon name="check" size={18} color={palette.good} />
+                </TouchableOpacity>
+              </View>
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  const errorSection = error && <LoadError message={error} onRetry={load} />;
+
+  const emptySection = !error &&
+    open.length === 0 &&
+    openDebts.length === 0 &&
+    events.length === 0 && (
+      <Text style={[styles.empty, { color: palette.ink3 }]}>
+        Ancora nessuna divisione. Le trovi qui quando dividi una spesa
+        dalla schermata di modifica, o quando un amico con Clinck divide
+        qualcosa con te.
+      </Text>
+    );
+
+  const settledSection = settled.length > 0 && (
+    <View>
+      <TouchableOpacity
+        onPress={() => setShowSettled((v) => !v)}
+        style={styles.settledToggle}
+      >
+        <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
+          Già saldati ({settled.length})
+        </Text>
+        <Icon
+          name={showSettled ? "chevron-up" : "chevron-down"}
+          size={14}
+          color={palette.ink3}
+        />
+      </TouchableOpacity>
+
+      {showSettled && (
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: palette.surface,
+              borderColor: palette.hairline,
+              marginTop: space.sm,
+            },
+          ]}
+        >
+          {settled.map((credit, index) => (
+            <View key={credit.id}>
+              {index > 0 && (
+                <View
+                  style={[
+                    styles.divider,
+                    { backgroundColor: palette.hairline },
+                  ]}
+                />
+              )}
+              <View style={styles.creditRow}>
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.person, { color: palette.ink2 }]}>
+                    {credit.person?.name ?? "—"}
+                  </Text>
+                  <Text style={[styles.context, { color: palette.ink3 }]}>
+                    {credit.payment?.merchant_name ?? "spesa eliminata"}
+                  </Text>
+                </View>
+                <Text style={[styles.owed, { color: palette.ink3 }]}>
+                  {formatAmount(Number(credit.amount_owed))}
+                </Text>
+                <TouchableOpacity onPress={() => reopen(credit)}>
+                  <Text style={[styles.context, { color: palette.accent }]}>
+                    Annulla
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+
+  const noteSection = (
+    <Text style={[styles.note, { color: palette.ink3 }]}>
+      I crediti aperti da più di {OVERDUE_DAYS} giorni vengono
+      evidenziati. Accettare una quota la registra come spesa tua, con la
+      data della spesa originale: se chi ha pagato la corregge, si
+      corregge anche la tua, e se la cancella sparisce anche dai tuoi
+      conti.
+    </Text>
+  );
+
+  /* ── Con chi divido di più ──────────────────────────────────────
+     Le due direzioni fianco a fianco per persona, non due grafici
+     separati: "quanto ho ricevuto da Leonardo" accanto a "quanto gli
+     ho mandato" e' la domanda che ci si fa, non le due tabelle da cui
+     i numeri arrivano. L'elenco sotto e' l'unico con le persone: prima
+     ce n'era un secondo identico ma senza il grafico sopra, e le
+     azioni di associare/scollegare/eliminare stavano solo li' — ora
+     stanno qui, sull'elenco che gia' esiste, invece che duplicarlo. */
+  const topSection = top5.length > 0 && (
+    <View>
+      <Text style={[styles.label, { color: palette.ink3 }]}>
+        Con chi dividi di più
+      </Text>
+      <View
+        onLayout={(e) => {
+          const next = Math.round(e.nativeEvent.layout.width);
+          if (next > 0 && next !== chartColumn) setChartColumn(next);
+        }}
+      >
+        <ChartCarousel
+          pages={[
+            {
+              key: "amount",
+              title: "Quanto dividi",
+              subtitle: "per persona",
+              content: (
+                <GroupedBarChart
+                  groups={top5.map((p) => ({
+                    key: p.personId,
+                    label: firstName(p.name),
+                    values: [p.received, p.sent],
+                  }))}
+                  colors={[palette.good, palette.over]}
+                  formatValue={(v) => formatAmount(v)}
+                />
+              ),
+            } as ChartPage,
+            {
+              key: "count",
+              title: "Quante volte",
+              subtitle: "numero di divisioni",
+              content: (
+                <GroupedBarChart
+                  groups={top5.map((p) => ({
+                    key: p.personId,
+                    label: firstName(p.name),
+                    values: [p.receivedCount, p.sentCount],
+                  }))}
+                  colors={[palette.good, palette.over]}
+                  formatValue={(v) => String(Math.round(v))}
+                />
+              ),
+            } as ChartPage,
+          ]}
+          // Sul telefono non si passa niente: il default (16) e' gia' il
+          // margine vero della schermata, e cambiarlo di mezzo pixel
+          // sposterebbe l'aggancio del carosello.
+          horizontalPadding={
+            wide && chartColumn > 0
+              ? (windowWidth - chartColumn) / 2
+              : undefined
+          }
+        />
+      </View>
+
+      <View style={styles.legendRow}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: palette.good }]} />
+          <Text style={[styles.legendText, { color: palette.ink2 }]}>Ricevuto</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: palette.over }]} />
+          <Text style={[styles.legendText, { color: palette.ink2 }]}>Inviato</Text>
+        </View>
+      </View>
+
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: palette.surface, borderColor: palette.hairline, marginTop: space.md },
+        ]}
+      >
+        {mergedPeople.map(({ person, receivedCount, sentCount }, index) => (
+          <PersonRow
+            key={person.id}
+            person={person}
+            divider={index > 0}
+            count={receivedCount + sentCount}
+            canAssociate={friends.length > 0}
+            onOpen={() => setOpenPerson({ id: person.id, name: person.name })}
+            onEdit={() => startRename(person)}
+            onAssociate={() => setLinking(person)}
+            onUnlink={() => confirmUnlink(person)}
+            onDelete={() => confirmDeletePerson(person.id, person.name)}
+          />
+        ))}
+      </View>
+    </View>
+  );
+
+  /* Guardia `!error`: senza, un fallimento nel caricare crediti/debiti
+     lascia `events` vuoto e questa sezione mostrerebbe "Nessuna
+     divisione ancora" per ogni persona come se fosse vero, mentre in
+     realta' non si e' riusciti a leggerle — lo stesso errore che
+     `LoadError` sopra sta gia' segnalando. */
+  const peopleSection = !error && top5.length === 0 && people.length > 0 && (
+    <View>
+      <Text style={[styles.label, { color: palette.ink3 }]}>Persone</Text>
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: palette.surface, borderColor: palette.hairline },
+        ]}
+      >
+        {mergedPeople.map(({ person, receivedCount, sentCount }, index) => (
+          <PersonRow
+            key={person.id}
+            person={person}
+            divider={index > 0}
+            count={receivedCount + sentCount}
+            canAssociate={friends.length > 0}
+            onOpen={() => setOpenPerson({ id: person.id, name: person.name })}
+            onEdit={() => startRename(person)}
+            onAssociate={() => setLinking(person)}
+            onUnlink={() => confirmUnlink(person)}
+            onDelete={() => confirmDeletePerson(person.id, person.name)}
+          />
+        ))}
+      </View>
+    </View>
+  );
+
+  /* ── Divisioni del mese ─────────────────────────────────────────
+     Stesso schema di "Vedi tutte le transazioni" nel dettaglio di
+     una categoria: chiuso mostra solo il mese corrente, aperto
+     l'intera storia raggruppata. */
+  const divisionsSection = events.length > 0 && (
+    <View>
+      <View style={styles.listHead}>
+        <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
+          {showAllDivisions ? "Tutte le divisioni" : "Divisioni del mese"}
+        </Text>
+        {hasOlderDivisions && (
+          <TouchableOpacity onPress={() => setShowAllDivisions((v) => !v)}>
+            <Text style={[styles.link, { color: palette.accent }]}>
+              {showAllDivisions ? "Mostra meno" : "Vedi tutte"}
+            </Text>
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {showAllDivisions ? (
+        eventMonths.map((group) => (
+          <View key={group.key}>
+            <Text style={[styles.monthLabel, { color: palette.ink3 }]}>
+              {group.label}
+            </Text>
+            {group.data.map((event) => (
+              <DivisionRow
+                key={event.id}
+                event={event}
+                onPress={() => setOpenPerson({ id: event.personId, name: event.personName })}
+              />
+            ))}
+          </View>
+        ))
+      ) : monthEvents.length > 0 ? (
+        monthEvents.map((event) => (
+          <DivisionRow
+            key={event.id}
+            event={event}
+            onPress={() => setOpenPerson({ id: event.personId, name: event.personName })}
+          />
+        ))
+      ) : (
+        <Text style={[styles.empty, { color: palette.ink3 }]}>
+          Nessuna divisione questo mese.
+        </Text>
+      )}
+    </View>
+  );
+
   return (
     <SwipeBack onBack={onBack}>
     <View style={[styles.container, { backgroundColor: palette.ground }]}>
@@ -409,540 +984,38 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {/* Un solo semicerchio, non due affiancati: l'anello esterno e'
-            quanto hai ricevuto questo mese, quello interno (specchiato,
-            cresce dalla punta destra) e' quanto hai inviato — stessa scala
-            per entrambi, il mese piu' pieno degli ultimi sei. Dentro ogni
-            anello la parte gia' saldata usa il colore pieno, quella ancora
-            aperta lo stesso colore piu' scuro e piu' trasparente: e' lo
-            stesso meccanismo con cui Home impila piu' fonti di introito in
-            un solo arco, non due anelli diversi. */}
-        {!error && (
-          <View style={styles.gaugeBlock}>
-            <View style={styles.gaugeCenter}>
-              <SemiGauge
-                width={gaugeWidth}
-                stroke={16}
-                outer={{
-                  segments: [
-                    { value: creditSettledMonth, color: palette.good },
-                    { value: creditOpenMonth, color: shade(palette.good) },
-                  ],
-                  max: gaugeMax,
-                }}
-                inner={{
-                  segments: [
-                    { value: debtSettledMonth, color: palette.over },
-                    { value: debtOpenMonth, color: shade(palette.over) },
-                  ],
-                  max: gaugeMax,
-                }}
-                mirrorInner
-                endLabel={formatAmount(gaugeMax)}
-              >
-                <View style={styles.gaugeCenterRow}>
-                  <View style={styles.gaugeCenterItem}>
-                    <Text
-                      style={[styles.gaugeAmount, { color: palette.good }]}
-                      numberOfLines={1}
-                    >
-                      {formatAmount(totalOpen)}
-                    </Text>
-                    <Text style={[styles.gaugeSubLabel, { color: palette.good }]}>
-                      da recuperare
-                    </Text>
-                  </View>
-                  <View style={styles.gaugeCenterItem}>
-                    <Text
-                      style={[styles.gaugeAmount, { color: palette.over }]}
-                      numberOfLines={1}
-                    >
-                      {formatAmount(totalDebts)}
-                    </Text>
-                    <Text style={[styles.gaugeSubLabel, { color: palette.over }]}>
-                      da inviare
-                    </Text>
-                  </View>
-                </View>
-              </SemiGauge>
-            </View>
+        {/* A sinistra lo stato e cio' su cui si decide: il semicerchio, i
+            riquadri di sintesi e le due liste azionabili (le quote da
+            accettare, i crediti da confermare saldati). Le azioni restano
+            nella colonna che l'occhio incontra per prima: in fondo alla
+            seconda, sotto un grafico e due elenchi, una decisione da prendere
+            non si vede piu'. A destra la lettura: il grafico "con chi dividi
+            di piu'", l'elenco Persone e le divisioni.
 
-            <View style={styles.legendRow}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: palette.good }]} />
-                <Text style={[styles.legendText, { color: palette.ink2 }]}>
-                  Ricevuto
-                </Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: palette.over }]} />
-                <Text style={[styles.legendText, { color: palette.ink2 }]}>
-                  Inviato
-                </Text>
-              </View>
-            </View>
-
-            <Text style={[styles.gaugeScaleNote, { color: palette.ink3 }]}>
-              scala: {formatAmount(gaugeMax)}, il mese più pieno degli ultimi 6
-            </Text>
-
-            <StatTiles
-              tiles={[
-                { label: "Totale diviso", value: formatAmount(totalDivided) },
-                {
-                  label: "Tot Inviato/Ricevuto",
-                  value: `${formatAmount(totalSentAllTime)} / ${formatAmount(totalReceivedAllTime)}`,
-                },
-                { label: "Transazioni", value: String(events.length) },
-                { label: "Persone", value: String(distinctPeopleCount) },
-              ]}
-            />
-          </View>
-        )}
-
-        {/* ── Quello che devo io ─────────────────────────────────────────
-            Accettare non e' una formalita': crea la spesa nei propri conti,
-            ed e' il motivo per cui la divisione fra account vale la pena.
-            Per questo la riga dice l'importo intero della spesa accanto alla
-            quota — si accetta sapendo su cosa. Niente piu' tab a nascondere
-            l'una o l'altra: le due liste stanno sempre entrambe qui sotto. */}
-        {!error && openDebts.length > 0 && (
-          <View>
-            <Text style={[styles.label, { color: palette.ink3 }]}>
-              Da accettare
-              {pendingDebts > 0 ? ` (${pendingDebts})` : ""}
-            </Text>
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: palette.surface, borderColor: palette.hairline },
-              ]}
-            >
-            {openDebts.map((debt, index) => (
-              <View key={debt.split_id}>
-                {index > 0 && (
-                  <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
-                )}
-                <View style={styles.debtRow}>
-                  <View style={styles.debtHead}>
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.person, { color: palette.ink }]}>
-                        {debt.merchant}
-                      </Text>
-                      <Text style={[styles.context, { color: palette.ink3 }]}>
-                        {debt.payer_name} · {shortDate(debt.occurred_at)} · su{" "}
-                        {formatAmount(Number(debt.total_amount))}
-                      </Text>
-                    </View>
-                    <Text style={[styles.owed, { color: palette.ink }]}>
-                      {formatAmount(Number(debt.amount_owed))}
-                    </Text>
-                  </View>
-
-                  {debt.status === "pending" ? (
-                    <View style={styles.debtActions}>
-                      <TouchableOpacity
-                        style={[styles.action, { backgroundColor: palette.accent }]}
-                        onPress={() => respondDebt(debt, true)}
-                      >
-                        <Text style={[styles.actionText, { color: palette.onAccent }]}>
-                          Accetta
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.action,
-                          { borderWidth: 1, borderColor: palette.hairline },
-                        ]}
-                        onPress={() => respondDebt(debt, false)}
-                      >
-                        <Text style={[styles.actionText, { color: palette.ink2 }]}>
-                          Rifiuta
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  ) : debt.settle_requested_at ? (
-                    <Text style={[styles.context, { color: palette.ink3 }]}>
-                      Hai detto di aver pagato: aspetta la conferma di{" "}
-                      {debt.payer_name}.
-                    </Text>
-                  ) : (
-                    <View style={styles.debtActions}>
-                      <TouchableOpacity
-                        style={[
-                          styles.action,
-                          { borderWidth: 1, borderColor: palette.hairline },
-                        ]}
-                        onPress={() => declarePaid(debt)}
-                      >
-                        <Text style={[styles.actionText, { color: palette.ink2 }]}>
-                          Ho pagato
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
-              </View>
-            ))}
-            </View>
-          </View>
-        )}
-
-        {!error && open.length > 0 && (
-          <View>
-            <Text style={[styles.label, { color: palette.ink3 }]}>Ti devono</Text>
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: palette.surface, borderColor: palette.hairline },
-              ]}
-            >
-            {open.map((credit, index) => {
-              const late = daysSince(credit.created_at) >= OVERDUE_DAYS;
-              const days = daysSince(credit.created_at);
-
-              return (
-                <View key={credit.id}>
-                  {index > 0 && (
-                    <View
-                      style={[
-                        styles.divider,
-                        { backgroundColor: palette.hairline },
-                      ]}
-                    />
-                  )}
-                  <View style={styles.creditRow}>
-                    <View
-                      style={[
-                        styles.avatar,
-                        { backgroundColor: tint(palette.accent, dark) },
-                      ]}
-                    >
-                      <Text style={[styles.initial, { color: palette.accent }]}>
-                        {(credit.person?.name ?? "?").charAt(0).toUpperCase()}
-                      </Text>
-                    </View>
-
-                    <View style={{ flex: 1 }}>
-                      <Text style={[styles.person, { color: palette.ink }]}>
-                        {credit.person?.name ?? "—"}
-                      </Text>
-                      <Text style={[styles.context, { color: palette.ink3 }]}>
-                        {credit.payment?.merchant_name ?? "spesa eliminata"}
-                        {" · "}
-                        {new Date(
-                          credit.payment?.occurred_at ?? credit.created_at
-                        ).toLocaleDateString("it-IT", {
-                          day: "numeric",
-                          month: "short",
-                        })}
-                      </Text>
-                      {/* Lo stato solo quando c'e' un account dall'altra
-                          parte: su una persona senza Clinck non c'e' niente
-                          da aspettare, e scrivere "in attesa" farebbe
-                          credere che manchi un passaggio. */}
-                      {credit.status !== "local" && (
-                        <Text
-                          style={[
-                            styles.state,
-                            {
-                              color:
-                                credit.status === "declined"
-                                  ? palette.over
-                                  : palette.ink3,
-                            },
-                          ]}
-                        >
-                          {credit.status === "pending"
-                            ? "In attesa che accetti"
-                            : credit.status === "declined"
-                              ? "Ha rifiutato la quota"
-                              : credit.settle_requested_at
-                                ? "Dice di aver pagato"
-                                : "Accettata"}
-                        </Text>
-                      )}
-                    </View>
-
-                    <View style={styles.creditRight}>
-                      <Text style={[styles.owed, { color: palette.ink }]}>
-                        {formatAmount(Number(credit.amount_owed))}
-                      </Text>
-                      {late && (
-                        <View
-                          style={[
-                            styles.pill,
-                            { backgroundColor: `${palette.over}22` },
-                          ]}
-                        >
-                          <Text style={[styles.pillText, { color: palette.over }]}>
-                            da {days} giorni
-                          </Text>
-                        </View>
-                      )}
-                    </View>
-
-                    <TouchableOpacity
-                      onPress={() => settle(credit)}
-                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                      accessibilityLabel="Segna come saldato"
-                    >
-                      <Icon name="check" size={18} color={palette.good} />
-                    </TouchableOpacity>
-                  </View>
-                </View>
-              );
-            })}
-            </View>
-          </View>
-        )}
-
-        {error && <LoadError message={error} onRetry={load} />}
-
-        {!error && open.length === 0 && openDebts.length === 0 && events.length === 0 && (
-          <Text style={[styles.empty, { color: palette.ink3 }]}>
-            Ancora nessuna divisione. Le trovi qui quando dividi una spesa
-            dalla schermata di modifica, o quando un amico con Clinck divide
-            qualcosa con te.
-          </Text>
-        )}
-
-        {settled.length > 0 && (
-          <View>
-            <TouchableOpacity
-              onPress={() => setShowSettled((v) => !v)}
-              style={styles.settledToggle}
-            >
-              <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
-                Già saldati ({settled.length})
-              </Text>
-              <Icon
-                name={showSettled ? "chevron-up" : "chevron-down"}
-                size={14}
-                color={palette.ink3}
-              />
-            </TouchableOpacity>
-
-            {showSettled && (
-              <View
-                style={[
-                  styles.card,
-                  {
-                    backgroundColor: palette.surface,
-                    borderColor: palette.hairline,
-                    marginTop: space.sm,
-                  },
-                ]}
-              >
-                {settled.map((credit, index) => (
-                  <View key={credit.id}>
-                    {index > 0 && (
-                      <View
-                        style={[
-                          styles.divider,
-                          { backgroundColor: palette.hairline },
-                        ]}
-                      />
-                    )}
-                    <View style={styles.creditRow}>
-                      <View style={{ flex: 1 }}>
-                        <Text style={[styles.person, { color: palette.ink2 }]}>
-                          {credit.person?.name ?? "—"}
-                        </Text>
-                        <Text style={[styles.context, { color: palette.ink3 }]}>
-                          {credit.payment?.merchant_name ?? "spesa eliminata"}
-                        </Text>
-                      </View>
-                      <Text style={[styles.owed, { color: palette.ink3 }]}>
-                        {formatAmount(Number(credit.amount_owed))}
-                      </Text>
-                      <TouchableOpacity onPress={() => reopen(credit)}>
-                        <Text style={[styles.context, { color: palette.accent }]}>
-                          Annulla
-                        </Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-          </View>
-        )}
-
-        <Text style={[styles.note, { color: palette.ink3 }]}>
-          I crediti aperti da più di {OVERDUE_DAYS} giorni vengono
-          evidenziati. Accettare una quota la registra come spesa tua, con la
-          data della spesa originale: se chi ha pagato la corregge, si
-          corregge anche la tua, e se la cancella sparisce anche dai tuoi
-          conti.
-        </Text>
-
-        {/* ── Con chi divido di più ──────────────────────────────────────
-            Le due direzioni fianco a fianco per persona, non due grafici
-            separati: "quanto ho ricevuto da Leonardo" accanto a "quanto gli
-            ho mandato" e' la domanda che ci si fa, non le due tabelle da cui
-            i numeri arrivano. L'elenco sotto e' l'unico con le persone: prima
-            ce n'era un secondo identico ma senza il grafico sopra, e le
-            azioni di associare/scollegare/eliminare stavano solo li' — ora
-            stanno qui, sull'elenco che gia' esiste, invece che duplicarlo. */}
-        {top5.length > 0 && (
-          <View>
-            <Text style={[styles.label, { color: palette.ink3 }]}>
-              Con chi dividi di più
-            </Text>
-            <ChartCarousel
-              pages={[
-                {
-                  key: "amount",
-                  title: "Quanto dividi",
-                  subtitle: "per persona",
-                  content: (
-                    <GroupedBarChart
-                      groups={top5.map((p) => ({
-                        key: p.personId,
-                        label: firstName(p.name),
-                        values: [p.received, p.sent],
-                      }))}
-                      colors={[palette.good, palette.over]}
-                      formatValue={(v) => formatAmount(v)}
-                    />
-                  ),
-                } as ChartPage,
-                {
-                  key: "count",
-                  title: "Quante volte",
-                  subtitle: "numero di divisioni",
-                  content: (
-                    <GroupedBarChart
-                      groups={top5.map((p) => ({
-                        key: p.personId,
-                        label: firstName(p.name),
-                        values: [p.receivedCount, p.sentCount],
-                      }))}
-                      colors={[palette.good, palette.over]}
-                      formatValue={(v) => String(Math.round(v))}
-                    />
-                  ),
-                } as ChartPage,
-              ]}
-            />
-
-            <View style={styles.legendRow}>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: palette.good }]} />
-                <Text style={[styles.legendText, { color: palette.ink2 }]}>Ricevuto</Text>
-              </View>
-              <View style={styles.legendItem}>
-                <View style={[styles.legendDot, { backgroundColor: palette.over }]} />
-                <Text style={[styles.legendText, { color: palette.ink2 }]}>Inviato</Text>
-              </View>
-            </View>
-
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: palette.surface, borderColor: palette.hairline, marginTop: space.md },
-              ]}
-            >
-              {mergedPeople.map(({ person, receivedCount, sentCount }, index) => (
-                <PersonRow
-                  key={person.id}
-                  person={person}
-                  divider={index > 0}
-                  count={receivedCount + sentCount}
-                  canAssociate={friends.length > 0}
-                  onOpen={() => setOpenPerson({ id: person.id, name: person.name })}
-                  onEdit={() => startRename(person)}
-                  onAssociate={() => setLinking(person)}
-                  onUnlink={() => confirmUnlink(person)}
-                  onDelete={() => confirmDeletePerson(person.id, person.name)}
-                />
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* Guardia `!error`: senza, un fallimento nel caricare crediti/debiti
-            lascia `events` vuoto e questa sezione mostrerebbe "Nessuna
-            divisione ancora" per ogni persona come se fosse vero, mentre in
-            realta' non si e' riusciti a leggerle — lo stesso errore che
-            `LoadError` sopra sta gia' segnalando. */}
-        {!error && top5.length === 0 && people.length > 0 && (
-          <View>
-            <Text style={[styles.label, { color: palette.ink3 }]}>Persone</Text>
-            <View
-              style={[
-                styles.card,
-                { backgroundColor: palette.surface, borderColor: palette.hairline },
-              ]}
-            >
-              {mergedPeople.map(({ person, receivedCount, sentCount }, index) => (
-                <PersonRow
-                  key={person.id}
-                  person={person}
-                  divider={index > 0}
-                  count={receivedCount + sentCount}
-                  canAssociate={friends.length > 0}
-                  onOpen={() => setOpenPerson({ id: person.id, name: person.name })}
-                  onEdit={() => startRename(person)}
-                  onAssociate={() => setLinking(person)}
-                  onUnlink={() => confirmUnlink(person)}
-                  onDelete={() => confirmDeletePerson(person.id, person.name)}
-                />
-              ))}
-            </View>
-          </View>
-        )}
-
-        {/* ── Divisioni del mese ─────────────────────────────────────────
-            Stesso schema di "Vedi tutte le transazioni" nel dettaglio di
-            una categoria: chiuso mostra solo il mese corrente, aperto
-            l'intera storia raggruppata. */}
-        {events.length > 0 && (
-          <View>
-            <View style={styles.listHead}>
-              <Text style={[styles.label, { color: palette.ink3, marginBottom: 0 }]}>
-                {showAllDivisions ? "Tutte le divisioni" : "Divisioni del mese"}
-              </Text>
-              {hasOlderDivisions && (
-                <TouchableOpacity onPress={() => setShowAllDivisions((v) => !v)}>
-                  <Text style={[styles.link, { color: palette.accent }]}>
-                    {showAllDivisions ? "Mostra meno" : "Vedi tutte"}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </View>
-
-            {showAllDivisions ? (
-              eventMonths.map((group) => (
-                <View key={group.key}>
-                  <Text style={[styles.monthLabel, { color: palette.ink3 }]}>
-                    {group.label}
-                  </Text>
-                  {group.data.map((event) => (
-                    <DivisionRow
-                      key={event.id}
-                      event={event}
-                      onPress={() => setOpenPerson({ id: event.personId, name: event.personName })}
-                    />
-                  ))}
-                </View>
-              ))
-            ) : monthEvents.length > 0 ? (
-              monthEvents.map((event) => (
-                <DivisionRow
-                  key={event.id}
-                  event={event}
-                  onPress={() => setOpenPerson({ id: event.personId, name: event.personName })}
-                />
-              ))
-            ) : (
-              <Text style={[styles.empty, { color: palette.ink3 }]}>
-                Nessuna divisione questo mese.
-              </Text>
-            )}
-          </View>
-        )}
+            Niente `order`: sinistra seguita da destra e' gia' l'ordine
+            verticale di sempre. Spostando una sezione da una colonna
+            all'altra andra' aggiunto, o telefono e iPad divergeranno in
+            silenzio. */}
+        <TwoColumns
+          left={
+            <>
+              {gaugeSection}
+              {debtsSection}
+              {creditsSection}
+              {errorSection}
+              {emptySection}
+              {settledSection}
+              {noteSection}
+            </>
+          }
+          right={
+            <>
+              {topSection}
+              {peopleSection}
+              {divisionsSection}
+            </>
+          }
+        />
       </ScrollView>
 
       <AddPersonSheet
