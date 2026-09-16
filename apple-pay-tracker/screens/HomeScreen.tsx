@@ -1009,7 +1009,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                     serve a qualcosa — un tetto rispettato tutti i mesi ma mai
                     verificato a consuntivo resta una buona intenzione. */}
                 {verdict !== null && goal !== null && (
-                  <View
+                  <TouchableOpacity
                     style={[
                       styles.alert,
                       {
@@ -1018,6 +1018,12 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                           : `${palette.warn}1f`,
                       },
                     ]}
+                    onPress={() => openSettings("limits")}
+                    accessibilityRole="button"
+                    accessibilityLabel={
+                      verdict.met ? "Obiettivo centrato" : "Obiettivo mancato"
+                    }
+                    accessibilityHint="Apre limiti e obiettivo di risparmio"
                   >
                     <Icon
                       name={verdict.met ? "piggy-bank" : "triangle-alert"}
@@ -1040,7 +1046,8 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                         {formatAmount(total)}.
                       </Text>
                     </View>
-                  </View>
+                    <Icon name="chevron-right" size={15} color={palette.ink3} />
+                  </TouchableOpacity>
                 )}
 
                 {/* Un conflitto fra limite e obiettivo va detto dove si guarda
@@ -1053,6 +1060,11 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                     <TouchableOpacity
                       style={[styles.alert, { backgroundColor: `${palette.warn}1f` }]}
                       onPress={() => openSettings("limits")}
+                      accessibilityRole="button"
+                      accessibilityLabel={
+                        conflicts.find((c) => c.severity === "conflict")?.title
+                      }
+                      accessibilityHint="Apre i limiti di spesa"
                     >
                       <Icon name="triangle-alert" size={16} color={palette.warn} />
                       <View style={{ flex: 1 }}>
@@ -1063,6 +1075,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                           {conflicts.find((c) => c.severity === "conflict")?.body}
                         </Text>
                       </View>
+                      <Icon name="chevron-right" size={15} color={palette.ink3} />
                     </TouchableOpacity>
                   )}
 
@@ -1072,6 +1085,9 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                   <TouchableOpacity
                     style={[styles.alert, { backgroundColor: `${palette.over}1f` }]}
                     onPress={() => openSettings("subscription")}
+                    accessibilityRole="button"
+                    accessibilityLabel="Automazione ferma"
+                    accessibilityHint="Apre l'abbonamento"
                   >
                     <Icon name="triangle-alert" size={16} color={palette.over} />
                     <View style={{ flex: 1 }}>
@@ -1084,6 +1100,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                         Apple Pay da sola.
                       </Text>
                     </View>
+                    <Icon name="chevron-right" size={15} color={palette.ink3} />
                   </TouchableOpacity>
                 ) : (
                   subscriptionProfile?.subscription_status === "trialing" &&
@@ -1092,6 +1109,9 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                     <TouchableOpacity
                       style={[styles.alert, { backgroundColor: `${palette.warn}1f` }]}
                       onPress={() => openSettings("subscription")}
+                      accessibilityRole="button"
+                      accessibilityLabel="Automazione, ultimi giorni di prova"
+                      accessibilityHint="Apre l'abbonamento"
                     >
                       <Icon name="triangle-alert" size={16} color={palette.warn} />
                       <View style={{ flex: 1 }}>
@@ -1105,28 +1125,39 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                           Poi 1,99 €/mese o 15 €/anno per continuare.
                         </Text>
                       </View>
+                      <Icon name="chevron-right" size={15} color={palette.ink3} />
                     </TouchableOpacity>
                   )
                 )}
 
+                {/* L'avviso di limite sfiorato o superato e' il posto da cui
+                    chi lo legge vuole andare a vedere (o alzare) il limite:
+                    era l'unico avviso di questa sezione che non portava da
+                    nessuna parte, e Andrea l'ha toccato aspettandosi i
+                    Limiti. Ora ci porta, col chevron che lo dichiara. */}
                 {viewingCurrentMonth &&
                   alerts.map((status) => {
                     const category = categoryById(status.limit.category_id);
                     const scope = category ? category.name : "complessivo";
                     const over = status.level === "over";
                     const tone = over ? palette.over : palette.warn;
+                    const title = over
+                      ? `Limite ${scope} superato`
+                      : `Limite ${scope} quasi raggiunto`;
 
                     return (
-                      <View
+                      <TouchableOpacity
                         key={`alert-${status.limit.id}`}
                         style={[styles.alert, { backgroundColor: `${tone}1f` }]}
+                        onPress={() => openSettings("limits")}
+                        accessibilityRole="button"
+                        accessibilityLabel={title}
+                        accessibilityHint="Apre i limiti di spesa"
                       >
                         <Icon name="triangle-alert" size={16} color={tone} />
                         <View style={{ flex: 1 }}>
                           <Text style={[styles.alertTitle, { color: palette.ink }]}>
-                            {over
-                              ? `Limite ${scope} superato`
-                              : `Limite ${scope} quasi raggiunto`}
+                            {title}
                           </Text>
                           <Text style={[styles.alertBody, { color: palette.ink2 }]}>
                             {formatAmount(status.spent)} di{" "}
@@ -1136,7 +1167,8 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                               : ` — restano ${formatAmount(status.remaining)}.`}
                           </Text>
                         </View>
-                      </View>
+                        <Icon name="chevron-right" size={15} color={palette.ink3} />
+                      </TouchableOpacity>
                     );
                   })}
 
@@ -1145,7 +1177,15 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                     perche': sembrava un bug del grafico invece che una
                     lettura fallita, e "tira giu' per aggiornare" non e' un
                     gesto che viene in mente da soli davanti a uno spazio
-                    vuoto. */}
+                    vuoto.
+
+                    Resta una `View` e non ha il chevron: e' un messaggio, non
+                    una destinazione — il rimedio e' tirare giu' questa stessa
+                    pagina, non aprirne un'altra. In questa sezione la regola
+                    e' secca: se un avviso porta da qualche parte e' toccabile
+                    e lo dichiara col chevron, se non porta da nessuna parte
+                    resta una `View`. Meta' avvisi cliccabili e meta' no, con
+                    lo stesso aspetto, e' peggio di nessuno cliccabile. */}
                 {balanceError && (
                   <View style={[styles.alert, { backgroundColor: `${palette.warn}1f` }]}>
                     <Icon name="triangle-alert" size={16} color={palette.warn} />
