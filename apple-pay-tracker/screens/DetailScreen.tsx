@@ -31,6 +31,7 @@ import {
   paymentsIn,
   sameMonth,
   WEEK_BAR_MIN_COLUMN_WIDTH,
+  weekBarLimit,
 } from "../lib/aggregate";
 import { formatAmount, monthName, monthShort, splitAmount } from "../lib/format";
 import { supabase } from "../lib/supabase";
@@ -185,9 +186,10 @@ export default function DetailScreen({ target, onBack, onOpenPayment }: Props) {
   );
 
   const months = useMemo(() => groupByMonth(payments), [payments]);
-  // Su schermo largo c'e' piu' spazio orizzontale per le settimane: se ne
-  // mostrano di piu' in una volta invece di far scorrere quasi subito.
-  const weekBucketLimit = wide ? 18 : 10;
+  // Stessa regola delle Statistiche, e presa dallo stesso posto: quante
+  // settimane stanno nei margini senza costringere a scorrere dentro il
+  // carosello.
+  const weekBucketLimit = weekBarLimit(wide);
   const buckets = useMemo(
     () => bucketize(payments, grain, grain === "week" ? weekBucketLimit : 8),
     [payments, grain, weekBucketLimit]

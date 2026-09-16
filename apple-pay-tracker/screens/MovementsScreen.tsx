@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -376,9 +376,12 @@ function IncomeList({ month }: { month: Date }) {
   const scrollRestoration = useScrollRestoration("movements-income");
 
   const [editing, setEditing] = useState<Income | null>(null);
+  /** Mese a cui appartengono le righe attualmente in elenco. */
+  const meseInElenco = useRef<string | null>(null);
 
   const load = useCallback(async () => {
     const { start, end } = monthRange(month);
+    const chiave = `${month.getFullYear()}-${month.getMonth()}`;
     const { data, error: failure } = await supabase
       .from("incomes")
       .select("*")
@@ -386,7 +389,25 @@ function IncomeList({ month }: { month: Date }) {
       .lt("occurred_at", end.toISOString())
       .order("occurred_at", { ascending: false });
     setError(failure?.message ?? null);
-    if (!failure) setIncomes((data ?? []) as Income[]);
+
+    if (!failure) {
+      setIncomes((data ?? []) as Income[]);
+      meseInElenco.current = chiave;
+      return;
+    }
+
+    // Lettura fallita: le righe gia' in pagina si tengono **solo** se sono di
+    // questo mese. Sono vecchie, non false — e "vecchie ma vere" vale finche'
+    // l'etichetta del periodo non cambia, che e' la stessa regola con cui
+    // `usePayments` azzera il mese precedente. Senza, passando da Agosto a
+    // Settembre con la rete giu' restavano elencati stipendio e ricavi di
+    // agosto sotto l'intestazione "Settembre": il totale spariva, l'avviso
+    // non compariva mai (l'elenco non era vuoto, quindi `LoadError` non
+    // veniva mai raggiunto) e l'unico segnale era la data dentro la riga.
+    if (meseInElenco.current !== chiave) {
+      setIncomes([]);
+      meseInElenco.current = null;
+    }
   }, [month]);
 
   useEffect(() => {
@@ -414,39 +435,47 @@ function IncomeList({ month }: { month: Date }) {
     </View>
   ) : null;
 
-  // La lettura: l'elenco degli introiti, a destra.
+  // La lettura: l'elenco degli introiti, a destra. Quando l'elenco c'e'
+  // ancora ma l'ultima lettura e' fallita, l'avviso va **sopra** le righe
+  // (`variant="inline"`): sono di questo mese e restano vere, ma dire che
+  // sono aggiornate non lo sarebbe.
   const list =
     incomes.length > 0 ? (
-      <View
-        style={[
-          styles.card,
-          { backgroundColor: palette.surface, borderColor: palette.hairline },
-        ]}
-      >
-        {incomes.map((entry, index) => (
-          <View key={entry.id}>
-            {index > 0 && (
-              <View style={[styles.divider, { backgroundColor: palette.hairline }]} />
-            )}
-            <TouchableOpacity
-              style={styles.entryRow}
-              onPress={() => setEditing(entry)}
-              accessibilityRole="button"
-            >
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.entryLabel, { color: palette.ink }]}>
-                  {entry.label}
+      <View style={{ gap: space.sm }}>
+        {error && <LoadError message={error} onRetry={load} variant="inline" />}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: palette.surface, borderColor: palette.hairline },
+          ]}
+        >
+          {incomes.map((entry, index) => (
+            <View key={entry.id}>
+              {index > 0 && (
+                <View
+                  style={[styles.divider, { backgroundColor: palette.hairline }]}
+                />
+              )}
+              <TouchableOpacity
+                style={styles.entryRow}
+                onPress={() => setEditing(entry)}
+                accessibilityRole="button"
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[styles.entryLabel, { color: palette.ink }]}>
+                    {entry.label}
+                  </Text>
+                  <Text style={[styles.entryMeta, { color: palette.ink3 }]}>
+                    {shortDateTime(entry.occurred_at)}
+                  </Text>
+                </View>
+                <Text style={[styles.entryAmount, { color: palette.good }]}>
+                  +{formatAmount(entry.amount)}
                 </Text>
-                <Text style={[styles.entryMeta, { color: palette.ink3 }]}>
-                  {shortDateTime(entry.occurred_at)}
-                </Text>
-              </View>
-              <Text style={[styles.entryAmount, { color: palette.good }]}>
-                +{formatAmount(entry.amount)}
-              </Text>
-            </TouchableOpacity>
-          </View>
-        ))}
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
       </View>
     ) : error ? (
       <LoadError message={error} onRetry={load} />

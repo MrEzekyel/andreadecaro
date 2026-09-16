@@ -1,9 +1,22 @@
-import React, { useRef } from "react";
-import { ScrollView, View } from "react-native";
+import React, { useRef, useState } from "react";
+import { LayoutChangeEvent, ScrollView, View } from "react-native";
 import Svg, { Line, Rect, Text as SvgText } from "react-native-svg";
 import { useTheme } from "../lib/ThemeContext";
 
-const WIDTH = 320;
+/**
+ * Larghezza usata solo per il primo fotogramma, prima che `onLayout` abbia
+ * misurato il contenitore vero.
+ *
+ * Era una costante `WIDTH = 320` usata per **tutta** la vita del componente,
+ * con `preserveAspectRatio` di default a decidere la scala: esattamente il
+ * difetto gia' chiuso in `TrendChart`, `BarChart` e `MonthBars` (vedi
+ * CLAUDE.md, "I grafici seguono la larghezza che hanno"). Finche' il
+ * carosello disegnava pagine larghe quanto l'iPad non si notava; da quando le
+ * pagine hanno la larghezza vera, questo restava l'unico grafico a colonne
+ * disegnato a 320 px e centrato dentro una colonna da 600, accanto ad altri
+ * che la riempivano tutta.
+ */
+const FALLBACK_WIDTH = 320;
 const GUTTER = 26;
 const TOP = 16;
 const PLOT_H = 100;
@@ -48,6 +61,7 @@ function niceStep(raw: number) {
  */
 export function GroupedBarChart({ groups, colors, formatValue, minGroupWidth }: Props) {
   const { palette } = useTheme();
+  const [boxWidth, setBoxWidth] = useState(FALLBACK_WIDTH);
   const scroller = useRef<ScrollView>(null);
 
   const peak = Math.max(...groups.flatMap((g) => g.values), 0);
@@ -61,9 +75,9 @@ export function GroupedBarChart({ groups, colors, formatValue, minGroupWidth }: 
   }
 
   const scorre =
-    minGroupWidth != null && GUTTER + groups.length * minGroupWidth > WIDTH;
+    minGroupWidth != null && GUTTER + groups.length * minGroupWidth > boxWidth;
   const gutter = scorre ? 0 : GUTTER;
-  const width = scorre ? groups.length * minGroupWidth! : WIDTH;
+  const width = scorre ? groups.length * minGroupWidth! : boxWidth;
 
   const plotWidth = width - gutter;
   const groupWidth = Math.max(
@@ -166,10 +180,19 @@ export function GroupedBarChart({ groups, colors, formatValue, minGroupWidth }: 
     </Svg>
   );
 
-  if (!scorre) return <View>{disegno}</View>;
+  const misura = (event: LayoutChangeEvent) => {
+    const measured = Math.round(event.nativeEvent.layout.width);
+    // Il confronto evita il ciclo re-render -> layout -> re-render.
+    if (measured > 0 && measured !== boxWidth) setBoxWidth(measured);
+  };
+
+  if (!scorre) return <View onLayout={misura}>{disegno}</View>;
 
   return (
-    <View style={{ flexDirection: "row", alignItems: "flex-start" }}>
+    <View
+      onLayout={misura}
+      style={{ flexDirection: "row", alignItems: "flex-start" }}
+    >
       <Svg width={GUTTER} height={HEIGHT}>
         {ticks.map((value) => (
           <SvgText

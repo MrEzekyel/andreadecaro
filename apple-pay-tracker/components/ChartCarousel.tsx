@@ -24,12 +24,6 @@ export type ChartPage = {
 
 type Props = {
   pages: ChartPage[];
-  /**
-   * @deprecated Non serve piu' e viene ignorato: la larghezza della pagina non
-   * si deduce piu' dalla finestra meno i margini, si misura. Resta accettato
-   * solo per non rompere un chiamante che lo passi ancora.
-   */
-  horizontalPadding?: number;
 };
 
 /**

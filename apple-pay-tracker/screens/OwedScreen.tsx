@@ -66,17 +66,6 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
   const { width: windowWidth } = useWindowDimensions();
   const wide = useWideLayout();
   const gaugeWidth = Math.min(windowWidth - space.lg * 2, 340);
-  /**
-   * Larghezza vera della colonna che ospita il carosello.
-   *
-   * `ChartCarousel` ricava la larghezza di una pagina dalla finestra
-   * (`width - horizontalPadding * 2`): dentro una colonna otterrebbe pagine
-   * larghe quanto tutto l'iPad, che escono dalla colonna e sballano
-   * l'aggancio. Misurandola si puo' passare il margine equivalente e
-   * riportare la pagina alla larghezza che ha davvero.
-   */
-  const [chartColumn, setChartColumn] = useState(0);
-
   const [credits, setCredits] = useState<OpenCredit[]>([]);
   const [debts, setDebts] = useState<IncomingSplit[]>([]);
   const [friends, setFriends] = useState<Connection[]>([]);
@@ -788,12 +777,7 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
       <Text style={[styles.label, { color: palette.ink3 }]}>
         Con chi dividi di più
       </Text>
-      <View
-        onLayout={(e) => {
-          const next = Math.round(e.nativeEvent.layout.width);
-          if (next > 0 && next !== chartColumn) setChartColumn(next);
-        }}
-      >
+      <View>
         <ChartCarousel
           pages={[
             {
@@ -829,14 +813,6 @@ export default function OwedScreen({ onBack }: { onBack: () => void }) {
               ),
             } as ChartPage,
           ]}
-          // Sul telefono non si passa niente: il default (16) e' gia' il
-          // margine vero della schermata, e cambiarlo di mezzo pixel
-          // sposterebbe l'aggancio del carosello.
-          horizontalPadding={
-            wide && chartColumn > 0
-              ? (windowWidth - chartColumn) / 2
-              : undefined
-          }
         />
       </View>
 

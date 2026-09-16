@@ -1357,7 +1357,18 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
               />
             ) : (
               /* ---------------------------- ENTRATE ---------------------- */
-              <>
+              /* Stesso taglio delle Uscite, che erano gia' a due colonne e a
+                 cui questa meta' andava allineata: a sinistra lo stato — il
+                 semicerchio con la sua legenda, o lo stato vuoto quando non
+                 e' entrato niente — e a destra la lettura: quello che resta
+                 giorno per giorno, le entrate mese per mese, gli ultimi
+                 introiti. Sul telefono `TwoColumns` non disegna niente e le
+                 sezioni restano nell'ordine di sempre: sinistra seguita da
+                 destra e' gia' l'ordine verticale attuale, quindi `order` non
+                 serve. Se una sezione cambiasse colonna, andrebbe aggiunto. */
+              <TwoColumns
+                left={
+                  <>
                 {monthlyIncome > 0 ? (
                   <>
                     {/* Stesso semicerchio delle uscite, ma doppio: fuori quanto
@@ -1468,13 +1479,6 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                         </View>
                       )}
                     </View>
-
-                    <View>
-                      <Text style={[styles.label, { color: palette.ink3 }]}>
-                        Quello che ti resta, giorno per giorno
-                      </Text>
-                      <BalanceChart points={balanceSeries} days={daysInMonth} />
-                    </View>
                   </>
                 ) : (
                   <View style={styles.emptyBlock}>
@@ -1492,6 +1496,18 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                         Aggiungi un introito
                       </Text>
                     </TouchableOpacity>
+                  </View>
+                )}
+                  </>
+                }
+                right={
+                  <>
+                {monthlyIncome > 0 && (
+                  <View>
+                    <Text style={[styles.label, { color: palette.ink3 }]}>
+                      Quello che ti resta, giorno per giorno
+                    </Text>
+                    <BalanceChart points={balanceSeries} days={daysInMonth} />
                   </View>
                 )}
 
@@ -1566,7 +1582,9 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                     ))}
                   </View>
                 )}
-              </>
+                  </>
+                }
+              />
             )}
           </>
         )}

@@ -42,8 +42,10 @@ import {
   paymentsIn,
   sameMonth,
   WEEK_BAR_MIN_COLUMN_WIDTH,
+  weekBarLimit,
 } from "../lib/aggregate";
 import { firstError } from "../lib/loadError";
+import { readPaged } from "../lib/readPaged";
 import { supabase } from "../lib/supabase";
 import { categoryColor, radius, space, tint, type } from "../lib/theme";
 import { Payment } from "../lib/types";
@@ -91,7 +93,7 @@ const GRAIN_BY_KIND: Record<PeriodKind, Grain> = {
  * "mese" non cambia con la larghezza (otto e' gia' comodo ovunque).
  */
 function barWindow(kind: PeriodKind, grain: Grain, wide: boolean) {
-  if (grain === "week") return wide ? 18 : 10;
+  if (grain === "week") return weekBarLimit(wide);
   return kind === "year" ? 12 : 8;
 }
 
@@ -285,37 +287,62 @@ export default function StatsScreen() {
       categoryHistoryResult,
       incomesResult,
       investmentsResult,
+    // Tutte e cinque passano da `readPaged`: sono letture che possono
+    // superare il migliaio di righe, e PostgREST tronca li' **senza dare
+    // errore**. Un troncamento qui non lascerebbe una schermata vuota, che si
+    // noterebbe: disegnerebbe le colonne dei mesi recenti piu' basse del vero
+    // e "Dove spendi di piu'" su un campione parziale. L'ordinamento e'
+    // ascendente su `occurred_at` piu' `id`, che lo rende non ambiguo: senza
+    // il secondo criterio le rate di uno stesso giorno possono comparire in
+    // due pagine e saltarne un'altra.
     ] = await Promise.all([
-      supabase
-        .from("payments")
-        .select("*")
-        .gte("occurred_at", period.start.toISOString())
-        .lt("occurred_at", period.end.toISOString())
-        .order("occurred_at"),
-      supabase
-        .from("payments")
-        .select("*")
-        .gte("occurred_at", historyStart.toISOString())
-        .order("occurred_at"),
+      readPaged<Payment>(() =>
+        supabase
+          .from("payments")
+          .select("*")
+          .gte("occurred_at", period.start.toISOString())
+          .lt("occurred_at", period.end.toISOString())
+          .order("occurred_at")
+          .order("id")
+      ),
+      readPaged<Payment>(() =>
+        supabase
+          .from("payments")
+          .select("*")
+          .gte("occurred_at", historyStart.toISOString())
+          .order("occurred_at")
+          .order("id")
+      ),
       // Nessun limite di tempo: la ripartizione per categoria puo' guardare
       // a un mese qualunque da quando esiste il primo movimento, o a tutto
-      // lo storico in blocco.
-      supabase.from("payments").select("*").order("occurred_at"),
-      supabase
-        .from("incomes")
-        .select("amount, occurred_at")
-        // Stesso filtro della Home: un rimborso non e' un introito, e nelle
-        // medie mensili pesa come se lo fosse.
-        .eq("is_reimbursement", false)
-        .gte("occurred_at", historyStart.toISOString()),
-      supabase
-        .from("investments")
-        .select("amount, occurred_at")
-        // Come in Home: contano solo gli acquisti eseguiti, non i rientri di
-        // denaro (vendite, dividendi) ne' gli ordini ancora in esecuzione.
-        .eq("kind", "buy")
-        .eq("status", "settled")
-        .gte("occurred_at", historyStart.toISOString()),
+      // lo storico in blocco. E' anche la lettura che cresce per prima oltre
+      // il migliaio, perche' non ha nessun filtro a contenerla.
+      readPaged<Payment>(() =>
+        supabase.from("payments").select("*").order("occurred_at").order("id")
+      ),
+      readPaged<Dated>(() =>
+        supabase
+          .from("incomes")
+          .select("amount, occurred_at")
+          // Stesso filtro della Home: un rimborso non e' un introito, e nelle
+          // medie mensili pesa come se lo fosse.
+          .eq("is_reimbursement", false)
+          .gte("occurred_at", historyStart.toISOString())
+          .order("occurred_at")
+          .order("id")
+      ),
+      readPaged<Dated>(() =>
+        supabase
+          .from("investments")
+          .select("amount, occurred_at")
+          // Come in Home: contano solo gli acquisti eseguiti, non i rientri di
+          // denaro (vendite, dividendi) ne' gli ordini ancora in esecuzione.
+          .eq("kind", "buy")
+          .eq("status", "settled")
+          .gte("occurred_at", historyStart.toISOString())
+          .order("occurred_at")
+          .order("id")
+      ),
     ]);
 
     const failure = firstError(
@@ -692,10 +719,19 @@ export default function StatsScreen() {
   // che i dati disegnati cambino, ed e' esattamente l'impressione di "non
   // succede niente" che il selettore Settimana/Mese/Anno dava.
   useEffect(() => {
-    const match = buckets.find((bucket) => {
+    // L'**ultima** colonna che si sovrappone al periodo, non quella che ne
+    // contiene l'inizio. Su "Anno" `period.start` e' il 1° gennaio e con
+    // dodici colonne mensili cade sempre dentro la finestra: si finiva per
+    // evidenziare sempre gennaio, e i due numeri sotto il grafico — che
+    // descrivono la colonna evidenziata — raccontavano gennaio sotto
+    // un'intestazione che diceva l'anno intero. Su settimana e mese il
+    // periodo e' lungo quanto una colonna, quindi "l'ultima sovrapposta" e
+    // "quella che lo contiene" sono la stessa: li' non cambia niente.
+    let match: Bucket | undefined;
+    for (const bucket of buckets) {
       const { start, end } = bucketRange(bucket, grain);
-      return period.start >= start && period.start < end;
-    });
+      if (start < period.end && end > period.start) match = bucket;
+    }
     if (match) setSelectedKey(match.key);
   }, [period, buckets, grain]);
 
@@ -737,22 +773,37 @@ export default function StatsScreen() {
     />
   );
 
+  /**
+   * I due numeri sotto un grafico a colonne descrivono la **colonna
+   * evidenziata**, non il periodo scritto in cima alla pagina. Quando i due
+   * non coincidono — e non coincidono ogni volta che si sfoglia a un
+   * periodo fuori dalla finestra disegnata — senza dirlo si legge "42,30 €
+   * di media" sotto un'intestazione che parla di un altro mese. Il nome
+   * della colonna e' l'unica cosa che lo impedisce.
+   */
   function statPair(
     first: { label: string; value: string },
     second: { label: string; value: string }
   ) {
     return (
-      <View style={styles.statsRow}>
-        {[first, second].map((stat) => (
-          <View key={stat.label} style={styles.stat}>
-            <Text style={[styles.statValue, { color: palette.accent }]}>
-              {stat.value}
-            </Text>
-            <Text style={[styles.statLabel, { color: palette.ink3 }]}>
-              {stat.label}
-            </Text>
-          </View>
-        ))}
+      <View style={{ gap: 6 }}>
+        {selected && (
+          <Text style={[styles.statScope, { color: palette.ink3 }]}>
+            {selected.label}
+          </Text>
+        )}
+        <View style={styles.statsRow}>
+          {[first, second].map((stat) => (
+            <View key={stat.label} style={styles.stat}>
+              <Text style={[styles.statValue, { color: palette.accent }]}>
+                {stat.value}
+              </Text>
+              <Text style={[styles.statLabel, { color: palette.ink3 }]}>
+                {stat.label}
+              </Text>
+            </View>
+          ))}
+        </View>
       </View>
     );
   }
@@ -1412,7 +1463,8 @@ const styles = StyleSheet.create({
   heroMeta: { ...type.caption, marginTop: space.sm },
   asideStack: { alignItems: "flex-end", gap: 4 },
   asideNote: { ...type.small, fontSize: 10, fontVariant: ["tabular-nums"] },
-  statsRow: { flexDirection: "row", gap: space.xxl, marginTop: space.sm },
+  statScope: { ...type.small, fontSize: 10.5, marginTop: space.sm },
+  statsRow: { flexDirection: "row", gap: space.xxl },
   stat: { gap: 2 },
   statValue: { ...type.bodyMedium, fontSize: 15, fontVariant: ["tabular-nums"] },
   statLabel: { ...type.small, fontSize: 10.5 },

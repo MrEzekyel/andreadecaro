@@ -21,6 +21,25 @@ export type Grain = "week" | "month";
  */
 export const WEEK_BAR_MIN_COLUMN_WIDTH = 34;
 
+/**
+ * Quante colonne settimanali mostrare, secondo la larghezza dello schermo.
+ *
+ * Sta qui e non nelle schermate perche' era gia' scritta in due posti
+ * (Statistiche e i dettagli di categoria/insegna) con due forme diverse:
+ * correggerne una sola lascia l'altra a scorrere, in una schermata che poi
+ * nessuno ricontrolla perche' "il fix e' stato fatto".
+ *
+ * Quattordici e non diciotto: su un iPad da 11" in orizzontale la colonna
+ * destra lascia al grafico ~566 px una volta tolti rail, margini, la colonna
+ * fissa di sinistra e il riquadro del carosello. A 34 px l'una, diciotto
+ * colonne ne chiedono 638 e il grafico ricomincia a scorrere **dentro** il
+ * carosello — cioe' il gesto che si e' appena finito di togliere. Quattordici
+ * ne chiedono 502 e ci stanno anche li'.
+ */
+export function weekBarLimit(wide: boolean) {
+  return wide ? 14 : 10;
+}
+
 export type Bucket = {
   key: string;
   label: string;
