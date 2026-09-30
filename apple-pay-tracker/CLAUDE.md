@@ -1,9 +1,16 @@
 # Clinck
 
 Tracker di spese personale per iOS. App Expo/React Native + backend Supabase.
-Distribuzione oggi via EAS Update dentro Expo Go; con il modello di business
-deciso (vedi "Abbonamento e referral" sotto) l'Apple Developer Program e il
-passaggio a una build nativa non sono più rimandabili — vedi `DA-FARE.md`.
+Distribuzione oggi: build nativa non firmata (profilo EAS `unsigned`,
+`eas.json` + `.eas/build/unsigned.yml`), firmata in locale con Xcode e un
+Apple ID gratuito e installata sull'iPhone — la firma gratuita scade dopo 7
+giorni, va rifirmata da lì (stesso schema di MB Companion,
+`/Users/andrea/MercedesAppRemake/app-mobile`, vedi `scripts/installa-iphone.sh`
+e `docs/installazione-iphone.md` lì come modello). Uso personale, fuori da
+App Store/TestFlight: niente RevenueCat/IAP finché non parte l'Apple
+Developer Program. Con il modello di business deciso (vedi "Abbonamento e
+referral" sotto) l'Apple Developer Program resta il passo per il pubblico —
+vedi `DA-FARE.md`.
 
 ## Stato del progetto — leggere prima di ripartire
 
@@ -60,8 +67,10 @@ produzione.
 
 ## Stack
 
-- **Expo SDK 57**, React Native 0.86, TypeScript, nessun modulo nativo custom
-  (deve restare compatibile con Expo Go)
+- **Expo SDK 57**, React Native 0.86, TypeScript. L'unico pezzo nativo e' il
+  widget (`targets/widget`, vedi "Widget"); il JavaScript deve restare
+  compatibile con Expo Go, quindi ogni modulo nativo si carica con
+  `requireOptionalNativeModule`
 - **Supabase**: Postgres + Row Level Security + Edge Function + pg_cron
   - project ref: `wcmxwhmiexhhbqvadbig`
 - `react-native-svg` per tutti i grafici (BarChart, TrendChart, CategoryDonut,
@@ -1482,6 +1491,34 @@ di un comando rapido).
   funziona dentro Expo Go. Fino a quel momento il pulsante "Abbonati" in
   `SubscriptionScreen` resta disattivato di proposito: lo schema e
   l'enforcement sono pronti, manca solo il pagamento.
+
+### Widget "Quanto resta"
+
+- `targets/widget/` (`@bacons/apple-targets`): widget piccolo, il semicerchio
+  della Home. Segue il tema del sistema tramite i colori dell'asset catalog
+  (`colors` in `expo-target.config.js`, formato `{ light, dark }`: il
+  commento della libreria dice `color/darkColor`, ma quel formato genera
+  colori vuoti e il widget esce senza testo).
+- **Non legge Supabase**: l'app scrive gli stessi numeri che disegna in un
+  App Group (`group.com.andreadecaro.clinck`, `lib/widget.ts`), e solo da
+  dati freschi del mese in corso — mai da cache o da una lettura fallita.
+  Una seconda sessione nel widget si contenderebbe il refresh token con
+  l'app. Il prezzo: una spesa arrivata dalla Shortcut ad app chiusa compare
+  solo alla prossima apertura, e dopo tre ore il widget mostra l'ora
+  dell'ultimo dato al posto dei giorni che restano.
+- `lib/widget.ts` usa `requireOptionalNativeModule`: un `eas update` arriva
+  anche alle build senza il modulo nativo, e un import diretto le farebbe
+  cadere all'avvio. Stesso motivo per ogni modulo nativo futuro.
+- La Swift del widget si compila in locale (niente Pod):
+  `xcodebuild -target widget` sul progetto di supporto in
+  `~/Library/Application Support/Clinck/firma`. L'app intera no: SDK 57
+  vuole Xcode 26.4, sul Mac c'e' il 26.3. Per provare una modifica al solo
+  widget non serve una build EAS: si compila `widget.appex` in locale, lo si
+  sostituisce in `Payload/Clinck.app/PlugIns/` dell'ultima IPA e si passa
+  l'IPA a `scripts/installa-iphone.sh`.
+- Se il widget non compare nella galleria ma i log del telefono dicono che
+  `chronod` lo include, controllare che Clinck non sia bloccata con
+  "Richiedi Face ID" di iOS: i widget delle app protette non compaiono.
 
 ### Canali realtime e schermate che cadono
 

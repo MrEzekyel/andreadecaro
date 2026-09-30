@@ -1,0 +1,41 @@
+# App per iPhone senza firma: la firma si mette in locale con Xcode e un
+# Apple ID gratuito al momento dell'installazione (vedi MB Companion,
+# app-mobile/scripts/installa-iphone.sh e docs/installazione-iphone.md, come
+# modello — lo script va generalizzato per il bundle id com.andreadecaro.clinck).
+build:
+  name: iPhone senza firma
+  steps:
+    - eas/checkout
+    - eas/install_node_modules
+    - eas/prebuild
+    - run:
+        name: Pod install
+        working_directory: ios
+        command: pod install
+    - run:
+        name: Compila senza firma
+        working_directory: ios
+        command: |
+          set -eo pipefail
+          xcodebuild -version
+          WORKSPACE=$(ls -d *.xcworkspace | head -1)
+          SCHEME=$(basename "$WORKSPACE" .xcworkspace)
+          echo "Workspace: $WORKSPACE, scheme: $SCHEME"
+          xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -configuration Release \
+            -sdk iphoneos -destination 'generic/platform=iOS' \
+            -archivePath build/App.xcarchive \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            archive > build.log 2>&1 || { grep -E "error:" build.log | head -60; tail -120 build.log; exit 1; }
+          tail -3 build.log
+          APP_PATH=$(find build/App.xcarchive/Products/Applications -maxdepth 1 -name "*.app" | head -1)
+          rm -rf Payload Clinck.ipa
+          mkdir Payload
+          cp -R "$APP_PATH" Payload/
+          zip -qry Clinck.ipa Payload
+          # eas/upload_artifact risolve i percorsi dalla radice del caricamento
+          # (la cartella sopra apple-pay-tracker), non da working_directory.
+          ls -la "$PWD/Clinck.ipa"
+    - eas/upload_artifact:
+        name: Carica IPA
+        inputs:
+          path: /Users/expo/workingdir/build/apple-pay-tracker/ios/Clinck.ipa

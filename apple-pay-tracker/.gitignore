@@ -40,3 +40,6 @@ yarn-error.*
 # generated native folders
 /ios
 /android
+
+# generato da @bacons/apple-targets a ogni prebuild (colori in expo-target.config.js)
+/targets/*/Assets.xcassets

@@ -60,6 +60,7 @@ import {
   usePayments,
 } from "../lib/usePayments";
 import { useSubscription } from "../lib/useSubscription";
+import { publishWidgetGauge } from "../lib/widget";
 
 /** Sotto questa soglia il trial merita un avviso, non solo la voce in Impostazioni. */
 const TRIAL_WARNING_DAYS = 7;
@@ -131,14 +132,25 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
   // Movimenti, non una pagina propria — la modifica non e' mai stata
   // raggiungibile da qui prima d'ora.
   const [editingIncome, setEditingIncome] = useState<IncomeRow | null>(null);
-  const { payments, total, previousTotal, error, staleLabel, staleReason, reload } =
-    usePayments(month);
+  const {
+    payments,
+    total,
+    previousTotal,
+    loading,
+    error,
+    staleLabel,
+    staleReason,
+    reload,
+  } = usePayments(month);
   const {
     monthlyOverall,
     categoryLimits,
     alerts,
     goal,
     conflicts,
+    loading: limitsLoading,
+    error: limitsError,
+    staleLabel: limitsStale,
     reload: reloadLimits,
   } = useLimits();
   const { profile: subscriptionProfile, automationActive, trialDaysLeft } =
@@ -622,6 +634,44 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     ]);
     setRefreshing(false);
   }
+
+  // Il widget riceve solo numeri letti adesso, del mese in corso: una
+  // lettura fallita o una copia in cache gli farebbero dire "restano 1.200 €"
+  // con la stessa sicurezza di un dato vero.
+  const widgetScale = ceilings?.scale ?? fallbackLimitAmount;
+  const widgetBinding = ceilings?.binding ?? fallbackLimitAmount;
+  const widgetFresh =
+    viewingCurrentMonth &&
+    !loading &&
+    !error &&
+    !staleLabel &&
+    !limitsLoading &&
+    !limitsError &&
+    !limitsStale;
+  const spentToday = useMemo(() => {
+    const now = new Date();
+    return payments
+      .filter((p) => {
+        const d = new Date(p.occurred_at);
+        return (
+          d.getFullYear() === now.getFullYear() &&
+          d.getMonth() === now.getMonth() &&
+          d.getDate() === now.getDate()
+        );
+      })
+      .reduce((sum, p) => sum + Number(p.effective_amount), 0);
+  }, [payments]);
+  useEffect(() => {
+    if (!widgetFresh || widgetScale == null || widgetBinding == null) return;
+    publishWidgetGauge({
+      month: monthKey(month),
+      limit: widgetScale,
+      binding: widgetBinding,
+      spent: total,
+      today: spentToday,
+      synthetic: !ceilings,
+    });
+  }, [widgetFresh, widgetScale, widgetBinding, total, spentToday, ceilings, month]);
 
   if (explorer.isOpen) return <>{explorer.overlay}</>;
 

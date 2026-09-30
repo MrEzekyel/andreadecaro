@@ -6,13 +6,29 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "plugins": [
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Consenti a Clinck di usare Face ID per sbloccare le tue spese."
+        }
+      ],
+      "@bacons/apple-targets"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.andreadecaro.clinck"
+      "bundleIdentifier": "com.andreadecaro.clinck",
+      "appleTeamId": "J8S23W7H6M",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "entitlements": {
+        "com.apple.security.application-groups": ["group.com.andreadecaro.clinck"]
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#FF5D2C",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
@@ -28,7 +44,10 @@
       }
     },
     "updates": {
-      "url": "https://u.expo.dev/ec664e8b-65d6-42e7-b3db-2275f0bf7622"
+      "url": "https://u.expo.dev/ec664e8b-65d6-42e7-b3db-2275f0bf7622",
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
     },
     "runtimeVersion": {
       "policy": "sdkVersion"

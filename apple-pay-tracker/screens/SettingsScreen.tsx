@@ -240,7 +240,7 @@ export default function SettingsScreen({
             </Text>
             <Text style={[styles.settingHint, { color: palette.ink3 }]}>
               {biometria
-                ? `Chiede ${biometria} all'apertura e dopo mezzo minuto fuori dall'app. Se iOS chiede il codice invece del riconoscimento, controlla che Expo Go sia abilitato in Impostazioni › ${biometria} e codice › Altre app.`
+                ? `Chiede ${biometria} all'apertura e dopo mezzo minuto fuori dall'app. Se iOS chiede il codice invece del riconoscimento, controlla che Clinck sia abilitato in Impostazioni › ${biometria} e codice › Altre app.`
                 : "Chiede il codice del telefono all'apertura e dopo mezzo minuto fuori dall'app"}
             </Text>
           </View>
