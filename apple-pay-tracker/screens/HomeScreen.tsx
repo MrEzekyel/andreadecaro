@@ -52,7 +52,8 @@ import { categoryColor, radius, space, type } from "../lib/theme";
 import { Merchant, RecurringRule } from "../lib/types";
 import { supabase } from "../lib/supabase";
 import { useLimits } from "../lib/useLimits";
-import { goalVerdict, resolveCeilings } from "../lib/savings";
+import { goalCeiling, goalVerdict, resolveCeilings } from "../lib/savings";
+import { FixedCostRule, upcomingRecurringTotal } from "../lib/fixedCosts";
 import {
   comparisonCutoff,
   isCurrentMonth,
@@ -164,6 +165,9 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     monthlyTotal: number;
     upcoming: UpcomingRule[];
   }>({ count: 0, monthlyTotal: 0, upcoming: [] });
+  // Solo per il widget: tutte le regole attive, per le rate ancora in arrivo
+  // nel mese. `null` finche' non sono lette.
+  const [widgetRules, setWidgetRules] = useState<FixedCostRule[] | null>(null);
 
   // Le rate configurate non dipendono dal mese guardato: cambiano solo
   // quando le regole cambiano, non quando si sfoglia il calendario.
@@ -174,15 +178,24 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
   const loadRecurring = useCallback(async () => {
     const { data, error } = await supabase
       .from("recurring_rules")
-      .select("id,label,amount,frequency,next_run_on")
+      .select("id,label,amount,frequency,next_run_on,day_of_month,weekday,start_on,end_on")
       .eq("active", true)
       .order("next_run_on", { ascending: true });
 
     if (error) return;
     const rules = (data ?? []) as Pick<
       RecurringRule,
-      "id" | "label" | "amount" | "frequency" | "next_run_on"
+      | "id"
+      | "label"
+      | "amount"
+      | "frequency"
+      | "next_run_on"
+      | "day_of_month"
+      | "weekday"
+      | "start_on"
+      | "end_on"
     >[];
+    setWidgetRules(rules);
     setRecurring({
       count: rules.length,
       monthlyTotal: rules
@@ -374,20 +387,34 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
   const isFixedCost = useCallback(
     (payment: (typeof payments)[number]) =>
       payment.excluded_from_stats ||
+      payment.source === "recurring" ||
       Boolean(payment.merchant_id && excludedMerchantIds.has(payment.merchant_id)),
     [excludedMerchantIds]
   );
 
-  // Home non ha il toggle "escludi costi fissi": mutuo e rate contano sempre
-  // nel totale. Ma nel grafico non devono comparire il giorno in cui sono
-  // stati registrati come se fossero una spesa qualunque — sono un impegno
-  // certo fin dall'inizio del mese, non qualcosa che "arriva" quel giorno.
-  const fixedCostsTotal = useMemo(() => {
-    const variable = payments
-      .filter((p) => !isFixedCost(p))
-      .reduce((sum, p) => sum + Number(p.effective_amount), 0);
-    return total - variable;
-  }, [payments, isFixedCost, total]);
+  /** I costi fissi gia' addebitati nel mese guardato. */
+  const paidFixedCosts = useMemo(
+    () =>
+      payments
+        .filter((p) => isFixedCost(p))
+        .reduce((sum, p) => sum + Number(p.effective_amount), 0),
+    [payments, isFixedCost]
+  );
+
+  /**
+   * I costi fissi che il mese in corso chiede in tutto: quelli gia' addebitati
+   * piu' le rate ricorrenti che devono ancora arrivare. Il primo del mese la
+   * rata del 15 non e' ancora una spesa, ma e' gia' un impegno certo — senza,
+   * la tacca partirebbe da zero e avanzerebbe per tutto il mese, cioe'
+   * segnerebbe il contrario di un impegno. `null` finche' le regole non sono
+   * lette: meglio il solo pagato che una sottostima spacciata per completa.
+   */
+  const committedFixedCosts = useMemo(() => {
+    if (!viewingCurrentMonth) return paidFixedCosts;
+    if (widgetRules === null) return null;
+    return paidFixedCosts + upcomingRecurringTotal(widgetRules, new Date());
+  }, [viewingCurrentMonth, widgetRules, paidFixedCosts]);
+  const fixedMark = committedFixedCosts ?? paidFixedCosts;
 
   /** Spesa cumulata giorno per giorno, fino a oggi se il mese e' in corso. */
   const trend = useMemo<TrendPoint[]>(() => {
@@ -402,9 +429,10 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     // futuri valgono `null` e danno al grafico la larghezza del mese intero,
     // cosi' la linea si ferma dov'e' oggi invece di stiracchiarsi fino al
     // bordo destro facendo sembrare finito un mese appena cominciato. La
-    // linea parte gia' dal totale dei costi fissi invece che da zero.
+    // linea parte gia' da tutti i costi fissi del mese, anche quelli non
+    // ancora addebitati: sono un impegno certo fin dal primo giorno.
     const points: TrendPoint[] = [];
-    let running = fixedCostsTotal;
+    let running = fixedMark;
     for (let i = 0; i < daysInMonth; i++) {
       if (i < elapsedDays) running += perDay[i];
       points.push({
@@ -413,7 +441,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
       });
     }
     return points;
-  }, [payments, daysInMonth, elapsedDays, isFixedCost, fixedCostsTotal]);
+  }, [payments, daysInMonth, elapsedDays, isFixedCost, fixedMark]);
 
   /**
    * Saldo del mese: sale a ogni introito, scende a ogni spesa e a ogni
@@ -584,15 +612,17 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     return goalVerdict(goal, monthlyIncome, total);
   }, [viewingCurrentMonth, goal, balanceError, monthlyIncome, total]);
 
-  // A questo ritmo, dove si finisce a fine mese. I costi fissi sono gia'
-  // interi dentro `fixedCostsTotal` e non vanno proiettati: solo la parte
-  // variabile continua a crescere giorno per giorno. Proiettare anche loro
-  // moltiplicherebbe il mutuo per trenta.
+  // A questo ritmo, dove si finisce a fine mese. I costi fissi entrano interi
+  // e non vanno proiettati: solo la parte variabile continua a crescere giorno
+  // per giorno. Proiettare anche loro moltiplicherebbe il mutuo per trenta.
+  // Le rate non ancora arrivate entrano intere con gli altri fissi; finche'
+  // le regole non sono lette non si proietta: senza le rate future il numero
+  // sarebbe basso e sicuro.
   const projection = useMemo(() => {
-    if (!viewingCurrentMonth || elapsedDays === 0) return null;
-    const variable = total - fixedCostsTotal;
-    return fixedCostsTotal + (variable / elapsedDays) * daysInMonth;
-  }, [viewingCurrentMonth, elapsedDays, total, fixedCostsTotal, daysInMonth]);
+    if (!viewingCurrentMonth || elapsedDays === 0 || committedFixedCosts === null) return null;
+    const variable = total - paidFixedCosts;
+    return committedFixedCosts + (variable / elapsedDays) * daysInMonth;
+  }, [viewingCurrentMonth, elapsedDays, total, paidFixedCosts, committedFixedCosts, daysInMonth]);
 
   const delta = percentChange(total, previousTotal);
   const previousMonth = new Date(month.getFullYear(), month.getMonth() - 1, 1);
@@ -661,6 +691,12 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
       })
       .reduce((sum, p) => sum + Number(p.effective_amount), 0);
   }, [payments]);
+  // Limite e obiettivo separati, per i due tratti dell'arco nel widget. Come
+  // in `resolveCeilings`, un obiettivo senza spazio (tetto <= 0) non e' un tetto.
+  const widgetGoalCeiling = viewingCurrentMonth && goal ? goalCeiling(goal) : null;
+  const widgetGoalLimit =
+    widgetGoalCeiling !== null && widgetGoalCeiling > 0 ? widgetGoalCeiling : null;
+  const widgetFixedCosts = viewingCurrentMonth ? committedFixedCosts : null;
   useEffect(() => {
     if (!widgetFresh || widgetScale == null || widgetBinding == null) return;
     publishWidgetGauge({
@@ -669,9 +705,23 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
       binding: widgetBinding,
       spent: total,
       today: spentToday,
+      spendLimit: limitAmount,
+      goalLimit: widgetGoalLimit,
+      fixed: widgetFixedCosts,
       synthetic: !ceilings,
     });
-  }, [widgetFresh, widgetScale, widgetBinding, total, spentToday, ceilings, month]);
+  }, [
+    widgetFresh,
+    widgetScale,
+    widgetBinding,
+    total,
+    spentToday,
+    limitAmount,
+    widgetGoalLimit,
+    widgetFixedCosts,
+    ceilings,
+    month,
+  ]);
 
   if (explorer.isOpen) return <>{explorer.overlay}</>;
 
@@ -849,10 +899,10 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                         // nella legenda qui sotto — una tacca senza nome qui
                         // e' gia' stata scambiata per un'altra cosa.
                         marks={[
-                          ...(fixedCostsTotal > 0
+                          ...(fixedMark > 0
                             ? [
                                 {
-                                  ratio: fixedCostsTotal / gauge.limit,
+                                  ratio: Math.min(fixedMark / gauge.limit, 1),
                                   color: palette.ink,
                                 },
                               ]
@@ -917,13 +967,13 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                         gia' stata scambiata per i costi fissi mentre segnava
                         il ritmo. Ora segna davvero i costi fissi, e lo dice. */}
                     <View style={styles.gaugeKey}>
-                      {fixedCostsTotal > 0 && (
+                      {fixedMark > 0 && (
                         <View style={styles.gaugeKeyItem}>
                           <View
                             style={[styles.keyTick, { backgroundColor: palette.ink }]}
                           />
                           <Text style={[styles.keyText, { color: palette.ink3 }]}>
-                            costi fissi {formatAmount(fixedCostsTotal)}
+                            costi fissi {formatAmount(fixedMark)}
                           </Text>
                         </View>
                       )}
@@ -958,7 +1008,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                         k="Al giorno"
                         v={`${compactAmount(total / Math.max(elapsedDays, 1))} €`}
                         sub={`${compactAmount(
-                          Math.max(total - fixedCostsTotal, 0) /
+                          Math.max(total - paidFixedCosts, 0) /
                             Math.max(elapsedDays, 1)
                         )} € senza fissi`}
                       />
@@ -1332,7 +1382,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                       limitLabel={
                         ceilings?.bindingSource === "goal" ? "OBIETTIVO" : "LIMITE"
                       }
-                      baseline={fixedCostsTotal}
+                      baseline={fixedMark}
                       color={palette.accent}
                     />
                     {merchantsUnknown && (

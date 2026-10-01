@@ -249,6 +249,17 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
     segmento, si passava tutti a `strokeLinecap="butt"` per evitare che le
     punte tonde si mangiassero il confine — soluzione scartata perché
     lasciava uno spicchio di fondo scoperto fra un segmento e l'altro.
+- **In Home (e nel widget) un costo fisso include le rate ricorrenti e
+  quelle non ancora arrivate.** `isFixedCost` vale per le spese escluse dalle
+  classifiche (anche tramite l'esercente) **e** per `source='recurring'`;
+  `committedFixedCosts` aggiunge le rate che il mese deve ancora addebitare
+  (`lib/fixedCosts.ts`, stessa regola di `next_occurrence()` nel database,
+  test in `lib/__tests__/fixed-costs.test.mjs`). Tacca, legenda, partenza
+  della linea e base della proiezione usano l'impegnato; la media "senza
+  fissi" e la parte variabile della proiezione usano il solo pagato. Prima
+  contava solo il pagato, e il primo del mese la rata del 15 non esisteva.
+  Confermato da Andrea il 1 ottobre 2026 dopo averlo provato sul telefono.
+  Statistiche ha una sua definizione (solo le escluse), non toccata.
 - **La proiezione di fine mese non moltiplica i costi fissi.** Sono già
   interi dentro `fixedCostsTotal` dal primo giorno: proiettarli
   moltiplicherebbe il mutuo per trenta. Si proietta solo la parte

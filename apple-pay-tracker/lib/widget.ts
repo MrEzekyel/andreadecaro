@@ -39,6 +39,12 @@ export type WidgetGauge = {
   spent: number;
   /** Speso oggi, per il riquadro "Oggi". */
   today: number;
+  /** Il limite di spesa del mese, se impostato. */
+  spendLimit: number | null;
+  /** Quanto si puo' spendere rispettando l'obiettivo di risparmio, se c'e'. */
+  goalLimit: number | null;
+  /** Costi fissi del mese, rate ancora da addebitare comprese; `null` se non lette. */
+  fixed: number | null;
   /** Il riferimento e' il guadagnato del mese, non un limite impostato. */
   synthetic: boolean;
 };

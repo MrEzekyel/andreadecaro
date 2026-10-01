@@ -22,5 +22,7 @@ module.exports = {
     ink2: { light: "#5f5e5a", dark: "#b0aea6" },
     track: { light: "#e3e1d9", dark: "#2e2d29" },
     over: { light: "#b4472c", dark: "#e0765a" },
+    good: { light: "#16a34a", dark: "#16a34a" },
+    warn: { light: "#a16207", dark: "#b77f06" },
   },
 };
