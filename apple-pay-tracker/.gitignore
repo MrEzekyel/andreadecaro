@@ -43,3 +43,4 @@ yarn-error.*
 
 # generato da @bacons/apple-targets a ogni prebuild (colori in expo-target.config.js)
 /targets/*/Assets.xcassets
+.claude/settings.local.json

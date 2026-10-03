@@ -12,6 +12,8 @@ import Svg, {
 import { useTheme } from "../lib/ThemeContext";
 import { compactAmount, formatAmount } from "../lib/format";
 import { type } from "../lib/theme";
+import { useChartZoom } from "../lib/useChartZoom";
+import { ZoomReset } from "./ZoomReset";
 
 /**
  * Larghezza di ripiego, usata solo per il primo fotogramma: dal secondo in poi
@@ -152,6 +154,10 @@ export function TrendChart({
    * punti si distribuiscono su tutto lo spazio disponibile.
    */
   const [width, setWidth] = useState(FALLBACK_WIDTH);
+  const zoom = useChartZoom({
+    minSpan: Math.min(1, 3 / Math.max(points.length - 1, 1)),
+    resetKey: `${points.length}:${points[0]?.label}`,
+  });
 
   // Indice originale conservato: e' quello che posiziona il punto sull'asse
   // del mese intero, non la sua posizione fra i soli giorni gia' trascorsi.
@@ -163,19 +169,52 @@ export function TrendChart({
     return <Text style={[styles.empty, { color: palette.ink3 }]}>{empty}</Text>;
   }
 
-  const peak = Math.max(...noti.map((p) => p.value), limit ?? 0);
-  const step = niceStep(Math.max(peak, 1) / 3);
-  const chartMax = peak > 0 ? Math.ceil(peak / step) * step : step;
+  const plotWidth = Math.max(width - EDGE * 2, 1);
+  zoom.setPlot(EDGE, plotWidth);
+  const { start, end } = zoom.view;
+  const lastIndex = Math.max(points.length - 1, 1);
+  const xOf = (index: number) =>
+    EDGE + ((index / lastIndex - start) / (end - start)) * plotWidth;
+
+  /**
+   * A grafico intero la scala parte da zero e arriva sopra al limite. Da
+   * ingranditi si adatta ai soli punti nella finestra (piu' un vicino per
+   * lato), come nelle app di trading: e' il motivo per cui si ingrandisce.
+   */
+  let chartMin = 0;
+  let step: number;
+  let chartMax: number;
+  if (zoom.zoomed) {
+    const inView = noti.filter((p, k) => {
+      const f = (i: number) => i / lastIndex;
+      const prev = noti[k - 1];
+      const next = noti[k + 1];
+      return (
+        (f(p.index) >= start && f(p.index) <= end) ||
+        (next !== undefined && f(next.index) >= start && f(p.index) < start) ||
+        (prev !== undefined && f(prev.index) <= end && f(p.index) > end)
+      );
+    });
+    const vals = (inView.length > 0 ? inView : noti).map((p) => p.value);
+    const lo = Math.min(...vals);
+    const hi = Math.max(...vals);
+    step = niceStep(Math.max(hi - lo, 1) / 3);
+    chartMin = Math.max(Math.floor(lo / step) * step, lo >= 0 ? 0 : -Infinity);
+    chartMax = Math.ceil(hi / step) * step;
+    if (chartMax <= chartMin) chartMax = chartMin + step;
+  } else {
+    const peak = Math.max(...noti.map((p) => p.value), limit ?? 0);
+    step = niceStep(Math.max(peak, 1) / 3);
+    chartMax = peak > 0 ? Math.ceil(peak / step) * step : step;
+  }
 
   const yTicks: number[] = [];
-  for (let value = step; value <= chartMax + step / 100; value += step) {
+  for (let value = chartMin + step; value <= chartMax + step / 100; value += step) {
     yTicks.push(value);
   }
 
-  const plotWidth = Math.max(width - EDGE * 2, 1);
-  const xOf = (index: number) =>
-    EDGE + (index / Math.max(points.length - 1, 1)) * plotWidth;
-  const yOf = (value: number) => BASE - (value / chartMax) * PLOT_H;
+  const yOf = (value: number) =>
+    BASE - ((value - chartMin) / (chartMax - chartMin)) * PLOT_H;
 
   const coords = noti.map((p) => ({ x: xOf(p.index), y: yOf(p.value) }));
 
@@ -185,13 +224,19 @@ export function TrendChart({
 
   // Etichette x equidistanti, estremi inclusi: con una al giorno si
   // sovrapporrebbero, con due sole non si leggerebbe l'andamento nel mezzo.
-  const labelCount = Math.min(xTicks, points.length);
+  // Ingranditi, le etichette si distribuiscono sui soli giorni visibili.
+  const firstIdx = Math.ceil(start * lastIndex - 1e-6);
+  const lastIdx = Math.floor(end * lastIndex + 1e-6);
+  const visibleCount = lastIdx - firstIdx + 1;
+  const labelCount = Math.min(xTicks, visibleCount);
   const labelIndexes = Array.from({ length: labelCount }, (_, i) =>
-    Math.round((i / Math.max(labelCount - 1, 1)) * (points.length - 1))
+    firstIdx + Math.round((i / Math.max(labelCount - 1, 1)) * (visibleCount - 1))
   );
 
   const limitY =
-    limit != null && limit > 0 && limit <= chartMax ? yOf(limit) : null;
+    limit != null && limit > 0 && limit <= chartMax && limit >= chartMin
+      ? yOf(limit)
+      : null;
 
   // Ritmo lineare: se da qui in poi si spendesse lo stesso importo ogni
   // giorno, si arriverebbe al limite esattamente l'ultimo giorno. Parte da
@@ -213,6 +258,7 @@ export function TrendChart({
         // Il confronto evita il ciclo re-render -> layout -> re-render.
         if (measured > 0 && measured !== width) setWidth(measured);
       }}
+      {...zoom.containerProps}
     >
       <Svg width="100%" height={HEIGHT} viewBox={`0 0 ${width} ${HEIGHT}`}>
         <Defs>
@@ -314,8 +360,12 @@ export function TrendChart({
 
         {/* Punto finale evidenziato, come in ScrubChart: e' "dove sei
             adesso", il numero che conta di piu' su un grafico cumulato. */}
-        <Circle cx={last.x} cy={last.y} r={6.5} fill={palette.surface} />
-        <Circle cx={last.x} cy={last.y} r={4} fill={color} />
+        {last.x >= 0 && last.x <= width && (
+          <>
+            <Circle cx={last.x} cy={last.y} r={6.5} fill={palette.surface} />
+            <Circle cx={last.x} cy={last.y} r={4} fill={color} />
+          </>
+        )}
 
         {labelIndexes.map((index) => (
           <SvgText
@@ -323,9 +373,9 @@ export function TrendChart({
             x={xOf(index)}
             y={BASE + 13}
             textAnchor={
-              index === 0
+              index === labelIndexes[0]
                 ? "start"
-                : index === points.length - 1
+                : index === labelIndexes[labelIndexes.length - 1]
                   ? "end"
                   : "middle"
             }
@@ -336,6 +386,7 @@ export function TrendChart({
           </SvgText>
         ))}
       </Svg>
+      {zoom.zoomed && <ZoomReset onPress={zoom.reset} />}
     </View>
   );
 }

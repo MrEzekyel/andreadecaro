@@ -496,7 +496,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
       points.push({
         day: i + 1,
         value: running,
-        high: high > running ? high : undefined,
+        high: inPerDay[i] > 0 && high > running ? high : undefined,
         income: inPerDay[i] > 0 ? inPerDay[i] : undefined,
         invested: investPerDay[i] > 0 ? investPerDay[i] : undefined,
         fixedCost: fixedPerDay[i] > 0 ? fixedPerDay[i] : undefined,

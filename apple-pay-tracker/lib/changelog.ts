@@ -22,6 +22,17 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-10-03",
+    date: "2026-10-03",
+    title: "Grafici da ingrandire",
+    items: [
+      "Allarga due dita su un grafico per ingrandire un tratto, come nelle app di trading: la scala si adatta a quello che vedi. Muovi le dita per spostarti, doppio tocco o «Tutto il periodo» per tornare indietro. Vale per l'andamento in Home e Statistiche, il saldo del mese e gli investimenti.",
+      "Il saldo del mese parte sempre da zero e arriva al picco vero, anche quando stipendio e mutuo cadono lo stesso giorno.",
+      "I costi fissi sul saldo hanno l'importo appeso a un filo, sopra o sotto dove c'è spazio, così non si accavalla più con la linea.",
+      "Le spese ricorrenti nascono già come costi fissi, escluse dalle classifiche: niente più da correggere a mano ogni mese.",
+    ],
+  },
+  {
     id: "2026-08-20",
     date: "2026-08-20",
     title: "Obiettivo di risparmio, più chiaro da impostare",

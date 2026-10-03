@@ -306,6 +306,25 @@ esplicitamente da Andrea, da rispettare in ogni nuova schermata:
   sotto zero solo se il saldo ci è andato davvero, e porta tre riferimenti
   di scala (fondo, metà, cima) scritti a sinistra — prima non ne aveva
   nessuno.
+  **Il fondo è sempre lo zero** (richiesta di Andrea, 3 ottobre 2026: un
+  fondo che seguiva il minimo del mese faceva leggere il saldo rispetto al
+  punto più basso, non rispetto a niente) e **la cima è il picco vero**: un
+  giorno con un introito passa prima dalla cima (introito contato prima
+  delle uscite dello stesso giorno, `BalancePoint.high`) e poi scende al
+  saldo di chiusura — con stipendio e mutuo lo stesso giorno, il solo saldo
+  di fine giornata nascondeva il picco. L'etichetta dei costi fissi è
+  appesa a un filo, sopra o sotto secondo lo spazio, e il filo si allunga
+  finché non trova un posto che non tocca né la linea né altre scritte.
+- **Zoom libero sui grafici a linea** (`lib/useChartZoom.ts`, usato da
+  `BalanceChart`, `TrendChart`, `ScrubChart`): due dita allargano attorno al
+  punto in cui stanno e spostano la finestra, doppio tocco o il tasto
+  «Tutto il periodo» (`ZoomReset`) tornano indietro. Da ingranditi la scala
+  verticale si adatta ai punti visibili, come nelle app di trading — è
+  l'unica eccezione al fondo-a-zero del saldo, ed è il motivo per cui si
+  ingrandisce. In `ScrubChart` un dito resta la lettura al tocco; lo zoom è
+  solo a due dita apposta, perché i due gesti non si contendano lo stesso
+  movimento. La finestra torna intera quando cambiano i dati (`resetKey`:
+  mese, periodo 1M/6M/1A). Fatto a mano con `PanResponder`, come il resto.
 - **Le fonti di introito usano gradazioni di verde** (`INCOME_SHADES` in
   `HomeScreen.tsx`), non i colori delle categorie di spesa: devono restare
   leggibili come «entrata» a colpo d'occhio, e un rosa o un blu accanto al
@@ -481,7 +500,11 @@ guardando il confronto.
     scrive **sull'insegna**: così vale anche per i negozi dello stesso gruppo
     in cui non si è ancora mai stati.
 - `recurring_rules` → `materialize_recurring()` genera le spese ricorrenti
-  ogni notte via pg_cron (mutuo, abbonamenti).
+  ogni notte via pg_cron (mutuo, abbonamenti). Ogni riga `source='recurring'` nasce
+  con `excluded_from_stats = true` (trigger `payments_recurring_is_fixed_cost`,
+  migrazione 0049): una rata è un costo fisso per definizione, e prima andava
+  corretta a mano una per una. Solo sull'insert: se poi la si reinclude, la
+  scelta resta.
 - `monthly_totals(p_months)` (migration `0035`) aggrega spese, introiti e
   investito **per mese, nel database**, per i due grafici a barre della
   Home. Stessa ragione di `portfolio_daily`: sommare lato app vorrebbe dire

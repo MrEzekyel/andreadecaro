@@ -1,7 +1,6 @@
 import React, { useMemo, useRef, useState } from "react";
 import {
   LayoutChangeEvent,
-  PanResponder,
   StyleSheet,
   Text,
   View,
@@ -18,6 +17,8 @@ import { useTheme } from "../lib/ThemeContext";
 import { compactAmount } from "../lib/format";
 import { useWideLayout } from "../lib/layout";
 import { space, type } from "../lib/theme";
+import { useChartZoom } from "../lib/useChartZoom";
+import { ZoomReset } from "./ZoomReset";
 
 export type ScrubPoint = {
   date: string;
@@ -89,33 +90,29 @@ export function ScrubChart({
   const [width, setWidth] = useState(0);
   const [active, setActive] = useState<number | null>(null);
 
-  // Il PanResponder si crea una volta sola, ma deve leggere la larghezza e i
-  // punti aggiornati: passano da un ref, non dalla closure iniziale.
-  const geom = useRef({ width: 0, count: 0 });
-  geom.current = { width, count: points.length };
-
   const report = useRef(onScrub);
   report.current = onScrub;
 
-  const pan = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_e, g) =>
-        Math.abs(g.dx) > 4 && Math.abs(g.dx) > Math.abs(g.dy),
-      onPanResponderTerminationRequest: () => false,
-
-      onPanResponderGrant: (e) => pick(e.nativeEvent.locationX),
-      onPanResponderMove: (e) => pick(e.nativeEvent.locationX),
-      onPanResponderRelease: () => clear(),
-      onPanResponderTerminate: () => clear(),
-    })
-  ).current;
+  // Un dito legge il valore come sempre; lo zoom va con due dita, cosi' i
+  // due gesti non si contendono lo stesso movimento.
+  const zoom = useChartZoom({
+    minSpan: Math.min(1, 4 / Math.max(points.length - 1, 1)),
+    single: { start: pick, move: pick, end: clear },
+    resetKey: `${points.length}:${points[0]?.date}`,
+  });
+  zoom.setPlot(0, width);
+  const { start, end } = zoom.view;
+  const lastIndex = Math.max(points.length - 1, 1);
+  // Gli indici dentro la finestra, piu' uno per lato: la linea ci entra e ne
+  // esce, e la scala verticale deve contenerli.
+  const from = Math.max(Math.floor(start * lastIndex) - (zoom.zoomed ? 1 : 0), 0);
+  const to = Math.min(Math.ceil(end * lastIndex) + (zoom.zoomed ? 1 : 0), points.length - 1);
 
   function pick(x: number) {
-    const { width: w, count } = geom.current;
-    if (w <= 0 || count === 0) return;
-    const ratio = Math.min(Math.max(x / w, 0), 1);
-    const index = Math.round(ratio * (count - 1));
+    if (width <= 0 || points.length === 0) return;
+    const ratio = Math.min(Math.max(x / width, 0), 1);
+    const f = start + ratio * (end - start);
+    const index = Math.min(Math.max(Math.round(f * lastIndex), 0), points.length - 1);
     setActive(index);
     report.current?.(index);
   }
@@ -130,28 +127,30 @@ export function ScrubChart({
 
     const plotH = height - TOP - BOTTOM;
     const values = points.map((p) => p.value);
-    const baselines = points
+    const inView = points.slice(from, to + 1);
+    const baselines = inView
       .map((p) => p.baseline)
       .filter((v): v is number => typeof v === "number");
 
-    const min = Math.min(...values, ...baselines);
-    const max = Math.max(...values, ...baselines);
+    const min = Math.min(...inView.map((p) => p.value), ...baselines);
+    const max = Math.max(...inView.map((p) => p.value), ...baselines);
     // Un intervallo piatto dividerebbe per zero e schiaccerebbe la linea.
     const span = max - min || Math.max(Math.abs(max), 1);
 
-    const xOf = (i: number) => (i / (points.length - 1)) * width;
+    const xOf = (i: number) =>
+      ((i / (points.length - 1) - start) / (end - start)) * width;
     const yOf = (v: number) => TOP + plotH - ((v - min) / span) * plotH;
 
     const xs = points.map((_, i) => xOf(i));
     const line = buildPath(xs, values.map(yOf));
-    const area = `${line} L ${width},${height - BOTTOM} L 0,${height - BOTTOM} Z`;
+    const area = `${line} L ${xs[xs.length - 1]},${height - BOTTOM} L ${xs[0]},${height - BOTTOM} Z`;
     const base =
-      baselines.length === points.length
+      points.every((p) => typeof p.baseline === "number")
         ? buildPath(xs, points.map((p) => yOf(p.baseline!)))
         : null;
 
     return { xs, yOf, line, area, base, min, max };
-  }, [points, width, height]);
+  }, [points, width, height, start, end, from, to]);
 
   if (points.length < 2) {
     return <Text style={[styles.empty, { color: palette.ink3 }]}>{empty}</Text>;
@@ -164,7 +163,7 @@ export function ScrubChart({
       <View
         style={{ height }}
         onLayout={(e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width)}
-        {...pan.panHandlers}
+        {...zoom.containerProps}
       >
         {shape && width > 0 && (
           <Svg width={width} height={height}>
@@ -222,7 +221,7 @@ export function ScrubChart({
               </>
             )}
 
-            {active === null && (
+            {active === null && shape.xs[current] <= width + 1 && (
               <>
                 <Circle
                   cx={shape.xs[current]}
@@ -240,6 +239,7 @@ export function ScrubChart({
             )}
           </Svg>
         )}
+        {zoom.zoomed && <ZoomReset onPress={zoom.reset} />}
       </View>
 
       {/* Legenda con dei campioni disegnati invece che dei trattini scritti nel
