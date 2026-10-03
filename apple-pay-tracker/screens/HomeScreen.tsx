@@ -487,10 +487,16 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
     const points: BalancePoint[] = [];
     let running = 0;
     for (let i = 0; i < elapsedDays; i++) {
+      // L'introito si conta prima delle uscite dello stesso giorno: con
+      // stipendio e mutuo entrambi il primo del mese, il solo saldo di fine
+      // giornata nascondeva il picco (2000 entrati diventavano 1404) e la
+      // scala del grafico restava piu' bassa di quanto il conto sia salito.
+      const high = running + inPerDay[i];
       running += inPerDay[i] - outPerDay[i] - investPerDay[i];
       points.push({
         day: i + 1,
         value: running,
+        high: high > running ? high : undefined,
         income: inPerDay[i] > 0 ? inPerDay[i] : undefined,
         invested: investPerDay[i] > 0 ? investPerDay[i] : undefined,
         fixedCost: fixedPerDay[i] > 0 ? fixedPerDay[i] : undefined,

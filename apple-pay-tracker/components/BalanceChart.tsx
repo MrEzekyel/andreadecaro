@@ -35,6 +35,12 @@ export type BalancePoint = {
   /** Giorno del mese, 1-based. */
   day: number;
   value: number;
+  /**
+   * Il punto piu' alto toccato quel giorno, se sopra al saldo di chiusura:
+   * l'introito arrivato prima delle uscite dello stesso giorno. Senza, il
+   * picco del mese spariva dentro il saldo di fine giornata.
+   */
+  high?: number;
   /** Introito arrivato quel giorno, se c'e': disegna il gradino in salita. */
   income?: number;
   /** Investito quel giorno: scende come una spesa, ma non e' speso. */
@@ -89,7 +95,9 @@ export function BalanceChart({
     return <Text style={[styles.empty, { color: palette.ink3 }]}>{empty}</Text>;
   }
 
-  const values = points.map((p) => p.value);
+  const values = points.flatMap((p) =>
+    p.high !== undefined ? [p.value, p.high] : [p.value]
+  );
   const trueMax = Math.max(...values, 0);
   const trueMin = Math.min(...values);
   /**
@@ -116,8 +124,22 @@ export function BalanceChart({
     PAD_L + ((day - 1) / Math.max(days - 1, 1)) * plotW;
   const yOf = (value: number) => BASE - ((value - floor) / span) * PLOT_H;
 
-  const coords = points.map((p) => ({ ...p, x: xOf(p.day), y: yOf(p.value) }));
-  const line = coords.map((c, i) => `${i === 0 ? "M" : "L"} ${c.x},${c.y}`).join(" ");
+  const coords = points.map((p) => ({
+    ...p,
+    x: xOf(p.day),
+    y: yOf(p.value),
+    // Dove disegnare il pallino dell'introito: in cima al gradino, non al
+    // saldo di chiusura che le uscite dello stesso giorno hanno gia' abbassato.
+    yHigh: yOf(p.high ?? p.value),
+  }));
+  // Un giorno con un picco passa prima dalla cima e poi scende al saldo di
+  // chiusura, cosi' la linea tocca davvero il massimo del mese.
+  const line = coords
+    .flatMap((c) =>
+      c.high !== undefined ? [`${c.x},${c.yHigh}`, `${c.x},${c.y}`] : [`${c.x},${c.y}`]
+    )
+    .map((xy, i) => `${i === 0 ? "M" : "L"} ${xy}`)
+    .join(" ");
   const last = coords[coords.length - 1];
   const area = `${line} L ${last.x},${BASE} L ${coords[0].x},${BASE} Z`;
 
@@ -197,10 +219,10 @@ export function BalanceChart({
           .filter((c) => c.income && c.income > 0)
           .map((c) => (
             <React.Fragment key={`in-${c.day}`}>
-              <Circle cx={c.x} cy={c.y} r={3.6} fill={palette.good} />
+              <Circle cx={c.x} cy={c.yHigh} r={3.6} fill={palette.good} />
               <SvgText
                 x={Math.min(c.x + 5, width - 4)}
-                y={Math.max(c.y - 7, 10)}
+                y={Math.max(c.yHigh - 7, 10)}
                 textAnchor={c.x > width - 60 ? "end" : "start"}
                 fontSize={9}
                 fill={palette.good}
