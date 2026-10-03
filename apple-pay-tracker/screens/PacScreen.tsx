@@ -16,7 +16,7 @@ import { useDetailMeasure } from "../lib/layout";
 import { useTheme } from "../lib/ThemeContext";
 import { formatAmount } from "../lib/format";
 import { GROUP_LABEL, GROUP_ORDER } from "../lib/portfolio";
-import { monthlyEquivalent } from "../lib/recurrence";
+import { monthlyEquivalent, nextRunOn, scheduleChanged } from "../lib/recurrence";
 import { supabase } from "../lib/supabase";
 import { radius, space, tint, type } from "../lib/theme";
 import { Asset, InvestmentRule, RecurringFrequency } from "../lib/types";
@@ -58,7 +58,7 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
   const [assetId, setAssetId] = useState<string | null>(null);
   const [amount, setAmount] = useState("");
   const [frequency, setFrequency] = useState<RecurringFrequency>("monthly");
-  const [day, setDay] = useState("3");
+  const [day, setDay] = useState("2");
   const [saving, setSaving] = useState(false);
 
   const assetById = useMemo(
@@ -88,7 +88,7 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
     setAssetId(assets[0]?.id ?? null);
     setAmount("");
     setFrequency("monthly");
-    setDay("3");
+    setDay("2");
     setSheet(true);
   }
 
@@ -124,14 +124,26 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
       card_name: "Trade Republic",
     };
 
+    // Prima rata nominale dopo oggi. Se cade di sabato, domenica o a borsa
+    // chiusa, il cron la sposta al primo giorno di borsa come fa il broker.
+    // Va ricalcolata anche quando cambia la cadenza: altrimenti la regola
+    // scatterebbe ancora alla data vecchia.
+    const weekday = editing?.weekday ?? 1;
+    const next = nextRunOn(frequency, dayNumber, weekday);
+
     setSaving(true);
     const { error } = editing
-      ? await supabase.from("investment_rules").update(payload).eq("id", editing.id)
+      ? await supabase
+          .from("investment_rules")
+          .update(
+            scheduleChanged(editing, frequency, dayNumber, weekday)
+              ? { ...payload, next_run_on: next }
+              : payload
+          )
+          .eq("id", editing.id)
       : await supabase.from("investment_rules").insert({
           ...payload,
-          // I piani descrivono, non generano: `next_run_on` non fa piu'
-          // scattare niente, ma la colonna e' obbligatoria dallo schema.
-          next_run_on: new Date().toISOString().slice(0, 10),
+          next_run_on: next,
           active: true,
         });
     setSaving(false);
@@ -147,7 +159,20 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
   async function toggle(rule: InvestmentRule) {
     await supabase
       .from("investment_rules")
-      .update({ active: !rule.active })
+      // Riattivando si riparte dalla prossima scadenza: con la data vecchia il
+      // cron recupererebbe una rata per ogni mese rimasto in pausa.
+      .update(
+        rule.active
+          ? { active: false }
+          : {
+              active: true,
+              next_run_on: nextRunOn(
+                rule.frequency,
+                rule.day_of_month ?? 2,
+                rule.weekday ?? 1
+              ),
+            }
+      )
       .eq("id", rule.id);
     onSaved();
   }
@@ -247,7 +272,8 @@ export default function PacScreen({ rules, assets, onBack, onSaved }: Props) {
 
         <Text style={[styles.note, { color: palette.ink3 }]}>
           Ogni piano attivo inserisce la sua rata da solo il giorno stabilito,
-          alle 10 del mattino, e la completa con la quotazione di quel momento:
+          alle 10 del mattino — o il primo giorno di borsa successivo se quel
+          giorno la borsa e' chiusa, come fa Trade Republic — e la completa con la quotazione di quel momento:
           non c'e' niente da caricare. I fondi private market non hanno un
           prezzo pubblico — nessuna fonte automatica esiste per un ELTIF cosi'
           — quindi la rata entra subito con l'ultimo valore noto, e resta

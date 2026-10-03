@@ -523,6 +523,15 @@ guardando il confronto.
   interamente automatico e **non richiede mai un import**:
   1. `materialize_investments()` (cron 05:00 UTC) inserisce la rata il giorno
      stabilito come `status='estimated'`, datata **alle 10:00 ora italiana**.
+     Il giorno stabilito è quello di Trade Republic: il 2 del mese, o il
+     primo giorno di borsa Xetra successivo se il 2 è weekend o chiusura
+     (`xetra_trading_day()`, migrazione 0050 — verificato sulle esecuzioni
+     vere: 4 maggio, 3 agosto 2026). `next_run_on` resta il giorno nominale,
+     lo spostamento si calcola al momento, così il mese dopo riparte dal 2.
+     Il cron gira alle 07:00 italiane, prima delle 10: inserisce la rata
+     della mattina stessa, non quella del giorno dopo. Riattivare un piano
+     dalla pausa ricalcola `next_run_on` (`PacScreen.toggle`), altrimenti il
+     cron recupererebbe una rata per ogni mese rimasto in pausa.
      L'orario è scritto come `at time zone 'Europe/Rome'` e non come un orario
      UTC fisso: altrimenti a ogni cambio di ora legale l'acquisto slitterebbe
      di un'ora, e con un prezzo intraday quello slittamento si vedrebbe.
@@ -1537,9 +1546,23 @@ di un comando rapido).
   App Group (`group.com.andreadecaro.clinck`, `lib/widget.ts`), e solo da
   dati freschi del mese in corso — mai da cache o da una lettura fallita.
   Una seconda sessione nel widget si contenderebbe il refresh token con
-  l'app. Il prezzo: una spesa arrivata dalla Shortcut ad app chiusa compare
-  solo alla prossima apertura, e dopo tre ore il widget mostra l'ora
-  dell'ultimo dato al posto dei giorni che restano.
+  l'app. Dopo tre ore senza dati nuovi il widget mostra l'ora dell'ultimo
+  dato al posto dei giorni che restano.
+- **Spese dalla Shortcut ad app chiusa**: le somma l'azione «Aggiorna widget»
+  (`targets/intents/`, estensione App Intents, bundle
+  `com.andreadecaro.clinck.app-intent`, in `Clinck.app/Extensions/` e non in
+  `PlugIns/`). Nel comando rapido va subito dopo «Ottieni contenuti di URL»,
+  dentro il ramo `contiene "ok":true`, con i Contenuti URL come input: dalla
+  risposta di `ingest-payment` prende `effective_amount`, `occurred_at` e
+  `created_at` e li aggiunge a `spent`/`today` nell'App Group — stesso conto
+  del totale in Home, che e' la somma degli `effective_amount` del mese.
+  Niente doppi conteggi: salta i `skipped`, gli id gia' sommati (`bumped`) e
+  le spese create prima dell'ultima scrittura dell'app (`publishedAt`: con
+  l'app aperta il realtime arriva prima). Restano fuori le spese che non
+  passano dalla Shortcut, come le rate di `settle-instalments`: compaiono alla
+  prossima apertura. Si compila in locale come il widget
+  (`xcodebuild -target intents`); il progetto di supporto ha il target dal
+  3 ottobre 2026 (il vecchio e' in `ios-prima-intents`).
 - `lib/widget.ts` usa `requireOptionalNativeModule`: un `eas update` arriva
   anche alle build senza il modulo nativo, e un import diretto le farebbe
   cadere all'avvio. Stesso motivo per ogni modulo nativo futuro.
