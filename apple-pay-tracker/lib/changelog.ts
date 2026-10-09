@@ -22,6 +22,15 @@ export type ChangelogEntry = {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    id: "2026-10-09",
+    date: "2026-10-09",
+    title: "Vendere un investimento",
+    items: [
+      "Dal dettaglio di un titolo, «Vendi tutto o una parte»: scegli la data e, se vendi solo una parte, quanto hai incassato. Le quote si calcolano dal prezzo di quel giorno.",
+      "Vendendo tutto la posizione passa fra quelle chiuse, con lo storico e il rendimento intatti; il ricavato compare in «Disinvestito».",
+    ],
+  },
+  {
     id: "2026-10-03",
     date: "2026-10-03",
     title: "Grafici da ingrandire",

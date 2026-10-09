@@ -900,6 +900,14 @@ chiudono quel buco.
   salvare un buy/sell, e blocca il salvataggio se non lo trova, invece di
   inventare quote da un prezzo che non conosce. I dividendi non hanno questo
   vincolo: non toccano `quantity`.
+- **Le vendite si fanno dal dettaglio dell'asset** ("Vendi tutto o una
+  parte" in `AssetDetailScreen`), non dal foglio generico: lì si conoscono le
+  quote possedute. Le quote si contano **alla data della vendita** (operazioni
+  `settled` con `effectiveDay <= giorno`), non a oggi, e vendendo tutto la
+  `quantity` è quella esatta posseduta e non `importo / prezzo` — la
+  divisione lascerebbe un residuo e la posizione resterebbe aperta per
+  0,0000001 quote. Un importo parziale oltre il valore a quella data viene
+  rifiutato.
 - **Il tasto centrale della tabbar, su Investimenti, è azzurro
   (`palette.invest`) e apre "Nuovo investimento"**, non più "Nuova spesa":
   prima seguiva il comportamento di sempre anche lì, ed era un errore

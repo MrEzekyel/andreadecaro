@@ -1,6 +1,8 @@
+import DateTimePicker from "@react-native-community/datetimepicker";
 import React, { useMemo, useState } from "react";
 import {
   Alert,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
@@ -74,6 +76,13 @@ export default function AssetDetailScreen({
   const [valueInput, setValueInput] = useState("");
   const [saving, setSaving] = useState(false);
 
+  const [sellSheet, setSellSheet] = useState(false);
+  const [sellAll, setSellAll] = useState(true);
+  const [sellInput, setSellInput] = useState("");
+  const [sellDate, setSellDate] = useState(new Date());
+  const [showSellDate, setShowSellDate] = useState(false);
+  const [selling, setSelling] = useState(false);
+
   const isManual = position.asset.price_source === "manual";
   const stale =
     isManual &&
@@ -122,6 +131,128 @@ export default function AssetDetailScreen({
     }
     setValueSheet(false);
     onSaved();
+  }
+
+  function openSellSheet() {
+    setSellAll(true);
+    setSellInput("");
+    setSellDate(new Date());
+    setShowSellDate(false);
+    setSellSheet(true);
+  }
+
+  /**
+   * Vendita totale o parziale, al prezzo del giorno scelto.
+   *
+   * Le quote si contano **a quella data**, non a oggi: vendere il 29 settembre
+   * qualcosa comprato il 2 ottobre lascerebbe la posizione negativa fra le due
+   * date, e il grafico del valore scenderebbe sotto zero. Vendendo tutto la
+   * quantita' e' quella esatta posseduta e non `importo / prezzo`: la
+   * divisione lascerebbe un residuo in virgola mobile, e la posizione
+   * resterebbe "aperta" con 0,0000001 quote.
+   */
+  async function saveSell() {
+    // Il giorno del calendario scelto, non quello in UTC: `toISOString` su una
+    // data scelta poco dopo mezzanotte a Roma darebbe il giorno prima.
+    const day = [
+      sellDate.getFullYear(),
+      String(sellDate.getMonth() + 1).padStart(2, "0"),
+      String(sellDate.getDate()).padStart(2, "0"),
+    ].join("-");
+    const held = investments.reduce((sum, op) => {
+      if (op.status !== "settled" || effectiveDay(op) > day) return sum;
+      const q = Number(op.quantity ?? 0);
+      return op.kind === "buy" ? sum + q : op.kind === "sell" ? sum - q : sum;
+    }, 0);
+
+    if (held < 1e-9) {
+      Alert.alert(
+        "Nessuna quota a quella data",
+        `Il ${formatDate(day)} non risultano quote di ${position.asset.name} da vendere.`
+      );
+      return;
+    }
+
+    const parsed = sellAll ? null : parseAmountInput(sellInput);
+    if (!sellAll && parsed === null) {
+      Alert.alert("Importo non valido", "Inserisci quanto hai incassato dalla vendita.");
+      return;
+    }
+
+    setSelling(true);
+    const { data: priceRow, error: priceError } = await supabase
+      .from("asset_prices")
+      .select("close_eur, on_date")
+      .eq("asset_id", position.asset.id)
+      .lte("on_date", day)
+      .order("on_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setSelling(false);
+
+    if (priceError) {
+      Alert.alert("Errore", priceError.message);
+      return;
+    }
+    if (!priceRow) {
+      Alert.alert(
+        "Nessun prezzo per questa data",
+        `Non ho un prezzo di "${position.asset.name}" a quella data, quindi non posso calcolare le quote vendute. Prova una data più recente.`
+      );
+      return;
+    }
+
+    const unitPrice = Number(priceRow.close_eur);
+    const fullValue = held * unitPrice;
+
+    if (!sellAll && parsed! > fullValue + 0.005) {
+      Alert.alert(
+        "Più di quanto possiedi",
+        `Il ${formatDate(day)} la posizione valeva ${formatAmount(fullValue)}. Per vendere tutto scegli "Tutto".`
+      );
+      return;
+    }
+
+    // Un importo parziale che arriva a meno di un centesimo dal totale e'
+    // una vendita totale scritta a mano: si chiude la posizione per intero.
+    const closesAll = sellAll || parsed! >= fullValue - 0.005;
+    const quantity = closesAll ? held : parsed! / unitPrice;
+    const amount = closesAll ? Math.round(fullValue * 100) / 100 : parsed!;
+
+    Alert.alert(
+      closesAll ? "Vendere tutto?" : "Vendere una parte?",
+      `${quantity.toFixed(6)} quote a ${formatAmount(unitPrice)} (prezzo del ${formatDate(priceRow.on_date)}) = ${formatAmount(amount)}.`,
+      [
+        { text: "Annulla", style: "cancel" },
+        {
+          text: "Vendi",
+          onPress: async () => {
+            setSelling(true);
+            const { error } = await supabase.from("investments").insert({
+              asset_id: position.asset.id,
+              label: position.asset.name,
+              amount,
+              kind: "sell",
+              quantity,
+              unit_price: unitPrice,
+              status: "settled",
+              settled_on: day,
+              // Mezzogiorno UTC, come le operazioni importate: a mezzanotte
+              // il fuso di Roma la sposterebbe al giorno prima.
+              occurred_at: `${day}T12:00:00Z`,
+              source: "manual",
+            });
+            setSelling(false);
+            if (error) {
+              Alert.alert("Non salvato", error.message);
+              return;
+            }
+            setSellSheet(false);
+            onSaved();
+          },
+        },
+      ]
+    );
   }
 
   const visible = useMemo(() => sliceSeries(series, range), [series, range]);
@@ -331,6 +462,14 @@ export default function AssetDetailScreen({
               </Text>
             </TouchableOpacity>
           )}
+          {!position.closed && (
+            <TouchableOpacity style={styles.updateRow} onPress={openSellSheet}>
+              <Icon name="banknote" size={14} color={palette.invest} />
+              <Text style={[styles.updateText, { color: palette.invest }]}>
+                Vendi tutto o una parte
+              </Text>
+            </TouchableOpacity>
+          )}
           <Fact label="Capitale versato" value={formatAmount(position.invested)} />
           {position.sold > 0 && (
             <Fact label="Disinvestito" value={formatAmount(position.sold)} />
@@ -439,6 +578,118 @@ export default function AssetDetailScreen({
           </Text>
         </TouchableOpacity>
       </Sheet>
+
+      <Sheet
+        visible={sellSheet}
+        onClose={() => setSellSheet(false)}
+        title={`Vendi ${position.asset.name}`}
+      >
+        <Text style={[styles.sheetHint, { color: palette.ink3 }]}>
+          Le quote vendute si calcolano dal prezzo del giorno della vendita.
+          Il ricavato finisce in "Disinvestito"; vendendo tutto la posizione
+          passa fra quelle chiuse, con lo storico intatto.
+        </Text>
+
+        <View style={styles.sellChips}>
+          {[
+            { all: true, label: "Tutto" },
+            { all: false, label: "Una parte" },
+          ].map((opt) => {
+            const selected = opt.all === sellAll;
+            return (
+              <TouchableOpacity
+                key={opt.label}
+                onPress={() => setSellAll(opt.all)}
+                style={[
+                  styles.sellChip,
+                  {
+                    backgroundColor: selected ? tint(palette.invest, dark) : palette.surface2,
+                    borderColor: selected ? palette.invest : "transparent",
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.sellChipLabel,
+                    { color: selected ? palette.invest : palette.ink2 },
+                  ]}
+                >
+                  {opt.label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {!sellAll && (
+          <>
+            <Text style={[styles.sellField, { color: palette.ink3 }]}>Incassato</Text>
+            <TextInput
+              value={sellInput}
+              onChangeText={setSellInput}
+              keyboardType="decimal-pad"
+              placeholder="0,00"
+              placeholderTextColor={palette.ink3}
+              style={[
+                styles.input,
+                {
+                  backgroundColor: palette.surface2,
+                  color: palette.ink,
+                  borderColor: palette.hairline,
+                },
+              ]}
+            />
+          </>
+        )}
+
+        <Text style={[styles.sellField, { color: palette.ink3 }]}>Data della vendita</Text>
+        <TouchableOpacity
+          onPress={() => setShowSellDate(true)}
+          style={[
+            styles.input,
+            { backgroundColor: palette.surface2, borderColor: palette.hairline },
+          ]}
+        >
+          <Text style={{ color: palette.ink, ...type.body }}>
+            {formatDate(sellDate.toISOString())}
+          </Text>
+        </TouchableOpacity>
+
+        {showSellDate && (
+          <>
+            <DateTimePicker
+              value={sellDate}
+              mode="date"
+              maximumDate={new Date()}
+              themeVariant={dark ? "dark" : "light"}
+              display={Platform.OS === "ios" ? "inline" : "default"}
+              onChange={(_event, selected) => {
+                if (Platform.OS !== "ios") setShowSellDate(false);
+                if (selected) setSellDate(selected);
+              }}
+            />
+            {Platform.OS === "ios" && (
+              <TouchableOpacity
+                onPress={() => setShowSellDate(false)}
+                style={styles.doneButton}
+                accessibilityRole="button"
+              >
+                <Text style={[styles.doneText, { color: palette.invest }]}>Fatto</Text>
+              </TouchableOpacity>
+            )}
+          </>
+        )}
+
+        <TouchableOpacity
+          style={[styles.save, { backgroundColor: palette.invest }]}
+          onPress={saveSell}
+          disabled={selling}
+        >
+          <Text style={[styles.saveText, { color: palette.onAccent }]}>
+            {selling ? "Un attimo…" : "Continua"}
+          </Text>
+        </TouchableOpacity>
+      </Sheet>
     </SwipeBack>
   );
 }
@@ -515,6 +766,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveText: { ...type.body, fontWeight: "500" },
+  sellChips: { flexDirection: "row", gap: space.sm },
+  sellChip: {
+    paddingVertical: 8,
+    paddingHorizontal: space.md,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+  },
+  sellChipLabel: { ...type.small, fontWeight: "500" },
+  sellField: { ...type.label, marginTop: space.md, marginBottom: space.sm },
+  doneButton: { alignSelf: "flex-end", paddingVertical: 8, paddingHorizontal: 2 },
+  doneText: { ...type.bodyMedium, fontSize: 14.5 },
   opRow: {
     flexDirection: "row",
     alignItems: "center",
