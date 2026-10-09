@@ -338,11 +338,11 @@ Deno.serve(async (req) => {
   // deve diventare la base per negare un servizio gia' pagato.
   const { data: profile } = await supabase
     .from("profiles")
-    .select("subscription_status, trial_ends_at")
+    .select("subscription_status, trial_ends_at, lifetime_access")
     .eq("user_id", userId)
     .maybeSingle();
 
-  if (profile) {
+  if (profile && !profile.lifetime_access) {
     const trialActive = new Date(profile.trial_ends_at).getTime() > Date.now();
     const subscriptionActive = profile.subscription_status === "active";
     if (!trialActive && !subscriptionActive) {

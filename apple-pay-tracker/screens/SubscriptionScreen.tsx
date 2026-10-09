@@ -49,6 +49,15 @@ export default function SubscriptionScreen({ onBack }: { onBack: () => void }) {
                   <Text style={[styles.statusHeadline, { color: palette.ink2 }]}>
                     Sto leggendo il tuo stato…
                   </Text>
+                ) : profile?.lifetime_access ? (
+                  <>
+                    <Text style={[styles.statusHeadline, { color: palette.ink }]}>
+                      Accesso a vita
+                    </Text>
+                    <Text style={[styles.statusDetail, { color: palette.ink2 }]}>
+                      L'automazione resta attiva senza abbonamento.
+                    </Text>
+                  </>
                 ) : status === "active" ? (
                   <>
                     <Text style={[styles.statusHeadline, { color: palette.ink }]}>

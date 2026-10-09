@@ -393,6 +393,8 @@ export type Profile = {
   revenuecat_app_user_id: string | null;
   referral_code: string;
   bonus_months_granted: number;
+  /** Automazione sempre attiva, senza trial ne' abbonamento (migrazione 0051). */
+  lifetime_access: boolean;
   created_at: string;
 };
 

@@ -1210,6 +1210,7 @@ export default function HomeScreen({ mode, onModeChange }: Props) {
                   </TouchableOpacity>
                 ) : (
                   subscriptionProfile?.subscription_status === "trialing" &&
+                  !subscriptionProfile.lifetime_access &&
                   trialDaysLeft !== null &&
                   trialDaysLeft <= TRIAL_WARNING_DAYS && (
                     <TouchableOpacity

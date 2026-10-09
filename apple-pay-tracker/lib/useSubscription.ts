@@ -103,7 +103,8 @@ export function useSubscription() {
   // libera: solo quando il profilo e' arrivato (fresco o in cache) si puo'
   // dire qualcosa di vero sull'automazione.
   const automationActive = profile
-    ? profile.subscription_status === "active" ||
+    ? profile.lifetime_access ||
+      profile.subscription_status === "active" ||
       (trialEndsAt !== null && trialEndsAt.getTime() > Date.now())
     : null;
 

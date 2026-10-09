@@ -98,8 +98,9 @@ export default function SettingsScreen({
     }
   }
 
-  const subscriptionValue =
-    profile?.subscription_status === "active"
+  const subscriptionValue = profile?.lifetime_access
+    ? "a vita"
+    : profile?.subscription_status === "active"
       ? "attivo"
       : automationActive === false
         ? "scaduto"
